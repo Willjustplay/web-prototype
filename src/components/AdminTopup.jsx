@@ -62,6 +62,9 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
   const [orderFilter, setOrderFilter] = useState("all");
   const [integration, setIntegration] = useState(null);
   const [busy, setBusy] = useState("");
+  const [pullVendorKind, setPullVendorKind] = useState("digiflazz");
+  const [pullMargin, setPullMargin] = useState(0);
+  const [pullCatalogOpen, setPullCatalogOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -223,6 +226,36 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
     }
   };
 
+  const pullDirectFromMerchant = async (opts = {}) => {
+    const vKind = opts.vendor_kind || pullVendorKind || "digiflazz";
+    const marginVal = opts.margin_percent !== undefined ? Number(opts.margin_percent) : Number(pullMargin) || 0;
+    setBusy(`pull-${vKind}`);
+    try {
+      const { data } = await api.post(
+        "/admin/topup/pull-merchant",
+        {
+          vendor_kind: vKind,
+          provider_id: opts.provider_id,
+          game_slugs: opts.game_slugs,
+          margin_percent: marginVal,
+          use_recommended_price: marginVal <= 0,
+          auto_activate_vendor: true,
+        },
+        { headers }
+      );
+      toast.success(
+        data.message ||
+          `Berhasil menarik ${data.games_total} game & ${data.denominations_pulled} nominal dari ${data.vendor_name}!`
+      );
+      setPullCatalogOpen(false);
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal menarik produk dari merchant");
+    } finally {
+      setBusy("");
+    }
+  };
+
   // ------------------------------------------------------------ order actions
   const orderAction = async (o, action, body = {}) => {
     setBusy(o.session_id);
@@ -367,6 +400,14 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
           {subTab === "games" && (
             <>
               <button
+                onClick={() => pullDirectFromMerchant({ vendor_kind: pullVendorKind })}
+                disabled={busy.startsWith("pull-")}
+                data-testid="admin-topup-quick-pull"
+                className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-lime text-void hover:bg-neon px-3.5 py-2 transition-colors disabled:opacity-50"
+              >
+                {busy.startsWith("pull-") ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />} Tarik dari Digiflazz / Merchant
+              </button>
+              <button
                 onClick={syncAll}
                 disabled={busy === "sync"}
                 data-testid="admin-topup-sync"
@@ -384,13 +425,22 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
             </>
           )}
           {subTab === "vendors" && (
-            <button
-              onClick={() => openVendor(null)}
-              data-testid="admin-topup-add-vendor"
-              className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-neon text-void hover:bg-lime px-4 py-2 transition-colors"
-            >
-              <Plus size={13} /> Supplier Baru
-            </button>
+            <>
+              <button
+                onClick={() => setPullCatalogOpen(true)}
+                data-testid="admin-topup-open-merchant-catalog"
+                className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-lime text-void hover:bg-neon px-3.5 py-2 transition-colors"
+              >
+                <Download size={13} /> Tarik Katalog Merchant
+              </button>
+              <button
+                onClick={() => openVendor(null)}
+                data-testid="admin-topup-add-vendor"
+                className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-neon text-void hover:bg-lime px-4 py-2 transition-colors"
+              >
+                <Plus size={13} /> Supplier Baru
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -403,7 +453,94 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
 
       {/* ------------------------------------------------ games & denominations */}
       {!loading && subTab === "games" && (
-        <div className="border border-line bg-panel overflow-x-auto" data-testid="admin-topup-games-table">
+        <div className="space-y-4">
+          {/* One-Click Direct Merchant Pull Banner (Zero Setup Required) */}
+          <div
+            data-testid="admin-topup-merchant-pull-bar"
+            className="border border-neon/40 bg-gradient-to-r from-neon/10 via-panel to-lime/5 p-4"
+          >
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-widest bg-lime/15 text-lime border border-lime/40 px-2 py-0.5">
+                    <Zap size={10} /> TANPA SETTING MANUAL
+                  </span>
+                  <h3 className="font-display font-bold text-sm uppercase tracking-wider text-slate-100">
+                    Tarik Produk Top Up Langsung dari Merchant
+                  </h3>
+                </div>
+                <p className="text-[11px] font-mono text-slate-400 mt-1">
+                  Tarik otomatis daftar game populer, nominal diamond/voucher, harga modal & jual, field User ID/Server, serta SKU langsung dari{" "}
+                  <span className="text-neon font-bold">Digiflazz</span>, <span className="text-slate-200">VIP Reseller</span>, <span className="text-slate-200">ApiGames</span>, atau <span className="text-slate-200">TokoVoucher</span> hanya dengan 1 klik.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap sm:flex-nowrap items-end gap-2.5 shrink-0">
+                <div className="w-full sm:w-44">
+                  <label className="block text-[9px] font-mono uppercase tracking-widest text-slate-400 mb-1">
+                    Pilih Merchant
+                  </label>
+                  <select
+                    value={pullVendorKind}
+                    onChange={(e) => setPullVendorKind(e.target.value)}
+                    data-testid="merchant-pull-select-vendor"
+                    className="w-full bg-void border border-line focus:border-neon text-xs font-mono text-slate-100 px-2.5 py-2 outline-none"
+                  >
+                    <option value="digiflazz">Digiflazz Indonesia</option>
+                    <option value="vipreseller">VIP Reseller (VIP Payment)</option>
+                    <option value="apigames">ApiGames Official</option>
+                    <option value="tokovoucher">TokoVoucher H2H</option>
+                    <option value="lapakgaming">LapakGaming / SmileOne</option>
+                  </select>
+                </div>
+
+                <div className="w-full sm:w-40">
+                  <label className="block text-[9px] font-mono uppercase tracking-widest text-slate-400 mb-1">
+                    Aturan Harga Jual
+                  </label>
+                  <select
+                    value={pullMargin}
+                    onChange={(e) => setPullMargin(Number(e.target.value))}
+                    data-testid="merchant-pull-select-margin"
+                    className="w-full bg-void border border-line focus:border-neon text-xs font-mono text-slate-100 px-2.5 py-2 outline-none"
+                  >
+                    <option value={0}>Harga Rekomendasi</option>
+                    <option value={5}>Modal + Margin 5%</option>
+                    <option value={8}>Modal + Margin 8%</option>
+                    <option value={10}>Modal + Margin 10%</option>
+                    <option value={15}>Modal + Margin 15%</option>
+                    <option value={20}>Modal + Margin 20%</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => pullDirectFromMerchant({ vendor_kind: pullVendorKind, margin_percent: pullMargin })}
+                  disabled={busy.startsWith("pull-")}
+                  data-testid="merchant-pull-all-btn"
+                  className="inline-flex items-center justify-center gap-2 bg-neon text-void hover:bg-lime font-display font-bold text-[11px] uppercase tracking-wider px-4 py-2.5 transition-colors disabled:opacity-50 whitespace-nowrap"
+                >
+                  {busy.startsWith("pull-") ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Zap size={13} />
+                  )}
+                  Tarik Semua Produk (1-Klik)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPullCatalogOpen(true)}
+                  data-testid="merchant-pull-choose-btn"
+                  className="inline-flex items-center justify-center gap-1.5 border border-neon/50 text-neon hover:bg-neon/10 font-mono font-bold text-[11px] uppercase tracking-wider px-3.5 py-2.5 transition-colors whitespace-nowrap"
+                >
+                  <Download size={13} /> Pilih Game
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-line bg-panel overflow-x-auto" data-testid="admin-topup-games-table">
           {games.length === 0 ? (
             <p className="text-center text-xs text-slate-500 font-mono py-16">Belum ada game top up.</p>
           ) : (
@@ -486,6 +623,7 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
               </tbody>
             </table>
           )}
+          </div>
         </div>
       )}
 
@@ -673,6 +811,16 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
                     )}
                   </div>
                   <div className="mt-4 flex flex-wrap gap-1.5">
+                    {v.kind !== "manual" && (
+                      <button
+                        onClick={() => pullDirectFromMerchant({ vendor_kind: v.kind, provider_id: v.id })}
+                        disabled={busy === `pull-${v.kind}` || busy === v.id}
+                        data-testid={`admin-topup-vendor-pull-${v.kind}`}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest bg-neon text-void hover:bg-lime px-2.5 py-1.5 transition-colors disabled:opacity-50"
+                      >
+                        {busy === `pull-${v.kind}` ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />} Tarik Produk
+                      </button>
+                    )}
                     <button onClick={() => openVendor(v)} data-testid={`admin-topup-vendor-edit-${v.kind}`} className="text-[10px] uppercase tracking-widest border border-line text-slate-400 hover:text-neon px-2 py-1.5 transition-colors">Edit</button>
                     <button onClick={() => vendorOp(v, v.is_active ? "deactivate" : "activate")} disabled={busy === v.id} className="text-[10px] uppercase tracking-widest border border-line text-slate-400 hover:text-neon px-2 py-1.5 transition-colors disabled:opacity-50">
                       {v.is_active ? "Nonaktifkan" : "Aktifkan"}
@@ -1012,6 +1160,16 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
         />
       )}
 
+      {pullCatalogOpen && (
+        <MerchantPullDialog
+          initialVendorKind={pullVendorKind}
+          initialMargin={pullMargin}
+          headers={headers}
+          onClose={() => setPullCatalogOpen(false)}
+          onDone={() => { setPullCatalogOpen(false); load(); }}
+        />
+      )}
+
       {proofUrl && (
         <div className="fixed inset-0 z-50 bg-void/80 backdrop-blur-sm grid place-items-center p-4" onClick={() => setProofUrl(null)} data-testid="admin-topup-proof-dialog">
           <div className="bg-panel border border-line p-3 max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
@@ -1024,12 +1182,266 @@ export const AdminTopup = ({ headers, sections, defaultSection }) => {
   );
 };
 
+/** Modal for browsing & pulling complete games and denominations directly from Digiflazz / other merchants without setup. */
+const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 0, headers, onClose, onDone }) => {
+  const [vendorKind, setVendorKind] = useState(initialVendorKind || "digiflazz");
+  const [marginPercent, setMarginPercent] = useState(initialMargin || 0);
+  const [catalogGames, setCatalogGames] = useState([]);
+  const [selectedSlugs, setSelectedSlugs] = useState([]);
+  const [expandedSlug, setExpandedSlug] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [pulling, setPulling] = useState(false);
+
+  const loadCatalog = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/admin/topup/merchant-catalog", {
+        headers,
+        params: { vendor_kind: vendorKind, margin_percent: marginPercent },
+      });
+      const list = Array.isArray(data?.games) ? data.games : [];
+      setCatalogGames(list);
+      setSelectedSlugs((prev) => (prev.length > 0 ? prev : list.map((g) => g.slug)));
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal memuat katalog merchant");
+    } finally {
+      setLoading(false);
+    }
+  }, [vendorKind, marginPercent, headers]);
+
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
+
+  const toggleSlug = (slug) => {
+    setSelectedSlugs((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedSlugs.length === catalogGames.length) {
+      setSelectedSlugs([]);
+    } else {
+      setSelectedSlugs(catalogGames.map((g) => g.slug));
+    }
+  };
+
+  const handlePull = async (pullAll = false) => {
+    const slugs = pullAll ? catalogGames.map((g) => g.slug) : selectedSlugs;
+    if (!slugs.length) {
+      toast.error("Pilih minimal 1 game untuk ditarik");
+      return;
+    }
+    setPulling(true);
+    try {
+      const { data } = await api.post(
+        "/admin/topup/pull-merchant",
+        {
+          vendor_kind: vendorKind,
+          game_slugs: slugs,
+          margin_percent: Number(marginPercent) || 0,
+          use_recommended_price: Number(marginPercent) <= 0,
+          auto_activate_vendor: true,
+        },
+        { headers }
+      );
+      toast.success(data.message || "Produk berhasil ditarik dari merchant!");
+      onDone();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal menarik produk");
+    } finally {
+      setPulling(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-void/80 backdrop-blur-sm overflow-y-auto p-4" data-testid="admin-topup-merchant-catalog-dialog" data-lenis-prevent>
+      <div className="max-w-4xl mx-auto my-6 bg-panel border border-line">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-mono font-bold uppercase tracking-widest bg-lime/15 text-lime border border-lime/40 px-2 py-0.5">
+                INSTAN & TANPA KONFIGURASI
+              </span>
+              <h3 className="font-display font-bold uppercase text-sm">
+                Tarik Katalog Produk dari Merchant
+              </h3>
+            </div>
+            <p className="text-[10px] font-mono text-slate-400 mt-1">
+              Pilih merchant & game yang ingin langsung ditarik ke katalog Top Up Anda lengkap dengan nominal, harga, dan SKU.
+            </p>
+          </div>
+          <button onClick={onClose} aria-label="Tutup" className="text-slate-400 hover:text-coral">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="grid sm:grid-cols-3 gap-4 bg-void/60 border border-line p-3.5">
+            <div>
+              <label className={labelCls}>Sumber Merchant</label>
+              <select
+                value={vendorKind}
+                onChange={(e) => setVendorKind(e.target.value)}
+                data-testid="dialog-merchant-vendor"
+                className={inputCls}
+              >
+                <option value="digiflazz">Digiflazz Indonesia (Rekomendasi)</option>
+                <option value="vipreseller">VIP Reseller (VIP Payment)</option>
+                <option value="apigames">ApiGames Official</option>
+                <option value="tokovoucher">TokoVoucher H2H</option>
+                <option value="lapakgaming">LapakGaming / SmileOne</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Margin Keuntungan Otomatis</label>
+              <select
+                value={marginPercent}
+                onChange={(e) => setMarginPercent(Number(e.target.value))}
+                data-testid="dialog-merchant-margin"
+                className={inputCls}
+              >
+                <option value={0}>Harga Jual Rekomendasi Pasar</option>
+                <option value={5}>Harga Modal + 5%</option>
+                <option value={8}>Harga Modal + 8%</option>
+                <option value={10}>Harga Modal + 10%</option>
+                <option value={15}>Harga Modal + 15%</option>
+                <option value={20}>Harga Modal + 20%</option>
+              </select>
+            </div>
+            <div className="flex flex-col justify-end">
+              <button
+                type="button"
+                onClick={toggleAll}
+                className="w-full border border-line hover:border-neon/60 text-slate-300 hover:text-neon text-[11px] font-mono uppercase tracking-widest py-2.5 px-3 transition-colors"
+              >
+                {selectedSlugs.length === catalogGames.length ? "Batalkan Semua Pilihan" : `Pilih Semua (${catalogGames.length} Game)`}
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-xs font-mono text-slate-400">
+              <Loader2 size={15} className="animate-spin text-neon" /> Memuat katalog produk dari {vendorKind.toUpperCase()}...
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-3">
+              {catalogGames.map((g) => {
+                const checked = selectedSlugs.includes(g.slug);
+                const expanded = expandedSlug === g.slug;
+                return (
+                  <div
+                    key={g.slug}
+                    data-testid={`merchant-catalog-game-${g.slug}`}
+                    className={`border transition-colors p-3.5 ${
+                      checked ? "border-neon/60 bg-neon/5" : "border-line bg-void/40"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <label className="flex items-start gap-3 cursor-pointer flex-1">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleSlug(g.slug)}
+                          className="mt-1"
+                        />
+                        <img
+                          src={g.icon}
+                          alt={g.name}
+                          className="w-10 h-10 object-cover border border-line shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-display font-bold text-xs text-slate-100 truncate">
+                            {g.name}
+                          </p>
+                          <p className="text-[10px] font-mono text-slate-400">
+                            {g.publisher} • {g.denomination_count} Nominal ({g.currency})
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-[9px] font-mono text-neon border border-neon/30 bg-neon/10 px-1.5 py-0.5">
+                              Prefix: {g.vendor_prefix}
+                            </span>
+                            {g.already_added && (
+                              <span className="text-[9px] font-mono text-lime border border-lime/30 bg-lime/10 px-1.5 py-0.5">
+                                Terdaftar ({g.existing_denom_count} item)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSlug(expanded ? "" : g.slug)}
+                        className="text-[10px] font-mono text-slate-400 hover:text-neon underline shrink-0"
+                      >
+                        {expanded ? "Tutup" : "Lihat SKU"}
+                      </button>
+                    </div>
+
+                    {expanded && (
+                      <div className="mt-3 pt-3 border-t border-line/60 space-y-1.5 max-h-44 overflow-y-auto">
+                        {g.denominations.map((d) => (
+                          <div
+                            key={d.code}
+                            className="flex items-center justify-between text-[10px] font-mono bg-void/80 px-2.5 py-1.5 border border-line/50"
+                          >
+                            <div>
+                              <span className="text-neon font-bold">{d.sku}</span>{" "}
+                              <span className="text-slate-300">{d.label}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-slate-500 line-through mr-2">
+                                Modal {formatIDR(d.modal_price)}
+                              </span>
+                              <span className="text-lime font-bold">
+                                Jual {formatIDR(d.selling_price)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-t border-line bg-void/40">
+          <p className="text-[11px] font-mono text-slate-400">
+            Terpilih: <strong className="text-neon">{selectedSlugs.length}</strong> dari {catalogGames.length} game
+          </p>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={onClose}
+              className="text-[11px] font-mono uppercase tracking-widest text-slate-400 hover:text-slate-200 px-4 py-2.5"
+            >
+              Batal
+            </button>
+            <button
+              onClick={() => handlePull(false)}
+              disabled={pulling || selectedSlugs.length === 0}
+              data-testid="dialog-merchant-pull-selected"
+              className="inline-flex items-center gap-2 bg-neon text-void font-display font-bold text-[11px] uppercase tracking-wider px-5 py-2.5 hover:bg-lime transition-colors disabled:opacity-50"
+            >
+              {pulling ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+              Tarik {selectedSlugs.length} Game Terpilih
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /** Bulk-attach supplier SKUs to a game's denominations. */
 const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
-  const [providerId, setProviderId] = useState(vendors.find((v) => v.kind !== "manual")?.id || "");
+  const [providerId, setProviderId] = useState(vendors.find((v) => v.kind === "digiflazz")?.id || vendors.find((v) => v.kind !== "manual")?.id || "");
   const [skuMap, setSkuMap] = useState({});
   const [marginPercent, setMarginPercent] = useState(0);
-  const [applyPrice, setApplyPrice] = useState(false);
+  const [applyPrice, setApplyPrice] = useState(true);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1042,7 +1454,7 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
     try {
       const brand = game.vendor_prefix || game.name;
       const { data } = await api.get(`/admin/topup/vendors/${providerId}/products`, {
-        headers, params: { q: game.vendor_prefix || "", limit: 200 },
+        headers, params: { q: game.vendor_prefix || game.slug || "", limit: 200 },
       });
       const list = data.products || [];
       setRows(list);
@@ -1057,11 +1469,12 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
               const exact = list.find(
                 (r) =>
                   r.sku === d.vendor_sku ||
+                  String(r.code || "").toLowerCase() === String(d.code).toLowerCase() ||
                   String(r.sku).toLowerCase().endsWith(String(d.code).toLowerCase())
               );
               const fallback = list[idx] || list[0];
               const chosen = exact || fallback;
-              if (chosen) next[d.code] = { sku: chosen.sku, price: chosen.price };
+              if (chosen) next[d.code] = { sku: chosen.sku, price: chosen.price, retail_price: chosen.retail_price };
             }
           });
           return next;
@@ -1073,7 +1486,7 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
     } finally {
       setLoading(false);
     }
-  }, [providerId, headers, game.vendor_prefix, game.name, game.denominations]);
+  }, [providerId, headers, game.vendor_prefix, game.slug, game.name, game.denominations]);
 
   useEffect(() => {
     if (providerId) loadProducts();
@@ -1081,8 +1494,25 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
 
   const pick = (code, row) => setSkuMap((m) => ({
     ...m,
-    [code]: { sku: row.sku, price: row.price },
+    [code]: { sku: row.sku, price: row.price, retail_price: row.retail_price },
   }));
+
+  const autoPullThisGame = async () => {
+    setSaving(true);
+    try {
+      const { data } = await api.post(`/admin/topup/games/${game.id}/import`, {
+        provider_id: providerId,
+        auto_pull_all: true,
+        margin_percent: Number(marginPercent) || 0,
+      }, { headers });
+      toast.success(data.message || `Semua nominal ${game.name} berhasil ditarik dari merchant!`);
+      onDone();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal menarik nominal otomatis");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const save = async () => {
     if (!Object.keys(skuMap).length) {
@@ -1109,13 +1539,34 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
       <div className="max-w-3xl mx-auto my-8 bg-panel border border-line">
         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
           <div>
-            <h3 className="font-display font-bold uppercase text-sm">Impor SKU Supplier</h3>
+            <h3 className="font-display font-bold uppercase text-sm">Tarik & Impor SKU Supplier</h3>
             <p className="text-[10px] font-mono text-slate-500 mt-0.5">{game.name}</p>
           </div>
           <button onClick={onClose} aria-label="Tutup" data-testid="import-close" className="text-slate-400 hover:text-coral"><X size={16} /></button>
         </div>
 
         <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+          <div className="border border-lime/40 bg-lime/5 p-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-display font-bold text-lime uppercase">
+                Tarik Otomatis Semua Nominal {game.name}
+              </p>
+              <p className="text-[10px] font-mono text-slate-400">
+                Langsung tarik seluruh daftar nominal lengkap beserta harga & SKU dari merchant tanpa pilih satu-satu.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={autoPullThisGame}
+              disabled={saving}
+              data-testid="import-auto-pull-game"
+              className="inline-flex items-center gap-1.5 bg-lime text-void hover:bg-neon font-display font-bold text-[10px] uppercase tracking-wider px-3.5 py-2 transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+              Tarik Semua Nominal Otomatis
+            </button>
+          </div>
+
           <div className="grid sm:grid-cols-3 gap-4">
             <div>
               <label htmlFor="imp-vendor" className={labelCls}>Supplier</label>
@@ -1181,7 +1632,7 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-line">
           <button onClick={onClose} className="text-[11px] font-mono uppercase tracking-widest text-slate-400 hover:text-slate-200 px-4 py-2.5">Batal</button>
           <button onClick={save} disabled={saving} data-testid="import-save" className="inline-flex items-center gap-2 bg-neon text-void font-display font-bold text-[11px] uppercase tracking-[0.2em] px-5 py-2.5 hover:bg-lime transition-colors disabled:opacity-60">
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Impor SKU
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Simpan Pemetaan SKU
           </button>
         </div>
       </div>

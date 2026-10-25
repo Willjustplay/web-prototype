@@ -531,7 +531,7 @@ function initDatabase() {
       kind: "manual",
       name: "Manual (Admin)",
       config: {},
-      is_active: true,
+      is_active: false,
       auto_dispatch: false,
       seq: 0,
       last_test: { ok: true, message: "Mode manual siap digunakan", at: nowIso() },
@@ -548,7 +548,7 @@ function initDatabase() {
         use_dev: false,
         brand_override: "",
       },
-      is_active: false,
+      is_active: true,
       auto_dispatch: true,
       seq: 1,
       cached_balance: 15750000,
@@ -603,6 +603,21 @@ function initDatabase() {
       created_at: nowIso(),
     },
     {
+      id: "vp-lapakgaming",
+      kind: "lapakgaming",
+      name: "LapakGaming / SmileOne",
+      config: {
+        partner_id: process.env.LAPAKGAMING_PARTNER_ID || "LG-WJP7721",
+        api_key: process.env.LAPAKGAMING_API_KEY || "lg_live_88291044aa11",
+      },
+      is_active: false,
+      auto_dispatch: true,
+      seq: 5,
+      cached_balance: 11500000,
+      last_test: { ok: true, message: "LapakGaming / SmileOne terhubung & siap memproses transaksi", at: nowIso() },
+      created_at: nowIso(),
+    },
+    {
       id: "vp-http",
       kind: "http",
       name: "Custom Merchant API",
@@ -615,7 +630,7 @@ function initDatabase() {
       },
       is_active: false,
       auto_dispatch: true,
-      seq: 5,
+      seq: 6,
       cached_balance: 5000000,
       last_test: { ok: true, message: "Custom Merchant API terhubung & siap digunakan", at: nowIso() },
       created_at: nowIso(),
@@ -648,6 +663,16 @@ function initDatabase() {
           message: `${v.name || v.kind} terhubung & siap memproses transaksi`,
           at: nowIso(),
         };
+      }
+    }
+    // If only manual was active by default, activate Digiflazz out-of-the-box so admin doesn't need manual setup
+    const activeNonManual = db.topup_providers.some((v) => v.is_active && v.kind !== "manual");
+    if (!activeNonManual) {
+      const df = db.topup_providers.find((v) => v.kind === "digiflazz");
+      if (df) {
+        for (const v of db.topup_providers) v.is_active = false;
+        df.is_active = true;
+        df.auto_dispatch = true;
       }
     }
   }
@@ -2138,24 +2163,289 @@ function buildQrDataUri(label: string, refId: string, amount: number): string {
   return `data:image/svg+xml;base64,${Buffer.from(svg, "utf-8").toString("base64")}`;
 }
 
-function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 200) {
+const MERCHANT_MASTER_GAMES = [
+  {
+    slug: "mobile-legends",
+    name: "Mobile Legends: Bang Bang",
+    publisher: "Moonton",
+    currency: "Diamond",
+    vendor_prefix: "ML",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan User ID dan Zone ID Mobile Legends Anda dengan benar.",
+    delivery_info: "Diamond masuk otomatis ke akun Mobile Legends Anda dalam 1-5 detik.",
+    fields: [
+      { key: "user_id", label: "User ID", placeholder: "123456789", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 15, pattern: "^[0-9]{5,15}$", help: "Masukkan angka User ID" },
+      { key: "zone_id", label: "Zone ID", placeholder: "1234", type: "text", inputmode: "numeric", required: true, min_len: 3, max_len: 6, pattern: "^[0-9]{3,6}$", help: "Masukkan angka Zone ID (di dalam kurung)" },
+    ],
+    denominations: [
+      { code: "WDP", label: "Weekly Diamond Pass", amount: 220, modal: 25500, price: 28000, price_strike: 32000, badge: "Terlaris", featured: true },
+      { code: "28", label: "28 Diamonds", amount: 28, modal: 7400, price: 8500, price_strike: 10000, badge: "" },
+      { code: "59", label: "59 Diamonds", amount: 59, modal: 14800, price: 16500, price_strike: 19000, badge: "" },
+      { code: "86", label: "86 Diamonds", amount: 86, modal: 19500, price: 22000, price_strike: 25000, badge: "Populer", featured: true },
+      { code: "172", label: "172 Diamonds", amount: 172, modal: 38500, price: 43000, price_strike: 48000, badge: "Populer" },
+      { code: "257", label: "257 Diamonds", amount: 257, modal: 57500, price: 64000, price_strike: 72000, badge: "" },
+      { code: "344", label: "344 Diamonds", amount: 344, modal: 76500, price: 85000, price_strike: 95000, badge: "" },
+      { code: "429", label: "429 Diamonds", amount: 429, modal: 95500, price: 105000, price_strike: 118000, badge: "" },
+      { code: "706", label: "706 Diamonds", amount: 706, modal: 152000, price: 168000, price_strike: 185000, badge: "Hemat", featured: true },
+      { code: "2195", label: "2195 Diamonds", amount: 2195, modal: 455000, price: 499000, price_strike: 545000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "free-fire",
+    name: "Free Fire / Free Fire MAX",
+    publisher: "Garena",
+    currency: "Diamond",
+    vendor_prefix: "FF",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Player ID Free Fire Anda (tanpa perlu login).",
+    delivery_info: "Diamond Free Fire masuk instan via Player ID.",
+    fields: [
+      { key: "user_id", label: "Player ID", placeholder: "1234567890", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka Player ID Free Fire" },
+    ],
+    denominations: [
+      { code: "MM", label: "Membership Mingguan", amount: 450, modal: 27000, price: 30000, price_strike: 35000, badge: "Terlaris", featured: true },
+      { code: "MB", label: "Membership Bulanan", amount: 2600, modal: 81000, price: 89000, price_strike: 100000, badge: "Hemat" },
+      { code: "50", label: "50 Diamonds", amount: 50, modal: 6800, price: 8000, price_strike: 9500, badge: "" },
+      { code: "70", label: "70 Diamonds", amount: 70, modal: 9200, price: 10500, price_strike: 12000, badge: "Populer" },
+      { code: "140", label: "140 Diamonds", amount: 140, modal: 18200, price: 20500, price_strike: 23000, badge: "Populer", featured: true },
+      { code: "355", label: "355 Diamonds", amount: 355, modal: 44500, price: 49500, price_strike: 55000, badge: "" },
+      { code: "720", label: "720 Diamonds", amount: 720, modal: 88500, price: 98000, price_strike: 110000, badge: "Hemat", featured: true },
+      { code: "1450", label: "1450 Diamonds", amount: 1450, modal: 176000, price: 195000, price_strike: 215000, badge: "" },
+      { code: "2180", label: "2180 Diamonds", amount: 2180, modal: 265000, price: 292000, price_strike: 325000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "genshin-impact",
+    name: "Genshin Impact",
+    publisher: "HoYoverse",
+    currency: "Genesis Crystal",
+    vendor_prefix: "GI",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan UID Genshin Impact (biasanya diawali angka 8 untuk server Asia) dan Server.",
+    delivery_info: "Genesis Crystal / Welkin Moon masuk otomatis ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
+      { key: "server", label: "Server", placeholder: "Asia / America / Europe / TW,HK,MO", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", help: "Contoh: Asia" },
+    ],
+    denominations: [
+      { code: "WELKIN", label: "Blessing of the Welkin Moon", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
+      { code: "60", label: "60 Genesis Crystals", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
+      { code: "300", label: "300+30 Genesis Crystals", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer", featured: true },
+      { code: "980", label: "980+110 Genesis Crystals", amount: 1090, modal: 172000, price: 192000, price_strike: 249000, badge: "Hemat" },
+      { code: "1980", label: "1980+260 Genesis Crystals", amount: 2240, modal: 372000, price: 410000, price_strike: 479000, badge: "" },
+      { code: "3280", label: "3280+600 Genesis Crystals", amount: 3880, modal: 575000, price: 635000, price_strike: 799000, badge: "" },
+      { code: "6480", label: "6480+1600 Genesis Crystals", amount: 8080, modal: 1150000, price: 1250000, price_strike: 1599000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "pubg-mobile",
+    name: "PUBG Mobile",
+    publisher: "Tencent / Krafton",
+    currency: "UC",
+    vendor_prefix: "PUBG",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Player ID PUBG Mobile Anda (Region Indonesia / Global).",
+    delivery_info: "UC PUBG Mobile masuk instan ke karakter Anda.",
+    fields: [
+      { key: "user_id", label: "Player ID", placeholder: "5123456789", type: "text", inputmode: "numeric", required: true, min_len: 7, max_len: 14, pattern: "^[0-9]{7,14}$", help: "Masukkan angka Player ID PUBG Mobile" },
+    ],
+    denominations: [
+      { code: "60", label: "60 UC", amount: 60, modal: 13800, price: 15500, price_strike: 18000, badge: "Populer" },
+      { code: "325", label: "325 UC", amount: 325, modal: 69000, price: 76000, price_strike: 85000, badge: "Terlaris", featured: true },
+      { code: "660", label: "660 UC", amount: 660, modal: 138000, price: 152000, price_strike: 170000, badge: "Hemat", featured: true },
+      { code: "1800", label: "1800 UC", amount: 1800, modal: 342000, price: 375000, price_strike: 420000, badge: "" },
+      { code: "3850", label: "3850 UC", amount: 3850, modal: 680000, price: 745000, price_strike: 820000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "valorant",
+    name: "Valorant",
+    publisher: "Riot Games",
+    currency: "Valorant Points",
+    vendor_prefix: "VAL",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1560253023-3ec5d502959f?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1560253023-3ec5d502959f?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Riot ID beserta Tagline (Contoh: Player#IDN).",
+    delivery_info: "Valorant Points (VP) masuk instan ke akun Riot Games Anda.",
+    fields: [
+      { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, pattern: "", help: "Format: Nickname#Tag" },
+    ],
+    denominations: [
+      { code: "475", label: "475 Valorant Points", amount: 475, modal: 51000, price: 56000, price_strike: 62000, badge: "Populer" },
+      { code: "1000", label: "1000 Valorant Points", amount: 1000, modal: 102000, price: 112000, price_strike: 125000, badge: "Terlaris", featured: true },
+      { code: "2050", label: "2050 Valorant Points", amount: 2050, modal: 204000, price: 222000, price_strike: 245000, badge: "Hemat", featured: true },
+      { code: "3650", label: "3650 Valorant Points", amount: 3650, modal: 348000, price: 379000, price_strike: 415000, badge: "" },
+      { code: "5350", label: "5350 Valorant Points", amount: 5350, modal: 502000, price: 545000, price_strike: 599000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "honor-of-kings",
+    name: "Honor of Kings",
+    publisher: "Tencent / Level Infinite",
+    currency: "Tokens",
+    vendor_prefix: "HOK",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Player UID Honor of Kings Anda.",
+    delivery_info: "Tokens Honor of Kings masuk otomatis ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "Player UID", placeholder: "1234567890123", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka UID Honor of Kings" },
+    ],
+    denominations: [
+      { code: "WC", label: "Weekly Card", amount: 180, modal: 14000, price: 16500, price_strike: 20000, badge: "Terlaris", featured: true },
+      { code: "80", label: "80 Tokens", amount: 80, modal: 14500, price: 16500, price_strike: 19000, badge: "Populer" },
+      { code: "240", label: "240 Tokens", amount: 240, modal: 43000, price: 48000, price_strike: 54000, badge: "Populer", featured: true },
+      { code: "400", label: "400 Tokens", amount: 400, modal: 71500, price: 79000, price_strike: 89000, badge: "" },
+      { code: "560", label: "560 Tokens", amount: 560, modal: 100000, price: 110000, price_strike: 125000, badge: "Hemat" },
+      { code: "1200", label: "1200 Tokens", amount: 1200, modal: 212000, price: 235000, price_strike: 265000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "honkai-star-rail",
+    name: "Honkai: Star Rail",
+    publisher: "HoYoverse",
+    currency: "Oneiric Shard",
+    vendor_prefix: "HSR",
+    featured: false,
+    icon: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan UID Honkai: Star Rail dan Server (Contoh: Asia).",
+    delivery_info: "Oneiric Shard / Express Supply Pass masuk instan ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
+      { key: "server", label: "Server", placeholder: "Asia", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", help: "Asia / America / Europe" },
+    ],
+    denominations: [
+      { code: "PASS", label: "Express Supply Pass", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
+      { code: "60", label: "60 Oneiric Shards", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
+      { code: "300", label: "300+30 Oneiric Shards", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer" },
+      { code: "980", label: "980+110 Oneiric Shards", amount: 1090, modal: 172000, price: 192000, price_strike: 249000, badge: "Hemat" },
+      { code: "1980", label: "1980+260 Oneiric Shards", amount: 2240, modal: 372000, price: 410000, price_strike: 479000, badge: "" },
+    ],
+  },
+  {
+    slug: "roblox",
+    name: "Roblox",
+    publisher: "Roblox Corporation",
+    currency: "Robux",
+    vendor_prefix: "RBX",
+    featured: false,
+    icon: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Username Roblox atau nomor tujuan untuk pengiriman voucher Robux.",
+    delivery_info: "Robux / Kode Voucher Roblox dikirim otomatis setelah pembayaran.",
+    fields: [
+      { key: "user_id", label: "Username Roblox", placeholder: "UsernameRoblox", type: "text", inputmode: "text", required: true, min_len: 3, max_len: 30, pattern: "", help: "Masukkan Username Roblox Anda" },
+    ],
+    denominations: [
+      { code: "80", label: "80 Robux", amount: 80, modal: 17500, price: 20000, price_strike: 24000, badge: "Populer" },
+      { code: "400", label: "400 Robux", amount: 400, modal: 74000, price: 82000, price_strike: 95000, badge: "Terlaris", featured: true },
+      { code: "800", label: "800 Robux", amount: 800, modal: 146000, price: 162000, price_strike: 185000, badge: "Hemat" },
+      { code: "1700", label: "1700 Robux", amount: 1700, modal: 292000, price: 320000, price_strike: 360000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "call-of-duty-mobile",
+    name: "Call of Duty: Mobile",
+    publisher: "Garena / Activision",
+    currency: "CP",
+    vendor_prefix: "CODM",
+    featured: false,
+    icon: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan OpenID / Player ID Call of Duty Mobile Anda.",
+    delivery_info: "CP Call of Duty Mobile masuk instan ke akun Anda.",
+    fields: [
+      { key: "user_id", label: "OpenID / Player ID", placeholder: "123456789012345", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 22, pattern: "^[0-9]{6,22}$", help: "Masukkan OpenID di menu pengaturan CODM" },
+    ],
+    denominations: [
+      { code: "63", label: "63 CP", amount: 63, modal: 9000, price: 10500, price_strike: 12000, badge: "" },
+      { code: "128", label: "128 CP", amount: 128, modal: 18000, price: 20500, price_strike: 24000, badge: "Populer" },
+      { code: "321", label: "321 CP", amount: 321, modal: 44500, price: 49500, price_strike: 56000, badge: "Terlaris", featured: true },
+      { code: "645", label: "645 CP", amount: 645, modal: 89000, price: 98000, price_strike: 112000, badge: "Hemat" },
+    ],
+  },
+  {
+    slug: "steam-wallet",
+    name: "Steam Wallet IDR",
+    publisher: "Valve Corporation",
+    currency: "Voucher IDR",
+    vendor_prefix: "SW",
+    featured: false,
+    icon: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Nomor WhatsApp atau ID penerima untuk pengiriman kode voucher Steam Wallet IDR.",
+    delivery_info: "Kode Voucher Steam Wallet IDR dikirim otomatis dan tampil di halaman pesanan.",
+    fields: [
+      { key: "user_id", label: "Nomor WhatsApp / ID Penerima", placeholder: "081234567890", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 20, pattern: "", help: "Nomor penerima voucher" },
+    ],
+    denominations: [
+      { code: "12", label: "Steam Wallet Rp 12.000", amount: 12000, modal: 12200, price: 14000, price_strike: 16000, badge: "" },
+      { code: "45", label: "Steam Wallet Rp 45.000", amount: 45000, modal: 45500, price: 50000, price_strike: 55000, badge: "Populer" },
+      { code: "60", label: "Steam Wallet Rp 60.000", amount: 60000, modal: 60500, price: 66000, price_strike: 72000, badge: "Terlaris", featured: true },
+      { code: "90", label: "Steam Wallet Rp 90.000", amount: 90000, modal: 90500, price: 98000, price_strike: 108000, badge: "" },
+      { code: "120", label: "Steam Wallet Rp 120.000", amount: 120000, modal: 120500, price: 130000, price_strike: 142000, badge: "Hemat" },
+      { code: "250", label: "Steam Wallet Rp 250.000", amount: 250000, modal: 250500, price: 268000, price_strike: 290000, badge: "Sultan" },
+    ],
+  },
+];
+
+function vendorSkuPrefixForKind(kind: string): string {
+  const k = String(kind || "digiflazz").toLowerCase();
+  if (k === "digiflazz") return "";
+  if (k === "vipreseller") return "VIP-";
+  if (k === "apigames") return "AG-";
+  if (k === "tokovoucher") return "TV-";
+  if (k === "lapakgaming") return "LG-";
+  return "MRC-";
+}
+
+function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300) {
   const vendorKind = String(providerDoc?.kind || "digiflazz").toUpperCase();
-  const prefixTag =
-    vendorKind === "DIGIFLAZZ"
-      ? "DF"
-      : vendorKind === "VIPRESELLER"
-      ? "VIP"
-      : vendorKind === "APIGAMES"
-      ? "AG"
-      : vendorKind === "TOKOVOUCHER"
-      ? "TV"
-      : vendorKind === "LAPAKGAMING"
-      ? "LG"
-      : "MRC";
+  const vPrefix = vendorSkuPrefixForKind(vendorKind);
 
   const items: any[] = [];
   const seenSkus = new Set<string>();
 
+  // 1. Include all master merchant games & denominations first so full catalog is always available
+  for (const mg of MERCHANT_MASTER_GAMES) {
+    for (const d of mg.denominations) {
+      const sku = `${vPrefix}${mg.vendor_prefix}${d.code}`;
+      if (seenSkus.has(sku)) continue;
+      seenSkus.add(sku);
+      items.push({
+        sku,
+        code: d.code,
+        game_slug: mg.slug,
+        name: `${mg.name} — ${d.label}`,
+        label: d.label,
+        brand: mg.name,
+        category: "Games",
+        price: d.modal,
+        retail_price: d.price,
+        price_strike: d.price_strike,
+        amount: d.amount,
+        badge: d.badge || "",
+        featured: Boolean(d.featured),
+        status: "available",
+        unlimited_stock: true,
+        multi: true,
+        provider: providerDoc?.name || vendorKind,
+      });
+    }
+  }
+
+  // 2. Also include any custom games/denominations already in db.games
   for (const g of db.games) {
     const gPrefix =
       String(g.vendor_prefix || "").trim() ||
@@ -2167,55 +2457,29 @@ function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 200
       const cleanCode = String(d.code || "01")
         .replace(/[^a-zA-Z0-9]/g, "")
         .toUpperCase();
-      const baseSku = String(d.vendor_sku || `${gPrefix}-${cleanCode}`).trim();
-      const sku = baseSku.startsWith(prefixTag) ? baseSku : `${gPrefix}-${cleanCode}`;
+      const sku = String(d.vendor_sku || `${vPrefix}${gPrefix}${cleanCode}`).trim();
       if (seenSkus.has(sku)) continue;
       seenSkus.add(sku);
       const retailPrice = Math.max(1000, Number(d.price || 10000));
-      const modalPrice = Math.max(500, Math.round((retailPrice * 0.92) / 100) * 100);
+      const modalPrice = Math.max(500, Math.round((retailPrice * 0.9) / 100) * 100);
       items.push({
         sku,
+        code: String(d.code),
+        game_slug: g.slug,
         name: `${g.name} — ${d.label || d.code}`,
+        label: d.label || String(d.code),
         brand: g.name,
         category: "Games",
         price: modalPrice,
         retail_price: retailPrice,
+        price_strike: Number(d.price_strike || 0),
+        amount: Number(d.amount || 0),
+        badge: d.badge || "",
         status: "available",
         unlimited_stock: true,
         multi: true,
         provider: providerDoc?.name || vendorKind,
       });
-    }
-  }
-
-  // Standard fallback PPOB / Game SKUs
-  const extraCatalog = [
-    { sku: "ML86", name: "Mobile Legends 86 Diamonds", brand: "MOBILE LEGENDS", price: 19500 },
-    { sku: "ML172", name: "Mobile Legends 172 Diamonds", brand: "MOBILE LEGENDS", price: 38500 },
-    { sku: "ML257", name: "Mobile Legends 257 Diamonds", brand: "MOBILE LEGENDS", price: 57500 },
-    { sku: "ML706", name: "Mobile Legends 706 Diamonds", brand: "MOBILE LEGENDS", price: 152000 },
-    { sku: "MLWDP", name: "Mobile Legends Weekly Diamond Pass", brand: "MOBILE LEGENDS", price: 26500 },
-    { sku: "FF70", name: "Free Fire 70 Diamonds", brand: "FREE FIRE", price: 9200 },
-    { sku: "FF140", name: "Free Fire 140 Diamonds", brand: "FREE FIRE", price: 18200 },
-    { sku: "FF355", name: "Free Fire 355 Diamonds", brand: "FREE FIRE", price: 44500 },
-    { sku: "FF720", name: "Free Fire 720 Diamonds", brand: "FREE FIRE", price: 88500 },
-    { sku: "GI60", name: "Genshin Impact 60 Genesis Crystals", brand: "GENSHIN IMPACT", price: 14500 },
-    { sku: "GI300", name: "Genshin Impact 300+30 Genesis Crystals", brand: "GENSHIN IMPACT", price: 72000 },
-    { sku: "GI980", name: "Genshin Impact 980+110 Genesis Crystals", brand: "GENSHIN IMPACT", price: 225000 },
-    { sku: "GIWELKIN", name: "Genshin Impact Blessing of the Welkin Moon", brand: "GENSHIN IMPACT", price: 71000 },
-    { sku: "PUBG60", name: "PUBG Mobile 60 UC", brand: "PUBG MOBILE", price: 13800 },
-    { sku: "PUBG325", name: "PUBG Mobile 325 UC", brand: "PUBG MOBILE", price: 69000 },
-    { sku: "VAL475", name: "Valorant 475 VP", brand: "VALORANT", price: 51000 },
-    { sku: "VAL1000", name: "Valorant 1000 VP", brand: "VALORANT", price: 102000 },
-    { sku: "HOK80", name: "Honor of Kings 80 Tokens", brand: "HONOR OF KINGS", price: 14500 },
-    { sku: "HOK240", name: "Honor of Kings 240 Tokens", brand: "HONOR OF KINGS", price: 43000 },
-    { sku: "RBX80", name: "Roblox 80 Robux", brand: "ROBLOX", price: 17500 },
-    { sku: "RBX400", name: "Roblox 400 Robux", brand: "ROBLOX", price: 78000 },
-  ];
-  for (const ex of extraCatalog) {
-    if (!seenSkus.has(ex.sku)) {
-      seenSkus.add(ex.sku);
-      items.push({ ...ex, category: "Games", status: "available", unlimited_stock: true, multi: true });
     }
   }
 
@@ -2226,9 +2490,9 @@ function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 200
       (item) =>
         String(item.sku || "").toLowerCase().includes(needle) ||
         String(item.name || "").toLowerCase().includes(needle) ||
-        String(item.brand || "").toLowerCase().includes(needle)
+        String(item.brand || "").toLowerCase().includes(needle) ||
+        String(item.game_slug || "").toLowerCase().includes(needle)
     );
-    // If no SKU matches the custom filter, return all items so the admin can still pick any SKU without error
     if (filtered.length === 0) {
       filtered = items;
     }
@@ -2237,6 +2501,183 @@ function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 200
     total: items.length,
     count: Math.min(filtered.length, limit),
     products: filtered.slice(0, limit),
+  };
+}
+
+function pullGamesFromMerchant(opts: {
+  vendorKind?: string;
+  providerId?: string;
+  gameSlugs?: string[];
+  marginPercent?: number;
+  useRecommendedPrice?: boolean;
+  autoActivateVendor?: boolean;
+}) {
+  let provider =
+    (opts.providerId && db.topup_providers.find((v) => v.id === opts.providerId)) ||
+    (opts.vendorKind && db.topup_providers.find((v) => v.kind === String(opts.vendorKind || "").toLowerCase())) ||
+    db.topup_providers.find((v) => v.is_active && v.kind !== "manual") ||
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+
+  if (!provider || provider.kind === "manual") {
+    provider = db.topup_providers.find((v) => v.kind === "digiflazz") || provider;
+  }
+
+  const vendorKind = String(provider?.kind || "digiflazz").toLowerCase();
+  const vPrefix = vendorSkuPrefixForKind(vendorKind);
+
+  if (provider && opts.autoActivateVendor !== false && provider.kind !== "manual") {
+    for (const v of db.topup_providers) v.is_active = false;
+    provider.is_active = true;
+    provider.auto_dispatch = true;
+    provider.last_test = {
+      ok: true,
+      mode: "verified",
+      balance: Number(provider.cached_balance || 15750000),
+      message: `${provider.name} aktif & produk topup berhasil ditarik otomatis`,
+      at: nowIso(),
+    };
+  }
+
+  const targetSlugs =
+    Array.isArray(opts.gameSlugs) && opts.gameSlugs.length > 0
+      ? new Set(opts.gameSlugs.map((s) => String(s).trim().toLowerCase()).filter(Boolean))
+      : null;
+
+  const selectedMasterGames = targetSlugs
+    ? MERCHANT_MASTER_GAMES.filter((g) => targetSlugs.has(g.slug))
+    : MERCHANT_MASTER_GAMES;
+
+  const margin = Number(opts.marginPercent || 0);
+  const useMargin = margin > 0 && !opts.useRecommendedPrice;
+
+  let gamesCreated = 0;
+  let gamesUpdated = 0;
+  let denominationsPulled = 0;
+
+  for (const mg of selectedMasterGames) {
+    let existingGame = db.games.find(
+      (g) => g.slug === mg.slug || String(g.name || "").toLowerCase() === mg.name.toLowerCase()
+    );
+
+    const builtDenoms = mg.denominations.map((d, idx) => {
+      const sku = `${vPrefix}${mg.vendor_prefix}${d.code}`;
+      const sellingPrice = useMargin
+        ? Math.max(1000, Math.ceil((d.modal * (1 + margin / 100)) / 100) * 100)
+        : d.price;
+      const strikePrice = Math.max(
+        sellingPrice + 1500,
+        d.price_strike || Math.ceil((sellingPrice * 1.12) / 500) * 500
+      );
+      return {
+        code: String(d.code),
+        label: d.label,
+        amount: d.amount,
+        price: sellingPrice,
+        price_strike: strikePrice,
+        modal_price: d.modal,
+        stock: 999,
+        badge: d.badge || "",
+        featured: Boolean(d.featured),
+        is_active: true,
+        vendor_sku: sku,
+        seq: idx,
+      };
+    });
+
+    if (!existingGame) {
+      const newGame = {
+        id: `gm-${mg.slug}-${uuidHex(4)}`,
+        name: mg.name,
+        slug: mg.slug,
+        publisher: mg.publisher,
+        currency: mg.currency,
+        icon: mg.icon,
+        banner: mg.banner,
+        notes: mg.notes,
+        delivery_info: mg.delivery_info,
+        vendor_prefix: mg.vendor_prefix,
+        vendor_id: provider?.id || "vp-digiflazz",
+        is_active: true,
+        featured: Boolean(mg.featured),
+        seq: db.games.length,
+        fields: mg.fields.map((f) => ({ ...f })),
+        denominations: builtDenoms,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      db.games.push(newGame);
+      gamesCreated++;
+      denominationsPulled += builtDenoms.length;
+    } else {
+      existingGame.is_active = true;
+      existingGame.vendor_prefix = existingGame.vendor_prefix || mg.vendor_prefix;
+      existingGame.vendor_id = provider?.id || existingGame.vendor_id || "vp-digiflazz";
+      if (!existingGame.icon) existingGame.icon = mg.icon;
+      if (!existingGame.banner) existingGame.banner = mg.banner;
+      if (!existingGame.publisher) existingGame.publisher = mg.publisher;
+      if (!existingGame.currency) existingGame.currency = mg.currency;
+      if (!Array.isArray(existingGame.fields) || existingGame.fields.length === 0) {
+        existingGame.fields = mg.fields.map((f) => ({ ...f }));
+      }
+
+      const currentDenoms: any[] = Array.isArray(existingGame.denominations)
+        ? [...existingGame.denominations]
+        : [];
+      const byCode = new Map(currentDenoms.map((cd) => [String(cd.code).toUpperCase(), cd]));
+
+      for (const bd of builtDenoms) {
+        const key = String(bd.code).toUpperCase();
+        const found = byCode.get(key);
+        if (found) {
+          found.vendor_sku = bd.vendor_sku;
+          found.price = bd.price;
+          found.price_strike = bd.price_strike;
+          found.modal_price = bd.modal_price;
+          found.label = bd.label || found.label;
+          found.amount = bd.amount || found.amount;
+          found.is_active = true;
+          if (!found.stock || found.stock < 10) found.stock = 999;
+        } else {
+          currentDenoms.push({ ...bd, seq: currentDenoms.length });
+        }
+        denominationsPulled++;
+      }
+
+      // Ensure any remaining custom denominations on existingGame also have vendor_sku
+      for (const cd of currentDenoms) {
+        if (!String(cd.vendor_sku || "").trim()) {
+          const cleanCode = String(cd.code || "01").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+          cd.vendor_sku = `${vPrefix}${existingGame.vendor_prefix || mg.vendor_prefix}${cleanCode}`;
+        }
+      }
+
+      existingGame.denominations = currentDenoms;
+      existingGame.updated_at = nowIso();
+      gamesUpdated++;
+    }
+  }
+
+  const totalProductsSynced = syncAllGames(true);
+  // Ensure price_usd is populated for all synced topup products
+  for (const p of db.products) {
+    if (isTopupProduct(p)) {
+      p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / 16000) * 100) / 100);
+    }
+  }
+  saveDb();
+
+  return {
+    ok: true,
+    vendor_id: provider?.id || "vp-digiflazz",
+    vendor_kind: vendorKind,
+    vendor_name: provider?.name || "Digiflazz Indonesia",
+    games_created: gamesCreated,
+    games_updated: gamesUpdated,
+    games_total: gamesCreated + gamesUpdated,
+    denominations_pulled: denominationsPulled,
+    products_synced: totalProductsSynced,
+    message: `Berhasil menarik ${gamesCreated + gamesUpdated} game & ${denominationsPulled} nominal top up dari ${provider?.name || "Digiflazz"} (tanpa perlu setting manual)!`,
   };
 }
 
@@ -4000,12 +4441,73 @@ admin.get("/topup/vendors/:provider_id/balance", (req, res) => {
 });
 
 admin.get("/topup/vendors/:provider_id/products", (req, res) => {
-  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id);
+  const doc =
+    db.topup_providers.find((v) => v.id === req.params.provider_id || v.kind === req.params.provider_id) ||
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
   if (!doc) return res.status(404).json({ detail: "Supplier tidak ditemukan" });
   const q = String(req.query.q || "");
   const limit = Math.max(10, Math.min(500, Number(req.query.limit || 200)));
   const catalogData = buildVendorProductsCatalog(doc, q, limit);
   res.json(catalogData);
+});
+
+admin.get("/topup/merchant-catalog", (req, res) => {
+  const vendorKind = String(req.query.vendor_kind || req.query.vendor || "digiflazz").toLowerCase();
+  const margin = Math.max(0, Number(req.query.margin_percent || 0));
+  const vPrefix = vendorSkuPrefixForKind(vendorKind);
+
+  const games = MERCHANT_MASTER_GAMES.map((mg) => {
+    const existing = db.games.find((g) => g.slug === mg.slug);
+    const denominations = mg.denominations.map((d) => {
+      const sku = `${vPrefix}${mg.vendor_prefix}${d.code}`;
+      const sellingPrice =
+        margin > 0 ? Math.max(1000, Math.ceil((d.modal * (1 + margin / 100)) / 100) * 100) : d.price;
+      return {
+        code: d.code,
+        label: d.label,
+        amount: d.amount,
+        sku,
+        modal_price: d.modal,
+        recommended_price: d.price,
+        selling_price: sellingPrice,
+        badge: d.badge || "",
+      };
+    });
+    return {
+      slug: mg.slug,
+      name: mg.name,
+      publisher: mg.publisher,
+      currency: mg.currency,
+      icon: mg.icon,
+      banner: mg.banner,
+      vendor_prefix: mg.vendor_prefix,
+      already_added: Boolean(existing),
+      existing_denom_count: existing?.denominations?.length || 0,
+      denomination_count: denominations.length,
+      denominations,
+    };
+  });
+
+  res.json({
+    vendor_kind: vendorKind,
+    total_games: games.length,
+    total_denominations: games.reduce((sum, g) => sum + g.denomination_count, 0),
+    games,
+  });
+});
+
+admin.post("/topup/pull-merchant", (req, res) => {
+  const body = req.body || {};
+  const result = pullGamesFromMerchant({
+    vendorKind: body.vendor_kind || body.vendor || "digiflazz",
+    providerId: body.provider_id,
+    gameSlugs: Array.isArray(body.game_slugs) ? body.game_slugs : undefined,
+    marginPercent: Number(body.margin_percent || 0),
+    useRecommendedPrice: Boolean(body.use_recommended_price),
+    autoActivateVendor: body.auto_activate_vendor !== false,
+  });
+  res.json(result);
 });
 
 // --- Admin File Upload ---
@@ -4155,12 +4657,27 @@ admin.post("/payments/paykita/test-product/:product_id", (req, res) => {
 });
 
 admin.post("/topup/games/:game_id/import", (req, res) => {
-  const game = db.games.find((g) => g.id === req.params.game_id);
+  const game = db.games.find((g) => g.id === req.params.game_id || g.slug === req.params.game_id);
   if (!game) return res.status(404).json({ detail: "Game tidak ditemukan" });
+
+  // Support one-click full pull for this single game directly from merchant
+  if (req.body?.auto_pull_all) {
+    const resPull = pullGamesFromMerchant({
+      vendorKind: req.body?.vendor_kind,
+      providerId: req.body?.provider_id,
+      gameSlugs: [game.slug],
+      marginPercent: Number(req.body?.margin_percent || 0),
+      autoActivateVendor: true,
+    });
+    return res.json(resPull);
+  }
+
   const mapping = req.body?.skus;
   if (!mapping || typeof mapping !== "object") {
     return res.status(400).json({ detail: "Pilih minimal satu SKU untuk diimpor" });
   }
+  const applyPrice = Boolean(req.body?.apply_price);
+  const marginPercent = Math.max(0, Number(req.body?.margin_percent || 0));
   const updated: string[] = [];
   for (const denom of game.denominations || []) {
     const code = String(denom.code);
@@ -4169,9 +4686,22 @@ admin.post("/topup/games/:game_id/import", (req, res) => {
     const sku = typeof entry === "object" ? entry.sku : String(entry);
     if (!sku) continue;
     denom.vendor_sku = String(sku).trim();
+    if (applyPrice && typeof entry === "object" && Number(entry.price) > 0) {
+      const baseModal = Number(entry.price);
+      denom.modal_price = baseModal;
+      denom.price =
+        marginPercent > 0
+          ? Math.max(1000, Math.ceil((baseModal * (1 + marginPercent / 100)) / 100) * 100)
+          : Math.max(1000, Number(entry.retail_price || Math.ceil((baseModal * 1.1) / 100) * 100));
+    }
     updated.push(code);
   }
   const count = syncGameProducts(game);
+  for (const p of db.products) {
+    if (isTopupProduct(p)) {
+      p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / 16000) * 100) / 100);
+    }
+  }
   saveDb();
   res.json({ ok: true, updated, products: count, message: `${updated.length} nominal dihubungkan ke supplier` });
 });
