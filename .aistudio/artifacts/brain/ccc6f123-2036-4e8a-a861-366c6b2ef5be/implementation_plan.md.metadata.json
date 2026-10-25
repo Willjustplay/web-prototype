@@ -1,0 +1,6 @@
+{
+  "summary":  "Rencana implementasi sistem verifikasi email wajib sebelum login, lupa/reset kata sandi dengan token SHA-256 dan Resend API (beserta pratinjau tautan dev), penyimpanan persisten lokal + dukungan MongoDB, serta tab Manajemen Pengguna dan Audit Log di Panel Admin.",
+  "updatedAt":  "2026-10-24T17:43:01.266000699Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

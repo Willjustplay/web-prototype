@@ -1,0 +1,6 @@
+{
+  "name": "WillJustPlay — Jual Beli Akun & Top Up Game",
+  "description": "Marketplace jual beli akun game premium & top up game instan dengan garansi penuh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
