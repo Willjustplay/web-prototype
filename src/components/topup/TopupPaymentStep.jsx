@@ -310,15 +310,20 @@ export const TopupPaymentStep = ({
     <div data-testid="topup-payment-step" className="grid lg:grid-cols-12 gap-6 lg:gap-8 items-start">
       {/* Left Column: Contact & Duitku Multi-Payment Selection */}
       <div className="lg:col-span-7 space-y-6">
-        {/* Card 1: Buyer Contact */}
+        {/* Card 1: Buyer Contact (Mandatory Email for Top Up Invoice) */}
         <div className="rounded-2xl border border-line bg-panel/90 p-5 sm:p-6 shadow-[0_12px_35px_rgba(0,0,0,0.4)]">
           <div className="flex items-center justify-between gap-2 mb-4">
             <div>
-              <p className="font-display font-bold text-sm sm:text-base text-slate-100">
-                01. Kontak Penerima Notifikasi
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-display font-bold text-sm sm:text-base text-slate-100">
+                  01. Email Penerima Invoice Top Up
+                </p>
+                <span className="px-2 py-0.5 rounded border border-neon/40 bg-neon/10 text-neon text-[10px] font-mono font-bold uppercase">
+                  Wajib Diisi *
+                </span>
+              </div>
               <p className="text-xs font-mono text-slate-400 mt-0.5">
-                Isi minimal salah satu untuk pengiriman bukti transaksi &amp; update status
+                Invoice resmi pembayaran Top Up akan dikirim otomatis ke email Anda setelah pembayaran terkonfirmasi lunas.
               </p>
             </div>
           </div>
@@ -327,22 +332,38 @@ export const TopupPaymentStep = ({
             <div className="space-y-2">
               <label
                 htmlFor="topup-buyer-email"
-                className="block text-[11px] font-mono uppercase tracking-wider text-slate-300"
+                className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-200"
               >
-                Alamat Email
+                <span>
+                  Alamat Email Aktif <span className="text-neon font-bold">*</span>
+                </span>
+                {email?.trim() && (
+                  <span
+                    className={`text-[10px] ${
+                      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+                        ? "text-lime"
+                        : "text-amber-300"
+                    }`}
+                  >
+                    {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+                      ? "✓ Format Valid"
+                      : "Format Belum Valid"}
+                  </span>
+                )}
               </label>
               <div className="relative group">
                 <Mail
                   size={14}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-neon transition-colors pointer-events-none"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neon transition-colors pointer-events-none"
                 />
                 <input
                   id="topup-buyer-email"
                   data-testid="topup-buyer-email"
                   type="email"
+                  required
                   value={email}
                   onChange={(e) => onEmail(e.target.value)}
-                  placeholder="nama@email.com"
+                  placeholder="nama@gmail.com (Wajib diisi)"
                   className="w-full rounded-xl bg-void border border-line pl-10 pr-3.5 py-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-neon focus:shadow-[0_0_18px_rgba(0,240,255,0.14)] transition-all"
                 />
               </div>
@@ -351,9 +372,10 @@ export const TopupPaymentStep = ({
             <div className="space-y-2">
               <label
                 htmlFor="topup-buyer-wa"
-                className="block text-[11px] font-mono uppercase tracking-wider text-slate-300"
+                className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-300"
               >
-                Nomor WhatsApp
+                <span>Nomor WhatsApp</span>
+                <span className="text-[10px] text-slate-500">Opsional</span>
               </label>
               <div className="relative group">
                 <Phone
@@ -367,7 +389,7 @@ export const TopupPaymentStep = ({
                   inputMode="numeric"
                   value={wa}
                   onChange={(e) => onWa(e.target.value)}
-                  placeholder="08123456789"
+                  placeholder="08123456789 (Opsional)"
                   className="w-full rounded-xl bg-void border border-line pl-10 pr-3.5 py-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-neon focus:shadow-[0_0_18px_rgba(0,240,255,0.14)] transition-all"
                 />
               </div>
@@ -580,6 +602,17 @@ export const TopupPaymentStep = ({
                 <dt className="text-slate-400 font-mono">Item Nominal</dt>
                 <dd className="text-right font-display font-bold text-slate-100">
                   {denomination?.label || "-"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-400 font-mono shrink-0">Email Invoice</dt>
+                <dd
+                  className={`text-right font-mono break-all ${
+                    email?.trim() ? "text-lime font-semibold" : "text-coral"
+                  }`}
+                  data-testid="topup-summary-email"
+                >
+                  {email?.trim() || "Wajib diisi *"}
                 </dd>
               </div>
               <div className="flex justify-between gap-4">

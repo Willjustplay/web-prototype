@@ -237,41 +237,18 @@ export const ProductModal = ({ product, onClose }) => {
     }
   };
 
-  // Smart handler when user types in the unified primary input
-  const handlePrimaryContactChange = (val) => {
+  const handleEmailChange = (val) => {
+    setBuyerEmail(val);
     setBuyerContact(val);
-    const trimmed = val.trim();
-    if (trimmed.includes("@")) {
-      setBuyerEmail(trimmed);
-      if (!showExtraContact) setBuyerWa("");
-    } else {
-      setBuyerWa(trimmed);
-      if (!showExtraContact && user?.email) {
-        setBuyerEmail(user.email);
-      } else if (!showExtraContact) {
-        setBuyerEmail("");
-      }
-    }
   };
 
   const activeDestObj = manualDestinations.find((d) => d.id === selectedDest);
 
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail.trim());
+
   const resolveBuyerPayload = () => {
-    const rawPrimary = buyerContact.trim();
-    let finalWa = buyerWa.trim();
-    let finalEmail = buyerEmail.trim();
-
-    if (!showExtraContact && rawPrimary) {
-      if (rawPrimary.includes("@")) {
-        finalEmail = rawPrimary;
-      } else {
-        finalWa = rawPrimary;
-        if (!finalEmail && user?.email) {
-          finalEmail = user.email;
-        }
-      }
-    }
-
+    const finalEmail = buyerEmail.trim().toLowerCase();
+    const finalWa = buyerWa.trim();
     return {
       buyer_email: finalEmail,
       buyer_whatsapp: finalWa,
@@ -280,8 +257,12 @@ export const ProductModal = ({ product, onClose }) => {
 
   const handleBuy = async () => {
     const buyer = resolveBuyerPayload();
-    if (!buyer.buyer_email && !buyer.buyer_whatsapp) {
-      toast.error("Masukkan nomor WhatsApp atau Email aktif untuk menerima pesanan");
+    if (!buyer.buyer_email) {
+      toast.error("Wajib memasukkan alamat email aktif sebelum melakukan pembelian");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyer.buyer_email)) {
+      toast.error("Format alamat email tidak valid (contoh: nama@gmail.com)");
       return;
     }
     setLoading(true);
@@ -318,8 +299,6 @@ export const ProductModal = ({ product, onClose }) => {
       setLoading(false);
     }
   };
-
-  const isPrimaryEmail = buyerContact.trim().includes("@");
 
   return (
     <Dialog open={!!product} onOpenChange={(o) => !o && onClose()}>
@@ -618,14 +597,17 @@ export const ProductModal = ({ product, onClose }) => {
 
               {/* STREAMLINED CHECKOUT FLOW */}
               <div className="space-y-4 pt-1">
-                {/* Step 1: Smart Single Contact Input (with Auto-Fill & Optional Backup Contact) */}
+                {/* Step 1: Mandatory Buyer Email Input + Optional WhatsApp */}
                 <div className="space-y-2" data-testid="buyer-contact-fields">
                   <div className="flex items-center justify-between gap-2">
                     <label
-                      htmlFor="primary-buyer-contact"
-                      className="text-xs font-medium text-slate-200"
+                      htmlFor="primary-buyer-email"
+                      className="text-xs font-medium text-slate-200 flex items-center gap-1.5"
                     >
-                      1. Kontak Penerima Pesanan
+                      <span>1. Email Penerima Akses Akun</span>
+                      <span className="text-[10px] font-mono font-bold text-neon px-1.5 py-0.5 bg-neon/10 border border-neon/30">
+                        WAJIB *
+                      </span>
                     </label>
                     <button
                       type="button"
@@ -635,96 +617,85 @@ export const ProductModal = ({ product, onClose }) => {
                       <Plus size={11} />
                       <span>
                         {showExtraContact
-                          ? "Gunakan 1 Kontak Saja"
-                          : "Tambah Kontak Cadangan"}
+                          ? "Sembunyikan WhatsApp"
+                          : "Tambah No. WhatsApp (Opsional)"}
                       </span>
                     </button>
                   </div>
 
-                  {!showExtraContact ? (
+                  <div className="relative">
+                    <Mail
+                      size={14}
+                      className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+                        isEmailValid ? "text-lime" : "text-neon"
+                      }`}
+                    />
+                    <input
+                      id="primary-buyer-email"
+                      type="email"
+                      required
+                      value={buyerEmail}
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      placeholder="Masukkan email aktif (contoh: kamu@gmail.com)..."
+                      data-testid="buyer-email-input"
+                      className={`w-full bg-void/90 border ${
+                        isEmailValid
+                          ? "border-lime/60 focus:border-lime"
+                          : "border-line focus:border-neon"
+                      } outline-none text-xs font-mono pl-9 pr-28 py-2.5 text-slate-100 placeholder:text-slate-500 transition-colors`}
+                    />
+                    {buyerEmail.trim() && (
+                      <span
+                        className={`absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-mono ${
+                          isEmailValid ? "text-lime" : "text-amber-300"
+                        }`}
+                      >
+                        {isEmailValid ? (
+                          <>
+                            <Check size={11} />
+                            {user?.email && buyerEmail.trim() === user.email
+                              ? "Terisi Otomatis"
+                              : "Email Valid"}
+                          </>
+                        ) : (
+                          "Cek Format Email"
+                        )}
+                      </span>
+                    )}
+                  </div>
+
+                  {showExtraContact ? (
                     <div className="relative">
-                      {isPrimaryEmail ? (
-                        <Mail
-                          size={14}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-neon"
-                        />
-                      ) : (
-                        <Phone
-                          size={14}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-neon"
-                        />
-                      )}
-                      <input
-                        id="primary-buyer-contact"
-                        type="text"
-                        value={buyerContact}
-                        onChange={(e) => handlePrimaryContactChange(e.target.value)}
-                        placeholder="Ketik No. WhatsApp (08xx) atau Email aktif..."
-                        data-testid="buyer-whatsapp-input"
-                        className="w-full bg-void/90 border border-line focus:border-neon outline-none text-xs font-mono pl-9 pr-24 py-2.5 text-slate-100 placeholder:text-slate-500 transition-colors"
+                      <Phone
+                        size={13}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                       />
-                      {buyerContact.trim() && (
-                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-mono text-lime">
-                          <Check size={11} />
-                          {user?.email && buyerContact.trim() === user.email
-                            ? "Terisi Otomatis"
-                            : isPrimaryEmail
-                            ? "Email Aktif"
-                            : "WhatsApp"}
-                        </span>
-                      )}
-                      {/* Hidden synced email input so automated tests targeting buyer-email-input always work */}
                       <input
-                        type="email"
-                        value={buyerEmail}
-                        onChange={(e) => {
-                          setBuyerEmail(e.target.value);
-                          if (!buyerContact.trim()) setBuyerContact(e.target.value);
-                        }}
-                        data-testid="buyer-email-input"
-                        aria-label="Email Aktif"
-                        className="sr-only"
-                        tabIndex={-1}
+                        type="tel"
+                        value={buyerWa}
+                        onChange={(e) => setBuyerWa(e.target.value)}
+                        placeholder="No. WhatsApp cadangan (08xxxxxxxxxx) — opsional"
+                        data-testid="buyer-whatsapp-input"
+                        className="w-full bg-void/90 border border-line focus:border-neon outline-none text-xs font-mono pl-8 pr-2.5 py-2 text-slate-100 placeholder:text-slate-500 transition-colors"
                       />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div className="relative">
-                        <Phone
-                          size={13}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
-                        <input
-                          type="tel"
-                          value={buyerWa}
-                          onChange={(e) => {
-                            setBuyerWa(e.target.value);
-                            setBuyerContact(e.target.value || buyerEmail);
-                          }}
-                          placeholder="No. WhatsApp (08xx)"
-                          data-testid="buyer-whatsapp-input"
-                          className="w-full bg-void/90 border border-line focus:border-neon outline-none text-xs font-mono pl-8 pr-2.5 py-2.5 text-slate-100 placeholder:text-slate-500 transition-colors"
-                        />
-                      </div>
-                      <div className="relative">
-                        <Mail
-                          size={13}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
-                        <input
-                          type="email"
-                          value={buyerEmail}
-                          onChange={(e) => {
-                            setBuyerEmail(e.target.value);
-                            if (!buyerWa.trim()) setBuyerContact(e.target.value);
-                          }}
-                          placeholder="Email aktif (kamu@email.com)"
-                          data-testid="buyer-email-input"
-                          className="w-full bg-void/90 border border-line focus:border-neon outline-none text-xs font-mono pl-8 pr-2.5 py-2.5 text-slate-100 placeholder:text-slate-500 transition-colors"
-                        />
-                      </div>
-                    </div>
+                    <input
+                      type="tel"
+                      value={buyerWa}
+                      onChange={(e) => setBuyerWa(e.target.value)}
+                      data-testid="buyer-whatsapp-input"
+                      aria-label="WhatsApp Cadangan"
+                      className="sr-only"
+                      tabIndex={-1}
+                    />
                   )}
+
+                  <p className="text-[11px] font-mono text-slate-400 leading-relaxed">
+                    Data akses akun{" "}
+                    <span className="text-neon">[Tipe Akun] [Email] [Password]</span>{" "}
+                    &amp; invoice resmi akan dikirim otomatis ke email Anda setelah pembayaran lunas.
+                  </p>
                 </div>
 
                 {/* Step 2: Clean & Dynamic Payment Method Selector */}

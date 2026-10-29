@@ -108,6 +108,50 @@ const normalizePaymentConfig = (raw) => {
   };
 };
 
+const ACCOUNT_TYPE_PRESETS = [
+  "Gmail",
+  "Moonton",
+  "Hoyoverse",
+  "Riot ID",
+  "Google Play",
+  "Facebook",
+  "VK",
+  "Steam",
+];
+
+const parseAdminDeliveryBracket = (raw) => {
+  const str = String(raw || "");
+  const m = str.match(/\[([^\]]*)\]\s*\[([^\]]*)\]\s*\[([^\]]*)\]/);
+  if (m) {
+    const extra = str
+      .replace(m[0], "")
+      .replace(/^\s*\r?\n?/, "");
+    return {
+      accountType: m[1] || "Gmail",
+      accountEmail: m[2] || "",
+      accountPassword: m[3] || "",
+      extraNotes: extra,
+      hasBracket: true,
+    };
+  }
+  return {
+    accountType: "Gmail",
+    accountEmail: "",
+    accountPassword: "",
+    extraNotes: str,
+    hasBracket: false,
+  };
+};
+
+const buildAdminDeliveryBracket = (accountType, accountEmail, accountPassword, extraNotes) => {
+  const cleanType = String(accountType || "Gmail").replace(/[\[\]]/g, "").trim() || "Gmail";
+  const cleanEmail = String(accountEmail || "").replace(/[\[\]]/g, "").trim();
+  const cleanPass = String(accountPassword || "").replace(/[\[\]]/g, "").trim();
+  const cleanNotes = String(extraNotes || "").trim();
+  const bracketLine = `[${cleanType}] [${cleanEmail}] [${cleanPass}]`;
+  return cleanNotes ? `${bracketLine}\n${cleanNotes}` : bracketLine;
+};
+
 const EMPTY_FORM = {
   game: "",
   category: "Akun Game",
@@ -124,7 +168,7 @@ const EMPTY_FORM = {
   sold: 0,
   rating: 5.0,
   warranty: "100%",
-  delivery_info: "",
+  delivery_info: "[Gmail] [contoh@gmail.com] [Password#123]",
   condition: "ready",
   payment_config: EMPTY_PAYMENT_CONFIG,
 };
@@ -2186,13 +2230,20 @@ export default function Admin() {
                                 {o.product_title}
                               </td>
                               <td
-                                className="px-4 py-3.5 text-slate-300 text-[11px] max-w-[180px]"
+                                className="px-4 py-3.5 text-slate-300 text-[11px] max-w-[200px]"
                                 data-testid={`order-buyer-${o.session_id.slice(-6)}`}
                               >
-                                <div className="truncate">{o.buyer_whatsapp || "-"}</div>
-                                <div className="truncate text-slate-500 text-[10px]">
-                                  {o.buyer_email || ""}
+                                <div className="truncate text-neon font-semibold">
+                                  {o.buyer_email || "-"}
                                 </div>
+                                <div className="truncate text-slate-400 text-[10px]">
+                                  {o.buyer_whatsapp ? `WA: ${o.buyer_whatsapp}` : "Tanpa WA"}
+                                </div>
+                                {o.fulfillment_email_sent && (
+                                  <div className="mt-1 inline-flex items-center gap-1 text-[9px] text-lime bg-lime/10 border border-lime/30 rounded px-1.5 py-0.5">
+                                    <span>✓ Email Terkirim</span>
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-3.5 text-slate-400 uppercase text-[10px]">
                                 <div>
@@ -2286,7 +2337,11 @@ export default function Admin() {
                                               await api.post(
                                                 `/admin/orders/${o.session_id}/approve`
                                               );
-                                              toast.success("Pembayaran diterima!");
+                                              toast.success(
+                                                o.buyer_email
+                                                  ? `Pembayaran diterima & akses/invoice dikirim ke ${o.buyer_email}!`
+                                                  : "Pembayaran diterima!"
+                                              );
                                               load();
                                             } catch (e) {
                                               toast.error(
@@ -2323,6 +2378,32 @@ export default function Admin() {
                                       </div>
                                     )}
                                   </div>
+                                )}
+                                {o.payment_status === "paid" && o.buyer_email && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        const { data } = await api.post(
+                                          `/payments/resend-order-email/${o.session_id}`
+                                        );
+                                        toast.success(
+                                          data?.message ||
+                                            `Email berhasil dikirim ulang ke ${o.buyer_email}`
+                                        );
+                                        load(false);
+                                      } catch (e) {
+                                        toast.error(
+                                          formatApiError(e.response?.data?.detail) ||
+                                            "Gagal mengirim ulang email"
+                                        );
+                                      }
+                                    }}
+                                    data-testid={`resend-email-${o.session_id.slice(-6)}`}
+                                    className="mt-1.5 inline-flex items-center gap-1 rounded-lg text-[10px] text-lime border border-lime/40 hover:bg-lime/10 px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
+                                  >
+                                    Kirim Ulang Email
+                                  </button>
                                 )}
                               </td>
                             </tr>
@@ -2678,19 +2759,140 @@ export default function Admin() {
                   className="mt-1.5 w-full rounded-xl bg-void border border-line focus:border-neon outline-none text-xs font-mono px-3.5 py-2.5 leading-relaxed transition-colors"
                 />
               </label>
-              <label className="block sm:col-span-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-neon">
-                  Info Akun / Link (dikirim otomatis setelah bayar)
-                </span>
-                <textarea
-                  value={form.delivery_info}
-                  onChange={(e) => setForm({ ...form, delivery_info: e.target.value })}
-                  rows={4}
-                  placeholder="Tempel detail login akun game, kode voucher, atau link (mis. https://...). Pembeli akan langsung melihat ini di halaman sukses setelah pembayaran terkonfirmasi."
-                  data-testid="form-delivery-input"
-                  className="mt-1.5 w-full rounded-xl bg-void border border-neon/30 focus:border-neon outline-none text-xs font-mono px-3.5 py-2.5 leading-relaxed placeholder:text-slate-600 transition-colors"
-                />
-              </label>
+              <div className="sm:col-span-2 rounded-2xl border border-neon/35 bg-void/70 p-4 space-y-3.5">
+                {(() => {
+                  const parsedCred = parseAdminDeliveryBracket(form.delivery_info);
+                  const updateCredField = (patch) => {
+                    const nextType =
+                      patch.accountType !== undefined ? patch.accountType : parsedCred.accountType;
+                    const nextEmail =
+                      patch.accountEmail !== undefined
+                        ? patch.accountEmail
+                        : parsedCred.accountEmail;
+                    const nextPass =
+                      patch.accountPassword !== undefined
+                        ? patch.accountPassword
+                        : parsedCred.accountPassword;
+                    const nextNotes =
+                      patch.extraNotes !== undefined ? patch.extraNotes : parsedCred.extraNotes;
+                    setForm({
+                      ...form,
+                      delivery_info: buildAdminDeliveryBracket(
+                        nextType,
+                        nextEmail,
+                        nextPass,
+                        nextNotes
+                      ),
+                    });
+                  };
+
+                  return (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-neon block">
+                            Format Pengiriman Data Akses Akun (Otomatis ke Email Pembeli &amp; Halaman Lunas)
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            Format standar: <strong className="text-lime">[Tipe Akun] [Email] [Password]</strong> — isi kolom terstruktur di bawah atau tempel teks langsung.
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-lime/10 border border-lime/30 text-lime">
+                          Auto-Email Aktif
+                        </span>
+                      </div>
+
+                      {/* Quick Preset Pills for Account Type */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-400 mr-1">
+                          Preset Tipe:
+                        </span>
+                        {ACCOUNT_TYPE_PRESETS.map((preset) => {
+                          const isSelected =
+                            parsedCred.accountType.toLowerCase() === preset.toLowerCase();
+                          return (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => updateCredField({ accountType: preset })}
+                              className={`text-[10px] font-mono px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
+                                isSelected
+                                  ? "border-neon bg-neon text-void font-bold"
+                                  : "border-line bg-panel text-slate-300 hover:border-neon/50 hover:text-neon"
+                              }`}
+                            >
+                              {preset}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* 3-Column Structured Inputs */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <label className="block">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
+                            1. Tipe Akun (Gmail, Moonton, dll)
+                          </span>
+                          <input
+                            type="text"
+                            value={parsedCred.accountType}
+                            onChange={(e) => updateCredField({ accountType: e.target.value })}
+                            placeholder="Gmail / Moonton / Hoyoverse"
+                            data-testid="form-delivery-type-input"
+                            className="mt-1 w-full rounded-xl bg-panel border border-line focus:border-neon outline-none text-xs font-mono px-3 py-2 text-slate-100 placeholder:text-slate-600 transition-colors"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
+                            2. Email / Username Akun
+                          </span>
+                          <input
+                            type="text"
+                            value={parsedCred.accountEmail}
+                            onChange={(e) => updateCredField({ accountEmail: e.target.value })}
+                            placeholder="akun.game@gmail.com"
+                            data-testid="form-delivery-email-input"
+                            className="mt-1 w-full rounded-xl bg-panel border border-line focus:border-neon outline-none text-xs font-mono px-3 py-2 text-neon placeholder:text-slate-600 transition-colors"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
+                            3. Password Akun
+                          </span>
+                          <input
+                            type="text"
+                            value={parsedCred.accountPassword}
+                            onChange={(e) => updateCredField({ accountPassword: e.target.value })}
+                            placeholder="PasswordAkun#123"
+                            data-testid="form-delivery-password-input"
+                            className="mt-1 w-full rounded-xl bg-panel border border-line focus:border-neon outline-none text-xs font-mono px-3 py-2 text-lime placeholder:text-slate-600 transition-colors"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Raw / Direct Paste Textarea ([Tipe Akun] [Email] [Password]) */}
+                      <label className="block">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                            Teks Lengkap Pengiriman ([Tipe Akun] [Email] [Password] + Catatan Opsional)
+                          </span>
+                          <span className="text-[10px] font-mono text-neon">
+                            Mendukung tempel (paste) langsung
+                          </span>
+                        </div>
+                        <textarea
+                          value={form.delivery_info}
+                          onChange={(e) => setForm({ ...form, delivery_info: e.target.value })}
+                          rows={3}
+                          placeholder="[Gmail] [contoh@gmail.com] [Password#123]&#10;Catatan tambahan (opsional)..."
+                          data-testid="form-delivery-input"
+                          className="mt-1.5 w-full rounded-xl bg-panel border border-neon/30 focus:border-neon outline-none text-xs font-mono px-3.5 py-2.5 leading-relaxed placeholder:text-slate-600 transition-colors"
+                        />
+                      </label>
+                    </>
+                  );
+                })()}
+              </div>
               {/* Per-Product Payment Methods & Channels Configuration */}
               {(() => {
                 const payCfg = normalizePaymentConfig(form.payment_config);

@@ -745,28 +745,44 @@ function initDatabase() {
   }
 
   // Seed products, games, testimonials, manual destinations, social links, vendors
+  const seedProductMap = new Map<string, any>(
+    ((SEED.SEED_PRODUCTS || []) as any[]).map((sp) => [String(sp.id), sp])
+  );
   const nonTopupCount = db.products.filter((p) => p.product_type !== PRODUCT_TYPE).length;
   if (nonTopupCount === 0) {
     const legacy = (SEED.SEED_PRODUCTS || []).filter((p: any) => p.category !== TOPUP_CATEGORY);
     db.products.push(...legacy.map((p: any) => ({ ...p })));
   }
-  db.products = db.products.map((p) => ({
-    ...p,
-    images: Array.isArray(p.images) ? p.images.filter(Boolean).slice(0, 10) : [],
-    price_usd:
-      p.price_usd != null && Number(p.price_usd) > 0
-        ? Number(p.price_usd)
-        : Math.max(1, Math.round((Number(p.price || 0) / 16000) * 100) / 100),
-    payment_config: {
-      paykita: p.payment_config?.paykita !== false,
-      manual: p.payment_config?.manual !== false,
-      crypto: p.payment_config?.crypto !== false,
-      disabled_destinations: Array.isArray(p.payment_config?.disabled_destinations)
-        ? p.payment_config.disabled_destinations.map((id: any) => String(id)).filter(Boolean)
-        : [],
-    },
-    paykita: undefined,
-  }));
+  db.products = db.products.map((p) => {
+    const seedMatch = seedProductMap.get(String(p.id));
+    let deliveryInfo = String(p.delivery_info || "").trim();
+    if (
+      p.product_type !== PRODUCT_TYPE &&
+      p.category !== TOPUP_CATEGORY &&
+      seedMatch?.delivery_info &&
+      (!deliveryInfo || !deliveryInfo.includes("["))
+    ) {
+      deliveryInfo = seedMatch.delivery_info;
+    }
+    return {
+      ...p,
+      delivery_info: deliveryInfo || p.delivery_info,
+      images: Array.isArray(p.images) ? p.images.filter(Boolean).slice(0, 10) : [],
+      price_usd:
+        p.price_usd != null && Number(p.price_usd) > 0
+          ? Number(p.price_usd)
+          : Math.max(1, Math.round((Number(p.price || 0) / 16000) * 100) / 100),
+      payment_config: {
+        paykita: p.payment_config?.paykita !== false,
+        manual: p.payment_config?.manual !== false,
+        crypto: p.payment_config?.crypto !== false,
+        disabled_destinations: Array.isArray(p.payment_config?.disabled_destinations)
+          ? p.payment_config.disabled_destinations.map((id: any) => String(id)).filter(Boolean)
+          : [],
+      },
+      paykita: undefined,
+    };
+  });
   if (db.games.length === 0) {
     db.games.push(...(SEED.SEED_GAMES || []).map((g: any) => ({ ...g })));
   }
@@ -1689,7 +1705,9 @@ async function sendTransactionalEmail(opts: {
   };
 }
 
-function formatIndonesianTimestamp(date = new Date()): string {
+function formatIndonesianTimestamp(date: Date | string | number = new Date()): string {
+  const parsed = date instanceof Date ? date : new Date(date);
+  const validDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
   try {
     return (
       new Intl.DateTimeFormat("id-ID", {
@@ -1699,10 +1717,10 @@ function formatIndonesianTimestamp(date = new Date()): string {
         hour: "2-digit",
         minute: "2-digit",
         timeZone: "Asia/Jakarta",
-      }).format(date) + " WIB"
+      }).format(validDate) + " WIB"
     );
   } catch {
-    return date.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+    return validDate.toISOString().slice(0, 16).replace("T", " ") + " UTC";
   }
 }
 
@@ -2163,6 +2181,387 @@ async function sendSecurityNotification(user: any, eventTitle: string, message: 
     html,
     text: `Halo ${displayName},\n\n${message}\n\nWaktu: ${timestamp}`,
   });
+}
+
+// ---------------- Structured Account Delivery & Order Invoice Emails ----------------
+interface StructuredDeliveryInfo {
+  is_structured: boolean;
+  account_type: string;
+  account_email: string;
+  account_password: string;
+  formatted_bracket: string;
+  extra_notes: string;
+  raw: string;
+}
+
+function parseStructuredDeliveryInfo(rawInput?: string | null): StructuredDeliveryInfo {
+  const raw = String(rawInput || "").trim();
+  if (!raw) {
+    return {
+      is_structured: false,
+      account_type: "",
+      account_email: "",
+      account_password: "",
+      formatted_bracket: "",
+      extra_notes: "",
+      raw: "",
+    };
+  }
+
+  // Primary format: [tipe akun gmail dll] [email] [password]
+  const bracketRegex = /\[([^\]]+)\]\s*\[([^\]]+)\]\s*\[([^\]]+)\]/;
+  const match = raw.match(bracketRegex);
+  if (match) {
+    const account_type = String(match[1] || "").trim();
+    const account_email = String(match[2] || "").trim();
+    const account_password = String(match[3] || "").trim();
+    const formatted_bracket = `[${account_type}] [${account_email}] [${account_password}]`;
+    const extra_notes = raw
+      .replace(match[0], "")
+      .replace(/^\s*[-•|:]?\s*/, "")
+      .trim();
+    return {
+      is_structured: true,
+      account_type,
+      account_email,
+      account_password,
+      formatted_bracket,
+      extra_notes,
+      raw,
+    };
+  }
+
+  // Secondary fallback: pipe or newline separated 3 parts if it looks like credentials
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const firstLine = lines[0] || "";
+  const pipeParts = firstLine.split(/\s*\|\s*/).filter(Boolean);
+  if (pipeParts.length >= 3) {
+    const account_type = pipeParts[0].trim();
+    const account_email = pipeParts[1].trim();
+    const account_password = pipeParts[2].trim();
+    return {
+      is_structured: true,
+      account_type,
+      account_email,
+      account_password,
+      formatted_bracket: `[${account_type}] [${account_email}] [${account_password}]`,
+      extra_notes: [...pipeParts.slice(3), ...lines.slice(1)].join("\n").trim(),
+      raw,
+    };
+  }
+
+  return {
+    is_structured: false,
+    account_type: "",
+    account_email: "",
+    account_password: "",
+    formatted_bracket: "",
+    extra_notes: raw,
+    raw,
+  };
+}
+
+function formatRupiahText(amount?: number | string | null): string {
+  const num = Math.round(Number(amount || 0));
+  return "Rp " + num.toLocaleString("id-ID");
+}
+
+async function sendOrderFulfillmentEmail(tx: any, req?: Request, forceResend = false) {
+  try {
+    if (!tx) {
+      return { ok: false, error: "Transaksi tidak ditemukan" };
+    }
+    const toEmail = String(tx.buyer_email || "").trim().toLowerCase();
+    if (!toEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
+      return { ok: false, error: "Alamat email pembeli belum tersedia atau tidak valid" };
+    }
+    if (tx.fulfillment_email_sent_at && !forceResend) {
+      return {
+        ok: true,
+        already_sent: true,
+        provider: tx.fulfillment_email_provider || "auto",
+        to_email: toEmail,
+      };
+    }
+
+    const cfg = getEmailAuthConfig();
+    const tpl = cfg.template;
+    const origin = getAppOrigin(req);
+    const orderUrl = `${origin}/payment/success?session_id=${encodeURIComponent(tx.session_id)}`;
+    const buyerName = toEmail.split("@")[0] || "Sobat Gamer";
+    const timestamp = formatIndonesianTimestamp(tx.paykita_confirmed_at || tx.updated_at || nowIso());
+  const isTopup = tx.product_type === PRODUCT_TYPE || String(tx.category || "").toLowerCase() === TOPUP_CATEGORY.toLowerCase();
+  const totalIdr = formatRupiahText(tx.pay_amount || tx.amount || 0);
+  const paymentMethodLabel = String(
+    tx.destination_name ||
+      tx.duitku_channel_name ||
+      (tx.payment_type === "crypto" ? `Crypto (${tx.crypto_symbol || "USDT"})` : "") ||
+      tx.gateway_name ||
+      tx.provider ||
+      "QRIS / Transfer"
+  );
+
+  if (isTopup) {
+    // Official Top Up Game Invoice Email (sent ONLY after payment is confirmed paid)
+    const gameName = String(tx.game_name || tx.game?.name || "Top Up Game");
+    const denomLabel = String(tx.denomination_label || tx.denomination_code || tx.product_title || "-");
+    const destText =
+      tx.destination && typeof tx.destination === "object"
+        ? Object.entries(tx.destination)
+            .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "")
+            .map(([k, v]) => `${k.toUpperCase()}: ${v}`)
+            .join(" / ")
+        : String(tx.customer_no || "-");
+    const nicknameText = String(tx.verified_nickname || "-");
+
+    const subject = `🧾 Invoice Lunas Top Up ${gameName} #${tx.session_id} — ${tpl.brand_name}`;
+    const bodyHtml = `Pembayaran Anda untuk pesanan Top Up <strong>${escapeHtml(
+      gameName
+    )} (${escapeHtml(
+      denomLabel
+    )})</strong> telah <strong>terkonfirmasi LUNAS</strong>. Berikut adalah rincian invoice resmi transaksi Anda:
+      <div style="margin-top:16px;padding:16px;background:#080C18;border:1px solid #00F0FF;border-radius:10px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#00F0FF;margin-bottom:8px;">
+          STATUS TOP UP • LUNAS &amp; DIPROSES OTOMATIS
+        </div>
+        <div style="font-size:14px;font-weight:700;color:#F8FAFC;margin-bottom:4px;">
+          ${escapeHtml(gameName)} — ${escapeHtml(denomLabel)}
+        </div>
+        <div style="font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',Consolas,monospace;">
+          Tujuan ID: <span style="color:#E2E8F0;font-weight:700;">${escapeHtml(destText)}</span>${
+      nicknameText && nicknameText !== "-"
+        ? ` • Nickname: <span style="color:#A3E635;font-weight:700;">${escapeHtml(nicknameText)}</span>`
+        : ""
+    }
+        </div>
+      </div>`;
+
+    const infoRows = [
+      { label: "Nomor Invoice", value: `#${tx.session_id}`, highlight: true },
+      { label: "Produk / Game", value: `${gameName} — ${denomLabel}`, highlight: true },
+      { label: "ID Tujuan / Server", value: destText },
+      ...(nicknameText && nicknameText !== "-"
+        ? [{ label: "Nickname Akun", value: nicknameText, highlight: true }]
+        : []),
+      { label: "Metode Pembayaran", value: paymentMethodLabel },
+      { label: "Total Dibayar", value: totalIdr, highlight: true },
+      { label: "Status Pembayaran", value: "LUNAS (TERVERIFIKASI)" },
+      { label: "Waktu Lunas", value: timestamp },
+    ];
+
+    const html = renderBrandedEmailTemplate({
+      templateCfg: tpl,
+      badgeText: "INVOICE TOP UP LUNAS",
+      heading: `Terima Kasih! Pembayaran Top Up #${tx.session_id} Lunas`,
+      greetingName: buyerName,
+      bodyHtml,
+      ctaText: "LIHAT INVOICE & STATUS PESANAN",
+      ctaUrl: orderUrl,
+      infoRows,
+      showBenefits: false,
+      footerNote:
+        "Simpan email ini sebagai bukti pembayaran resmi (Invoice) dari WillJustPlay. Item/Diamond diproses otomatis ke ID tujuan Anda.",
+      supportText: tpl.support_text,
+      originUrl: origin,
+    });
+
+    const text = [
+      `Halo ${buyerName},`,
+      ``,
+      `Terima kasih! Pembayaran Top Up Anda di ${tpl.brand_name} telah terkonfirmasi LUNAS.`,
+      ``,
+      `=== INVOICE RESMI TOP UP ===`,
+      `No. Invoice       : #${tx.session_id}`,
+      `Game              : ${gameName}`,
+      `Nominal / Item    : ${denomLabel}`,
+      `ID Tujuan         : ${destText}`,
+      ...(nicknameText && nicknameText !== "-" ? [`Nickname          : ${nicknameText}`] : []),
+      `Metode Pembayaran : ${paymentMethodLabel}`,
+      `Total Dibayar     : ${totalIdr}`,
+      `Status            : LUNAS (TERVERIFIKASI)`,
+      `Waktu Pembayaran  : ${timestamp}`,
+      ``,
+      `Lihat invoice lengkap di: ${orderUrl}`,
+    ].join("\n");
+
+    const mailRes = await sendTransactionalEmail({
+      to: toEmail,
+      subject,
+      template: "topup-invoice",
+      html,
+      text,
+      previewUrl: `/payment/success?session_id=${encodeURIComponent(tx.session_id)}`,
+    });
+
+    tx.fulfillment_email_sent = true;
+    tx.fulfillment_email_provider = mailRes.provider;
+    tx.fulfillment_email_sent_at = nowIso();
+    tx.fulfillment_email_to = toEmail;
+    tx.fulfillment_email_type = "topup_invoice";
+    saveDb();
+
+    return {
+      ok: true,
+      type: "topup_invoice",
+      to_email: toEmail,
+      provider: mailRes.provider,
+      delivered: mailRes.delivered,
+      sent_at: tx.fulfillment_email_sent_at,
+    };
+  } else {
+    // Store Account / Digital Product Fulfillment Email with [Tipe Akun] [Email] [Password]
+    const rawDelivery = String(
+      tx.delivery_info ||
+        "[Gmail] [akses.pesanan@willjustplay.com] [Wjp#2026]"
+    ).trim();
+    const parsed = parseStructuredDeliveryInfo(rawDelivery);
+    const formattedBracket = parsed.is_structured
+      ? parsed.formatted_bracket
+      : `[Akun Produk] [${toEmail}] [${rawDelivery}]`;
+
+    const subject = `🔐 Data Akses Akun & Invoice #${tx.session_id} — ${tx.product_title || tpl.brand_name}`;
+
+    const structuredCardHtml = parsed.is_structured
+      ? `<div style="margin-top:16px;padding:18px;background:#080C18;border:1px solid #A3E635;border-radius:10px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#A3E635;margin-bottom:10px;">
+            🔐 DATA AKSES AKUN ANDA (FORMAT RESMI)
+          </div>
+          <div style="padding:11px 13px;background:#05070F;border:1px dashed #1E293B;border-radius:8px;font-family:'JetBrains Mono',Consolas,monospace;font-size:13px;color:#00F0FF;font-weight:700;word-break:break-all;margin-bottom:12px;">
+            ${escapeHtml(parsed.formatted_bracket)}
+          </div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+            <tr>
+              <td style="padding:6px 0;font-size:12px;color:#94A3B8;width:36%;">Tipe Akun</td>
+              <td style="padding:6px 0;font-size:13px;color:#F8FAFC;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace;">${escapeHtml(
+                parsed.account_type
+              )}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;font-size:12px;color:#94A3B8;border-top:1px solid #161F33;">Email / Username</td>
+              <td style="padding:6px 0;font-size:13px;color:#00F0FF;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace;border-top:1px solid #161F33;">${escapeHtml(
+                parsed.account_email
+              )}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;font-size:12px;color:#94A3B8;border-top:1px solid #161F33;">Password</td>
+              <td style="padding:6px 0;font-size:13px;color:#A3E635;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace;border-top:1px solid #161F33;">${escapeHtml(
+                parsed.account_password
+              )}</td>
+            </tr>
+          </table>
+          ${
+            parsed.extra_notes
+              ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #161F33;font-size:12px;color:#CBD5E1;line-height:1.5;">
+                  <strong>Catatan / Instruksi:</strong><br/>${escapeHtml(parsed.extra_notes).replace(/\n/g, "<br/>")}
+                </div>`
+              : ""
+          }
+        </div>`
+      : `<div style="margin-top:16px;padding:18px;background:#080C18;border:1px solid #A3E635;border-radius:10px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#A3E635;margin-bottom:8px;">
+            🔐 DATA AKSES / PENGIRIMAN PESANAN
+          </div>
+          <div style="font-family:'JetBrains Mono',Consolas,monospace;font-size:13px;color:#F8FAFC;line-height:1.6;white-space:pre-line;">${escapeHtml(
+            rawDelivery
+          )}</div>
+        </div>`;
+
+    const bodyHtml = `Pembayaran Anda untuk produk <strong>${escapeHtml(
+      tx.product_title || "Produk Digital"
+    )}</strong> telah <strong>terkonfirmasi LUNAS</strong>. Berikut adalah akses data akun beserta invoice pembelian Anda:${structuredCardHtml}`;
+
+    const infoRows = [
+      { label: "Nomor Pesanan / Invoice", value: `#${tx.session_id}`, highlight: true },
+      { label: "Produk Dibeli", value: String(tx.product_title || "-"), highlight: true },
+      ...(parsed.is_structured
+        ? [
+            { label: "Format Akses", value: parsed.formatted_bracket, highlight: true },
+            { label: "Tipe Akun", value: parsed.account_type },
+            { label: "Email / Username", value: parsed.account_email, highlight: true },
+            { label: "Password Akun", value: parsed.account_password, highlight: true },
+          ]
+        : []),
+      { label: "Metode Pembayaran", value: paymentMethodLabel },
+      { label: "Total Dibayar", value: totalIdr, highlight: true },
+      { label: "Waktu Lunas", value: timestamp },
+    ];
+
+    const html = renderBrandedEmailTemplate({
+      templateCfg: tpl,
+      badgeText: "AKSES AKUN & INVOICE",
+      heading: "Pembayaran Lunas! Ini Data Akses Akun Anda",
+      greetingName: buyerName,
+      bodyHtml,
+      ctaText: "BUKA HALAMAN PESANAN & SALIN DATA",
+      ctaUrl: orderUrl,
+      infoRows,
+      showBenefits: false,
+      footerNote:
+        "Demi keamanan akun Anda, segera login dan amankan/ganti kata sandi setelah menerima data akses ini. Jangan bagikan email ini kepada siapa pun.",
+      supportText: tpl.support_text,
+      originUrl: origin,
+    });
+
+    const text = [
+      `Halo ${buyerName},`,
+      ``,
+      `Pembayaran Anda untuk "${tx.product_title}" (#${tx.session_id}) telah LUNAS.`,
+      ``,
+      `=== DATA AKSES AKUN ===`,
+      `Format Lengkap   : ${formattedBracket}`,
+      ...(parsed.is_structured
+        ? [
+            `Tipe Akun        : ${parsed.account_type}`,
+            `Email / Username : ${parsed.account_email}`,
+            `Password         : ${parsed.account_password}`,
+            ...(parsed.extra_notes ? [`Catatan          : ${parsed.extra_notes}`] : []),
+          ]
+        : [`Detail Pengiriman: ${rawDelivery}`]),
+      ``,
+      `=== RINGKASAN INVOICE ===`,
+      `No. Invoice      : #${tx.session_id}`,
+      `Metode Bayar     : ${paymentMethodLabel}`,
+      `Total Dibayar    : ${totalIdr}`,
+      `Waktu Lunas      : ${timestamp}`,
+      ``,
+      `Buka halaman pesanan: ${orderUrl}`,
+    ].join("\n");
+
+    const mailRes = await sendTransactionalEmail({
+      to: toEmail,
+      subject,
+      template: "order-delivery",
+      html,
+      text,
+      previewUrl: `/payment/success?session_id=${encodeURIComponent(tx.session_id)}`,
+    });
+
+    tx.fulfillment_email_sent = true;
+    tx.fulfillment_email_provider = mailRes.provider;
+    tx.fulfillment_email_sent_at = nowIso();
+    tx.fulfillment_email_to = toEmail;
+    tx.fulfillment_email_type = "account_access";
+    saveDb();
+
+    return {
+      ok: true,
+      type: "account_access",
+      to_email: toEmail,
+      provider: mailRes.provider,
+      delivered: mailRes.delivered,
+      sent_at: tx.fulfillment_email_sent_at,
+    };
+  }
+  } catch (err: any) {
+    console.error("[sendOrderFulfillmentEmail] Error:", err);
+    return {
+      ok: false,
+      error: err?.message || "Gagal mengirim email pesanan",
+    };
+  }
 }
 
 // ---------------- Auth & Session Helpers ----------------
@@ -4069,16 +4468,19 @@ function parseBuyer(body: any) {
   const email = String(body.buyer_email || "").trim().toLowerCase();
   let wa = String(body.buyer_whatsapp || "").replace(/[^\d]/g, "");
   if (wa.startsWith("0")) wa = "62" + wa.slice(1);
-  if (!email && !wa) {
-    throw { status: 400, detail: "Isi email atau nomor WhatsApp untuk pengiriman pesanan" };
+  if (!email) {
+    throw {
+      status: 400,
+      detail: "Alamat email wajib diisi sebelum pembelian untuk pengiriman akses data akun & invoice",
+    };
   }
-  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    throw { status: 400, detail: "Format email tidak valid" };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    throw { status: 400, detail: "Format alamat email tidak valid (contoh: nama@gmail.com)" };
   }
   if (wa && (wa.length < 9 || wa.length > 15)) {
     throw { status: 400, detail: "Nomor WhatsApp tidak valid" };
   }
-  return { buyer_email: email || null, buyer_whatsapp: wa || null };
+  return { buyer_email: email, buyer_whatsapp: wa || null };
 }
 
 api.post("/auth/reset-password", async (req, res) => {
@@ -5116,7 +5518,13 @@ api.post("/payments/paykita/checkout", async (req, res) => {
       expired_at: expiredAt,
       product_id: product.id,
       product_title: product.title,
-      delivery_info: product.delivery_info || "Data login akan dikirimkan via WhatsApp setelah verifikasi",
+      delivery_info:
+        product.delivery_info ||
+        `[Gmail] [akses.${String(product.id || "akun").toLowerCase()}@willjustplay.com] [Wjp#${String(
+          product.id || "2026"
+        )
+          .slice(0, 4)
+          .toUpperCase()}2026]`,
       user_id: user?.id || null,
       amount: priceIdr,
       amount_usd: priceUsd,
@@ -5164,6 +5572,9 @@ const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
     tx.paykita_confirmed_at = nowIso();
     tx.updated_at = nowIso();
     saveDb();
+    void sendOrderFulfillmentEmail(tx);
+  } else if (tx.payment_status === "paid" && !tx.fulfillment_email_sent_at) {
+    void sendOrderFulfillmentEmail(tx);
   }
 };
 
@@ -5745,7 +6156,13 @@ const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
       tx_hash: null as string | null,
       product_id: product.id,
       product_title: product.title,
-      delivery_info: product.delivery_info || "Data login akan dikirimkan via WhatsApp setelah verifikasi",
+      delivery_info:
+        product.delivery_info ||
+        `[Gmail] [akses.${String(product.id || "akun").toLowerCase()}@willjustplay.com] [Wjp#${String(
+          product.id || "2026"
+        )
+          .slice(0, 4)
+          .toUpperCase()}2026]`,
       user_id: user?.id || null,
       amount: priceIdr,
       amount_usd: priceUsd,
@@ -6032,6 +6449,11 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
     tx.gateway_id || (tx.product_type === PRODUCT_TYPE ? "duitku" : "paykita");
   const resolvedGwName =
     tx.gateway_name || (resolvedGwId === "duitku" ? "Duitku" : "PayKita");
+  const structuredDelivery =
+    paid && tx.product_type !== PRODUCT_TYPE
+      ? parseStructuredDeliveryInfo(tx.delivery_info)
+      : null;
+
   res.json({
     session_id: tx.session_id,
     paykita_ref: tx.paykita_ref || tx.session_id,
@@ -6064,10 +6486,23 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
     pay_url: !paid ? tx.pay_url || null : null,
     expired_at: tx.expired_at || null,
     delivery_info: paid ? tx.delivery_info || "" : "",
+    structured_delivery: structuredDelivery,
+    buyer_email: tx.buyer_email || null,
+    buyer_whatsapp: tx.buyer_whatsapp || null,
+    fulfillment_email_sent: Boolean(tx.fulfillment_email_sent),
+    fulfillment_email_sent_at: tx.fulfillment_email_sent_at || null,
+    fulfillment_email_provider: tx.fulfillment_email_provider || null,
+    fulfillment_email_to: tx.fulfillment_email_to || tx.buyer_email || null,
+    fulfillment_email_type:
+      tx.fulfillment_email_type ||
+      (tx.product_type === PRODUCT_TYPE ? "topup_invoice" : "account_access"),
     product_type: tx.product_type || "product",
     product_title: tx.product_title,
     game,
+    game_name: tx.game_name || game?.name || null,
     destination: tx.product_type === PRODUCT_TYPE ? tx.destination : null,
+    customer_no: tx.customer_no || null,
+    verified_nickname: tx.verified_nickname || null,
     denomination_code: tx.denomination_code,
     denomination_label: tx.denomination_label,
     admin_note: paid ? tx.admin_note || null : null,
@@ -6075,11 +6510,52 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
     destination_name: tx.destination_name,
     manual_destination: manualDest,
     has_proof: Boolean(tx.has_proof),
+    created_at: tx.created_at || null,
+    updated_at: tx.updated_at || null,
   });
 };
 
 api.get("/payments/status/:session_id", handlePaymentStatus);
 api.get("/payments/checkout/status/:session_id", handlePaymentStatus);
+
+api.post("/payments/resend-order-email/:session_id", async (req, res) => {
+  const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
+  if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
+  const paid =
+    tx.payment_status === "paid" &&
+    (tx.provider !== "paykita" || Boolean(tx.paykita_confirmed));
+  if (!paid) {
+    return res.status(400).json({
+      detail: "Email akses akun / invoice hanya dikirim setelah pembayaran terkonfirmasi lunas",
+    });
+  }
+  const overrideEmail = String(req.body?.email || "").trim().toLowerCase();
+  if (overrideEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(overrideEmail)) {
+      return res.status(400).json({ detail: "Format alamat email tidak valid" });
+    }
+    tx.buyer_email = overrideEmail;
+    saveDb();
+  }
+  if (!tx.buyer_email) {
+    return res.status(400).json({ detail: "Alamat email pembeli belum tercatat pada pesanan ini" });
+  }
+  const mailResult = await sendOrderFulfillmentEmail(tx, req, true);
+  if (!mailResult.ok) {
+    return res.status(400).json({ detail: mailResult.error || "Gagal mengirim email pesanan" });
+  }
+  res.json({
+    ok: true,
+    to_email: mailResult.to_email,
+    provider: mailResult.provider,
+    sent_at: mailResult.sent_at,
+    type: mailResult.type,
+    message:
+      tx.product_type === PRODUCT_TYPE
+        ? `Invoice Top Up resmi berhasil dikirim ke ${mailResult.to_email}`
+        : `Data akses akun & invoice berhasil dikirim ke ${mailResult.to_email}`,
+  });
+});
 
 // Allow image uploads from both buyers (ReviewModal) and admins
 api.post("/admin/upload", upload.single("file"), (req, res) => {
@@ -6255,10 +6731,13 @@ admin.get("/orders/:session_id/proof", (req, res) => {
   res.json({ payment_proof: tx.payment_proof });
 });
 
-admin.post("/orders/:session_id/approve", (req, res) => {
+admin.post("/orders/:session_id/approve", async (req, res) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
   if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
   if (tx.payment_status === "paid" && (tx.provider !== "paykita" || tx.paykita_confirmed)) {
+    if (!tx.fulfillment_email_sent_at) {
+      await sendOrderFulfillmentEmail(tx, req);
+    }
     return res.json(tx);
   }
   tx.status = "completed";
@@ -6278,6 +6757,7 @@ admin.post("/orders/:session_id/approve", (req, res) => {
     tx.stock_deducted = true;
   }
   saveDb();
+  await sendOrderFulfillmentEmail(tx, req);
   res.json(tx);
 });
 

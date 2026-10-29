@@ -1,52 +1,51 @@
-# Rencana Desain Ulang Checkout Produk Beranda (Clean, Dinamis & Simpel)
+# Rencana Implementasi: Format Pengiriman Akun Terstruktur, Pengiriman Email Otomatis (Akses Akun & Invoice Top Up), dan Wajib Email Saat Checkout
 
 ## 1. Tujuan & Gambaran Umum
-Merapikan dan menyederhanakan alur pembelian **Produk Beranda** secara menyeluruh — mulai dari **Modal Detail & Checkout Cepat (`src/components/ProductModal.jsx`)** hingga **Halaman Instruksi & Konfirmasi Pembayaran (`src/pages/PaymentSuccess.jsx`)** — agar terasa jauh lebih bersih (*clean*), responsif/dinamis, minim langkah, dan sangat mudah dipahami oleh pembeli.
+Menyempurnakan alur pembelian, pengiriman produk akun beranda, dan pengiriman invoice produk Top Up dengan empat pembaruan utama:
+1. **Format Pengiriman Data Akun Terstruktur (`[Tipe Akun] [Email] [Password]`)**: Menyediakan input terstruktur 3 kolom (Tipe Akun seperti Gmail/Moonton/Google/dll, Email/Username, dan Password) di Panel Admin yang tersinkronisasi dua arah dengan mode tempel teks langsung (`[tipe akun] [email] [password]`).
+2. **Tampilan Kartu Kredensial Akun Interaktif**: Menampilkan data akses akun di halaman sukses pembayaran (`PaymentSuccess`) dalam kartu terstruktur dengan tombol salin per bagian (*Tipe Akun*, *Email*, *Password*) sekaligus tombol salin format penuh (`[Tipe Akun] [Email] [Password]`).
+3. **Pengiriman Email Otomatis ke Pembeli Saat Lunas**:
+   - **Produk Beranda (Akun/Item)**: Mengirimkan email berisi **Data Akses Akun Terstruktur** (`[Tipe Akun] [Email] [Password]`) beserta rincian transaksi ke email pembeli begitu pembayaran terkonfirmasi lunas (baik via QRIS otomatis PayKita maupun persetujuan Admin).
+   - **Produk Top Up Game**: Mengirimkan email **Invoice Resmi Top Up Game** (berisi ID Pesanan, Game, Nominal Item, Tujuan User ID/Zone ID & Nickname, Metode Bayar Duitku, Total Bayar, dan Status Pengiriman Digiflazz) ke email pembeli segera setelah pembayaran Top Up terkonfirmasi lunas.
+4. **Wajib Memasukkan Email Sebelum Pembelian**: Mewajibkan pembeli mengisi alamat email yang valid (otomatis terisi jika sudah login) sebelum melanjutkan pembayaran baik pada produk Beranda (`ProductModal`) maupun produk Top Up (`Topup` & `TopupPaymentStep`), disertai validasi di sisi server (`server.ts`).
 
 ---
 
-## 2. Pengalaman Pengguna & Perombakan Antarmuka (UX & UI)
+## 2. Perubahan Antarmuka & Pengalaman Pengguna (Frontend)
 
-### A. Modal Detail & Checkout Produk Beranda (`src/components/ProductModal.jsx`)
-1. **Tata Letak Satu Tampilan Ringkas (*Contiguous Purchase Module*)**:
-   - **Kolom Kiri (Media & Spesifikasi Inti)**: Galeri foto produk berasio proporsional dengan navigasi *swipe* & *thumbnail* yang bersih, diikuti baris informasi spesifikasi inti (Rank/Tier, Stok, Garansi) dengan pemisah garis tipis (*hairline divider*) tanpa tumpukan kotak di dalam kotak (*no cards-within-cards*).
-   - **Kolom Kanan (Info Produk & Checkout Langsung)**:
-     - Header produk yang bersih menampilkan kategori, status ketersediaan, judul produk, dan harga utama (`IDR` & ekuivalen `USD` untuk opsi Crypto) dalam format *tabular numerals* yang tegas.
-     - Deskripsi produk ringkas yang dapat dibuka/tutup (*collapsible*) dengan transisi halus tanpa memakan ruang vertikal berlebih.
-2. **Input Kontak Pembeli Pintar (1 Kolom Utama + Auto-Fill)**:
-   - Mengganti dua kolom input yang padat menjadi **satu input kontak pintar** (*No. WhatsApp atau Email Aktif*) yang otomatis terisi (*auto-filled*) jika pengguna sudah login (`user.email`).
-   - Dilengkapi tombol opsional *"+ Tambah WhatsApp / Email cadangan"* jika pembeli ingin menyertakan keduanya, atau deteksi otomatis apakah input berupa nomor WhatsApp (`08...` / `+62...`) atau alamat email, sehingga pembeli cukup mengetik satu kontak saja untuk langsung lanjut bayar.
-3. **Pemilih Metode Pembayaran yang Jelas & Dinamis**:
-   - Menyajikan pilihan metode pembayaran produk beranda (**QRIS Otomatis PayKita**, **Transfer / QRIS Manual**, dan **Crypto USD**) menggunakan kontrol tab/kartu bersih yang langsung menampilkan ringkasan instruksi singkat:
-     - **QRIS Otomatis (PayKita)**: Menampilkan indikator proses instan satu klik tanpa perlu memilih sub-rekening.
-     - **Transfer / QRIS Manual**: Menampilkan daftar tujuan bank/e-wallet/QRIS dalam bentuk kartu pilihan bersih yang mudah diklik.
-     - **Crypto (USDT/Coin)**: Menampilkan nominal USD otomatis beserta pilihan jaringan (*network*) yang rapi.
-4. **Ringkasan Total & Tombol CTA Utama (*Sticky Action Bar*)**:
-   - Baris tombol aksi utama yang selalu mudah dijangkau di bagian bawah modal, menampilkan nominal yang harus dibayar secara dinamis sesuai metode yang dipilih serta tombol tanya CS via WhatsApp yang proporsional.
+### A. Wajib Email pada Checkout Produk Beranda (`src/components/ProductModal.jsx`)
+- Mengubah input kontak pada `ProductModal.jsx` agar memiliki **input Email Pembeli (Wajib `*`)** yang otomatis terisi dari email akun apabila user sudah login, serta input **WhatsApp (Opsional)** pendamping.
+- Menambahkan validasi format email (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`) sebelum tombol **Bayar Sekarang** memproses pesanan, dengan pesan petunjuk bahwa akses akun (`[Tipe Akun] [Email] [Password]`) dan bukti pembayaran akan dikirim langsung ke alamat email tersebut.
 
-### B. Halaman Instruksi & Status Pembayaran (`src/pages/PaymentSuccess.jsx`)
-1. **Hierarki Informasi Pembayaran yang Bersih & Fokus**:
-   - Menghilangkan elemen dekoratif yang ramai dan menyatukan kartu pembayaran ke dalam satu kontainer fokus dengan *progress step* yang jelas: **1. Selesaikan Pembayaran → 2. Verifikasi → 3. Pesanan Selesai**.
-   - Ringkasan pesanan ringkas di bagian atas (Nama Produk, ID Sesi dengan tombol salin cepat, dan batas waktu pembayaran *live countdown*).
-2. **Tampilan Dinamis Berdasarkan Metode Pembayaran**:
-   - **Mode QRIS Otomatis (PayKita)**:
-     - Bingkai kode QRIS bersih di tengah halaman dengan tombol **"Unduh / Perbesar QRIS"** dan tombol **"Salin Nominal Total Bayar"**.
-     - Rincian harga (Harga Produk + Kode Unik/Biaya Layanan jika ada) ditampilkan secara transparan dengan garis pemisah tipis.
-     - Tombol **"Cek Status Pembayaran"** yang berdampingan dengan deteksi otomatis (*auto-polling* setiap 3 detik) tanpa perlu muat ulang halaman.
-   - **Mode Transfer Manual / Crypto**:
-     - Kartu nomor rekening / alamat wallet dengan tombol **Salin** satu klik dan tampilan QR (jika tersedia).
-     - Area **Upload Bukti Transfer** (atau input TXID untuk Crypto) dengan pratinjau file dan umpan balik instan saat bukti berhasil dikirim.
-3. **Tampilan Pengiriman Akun / Produk (*Delivery Box*)**:
-   - Saat pembayaran terkonfirmasi lunas, menampilkan informasi akun/akses di dalam panel khusus yang mudah disalin atau dibuka langsung, disertai tombol ulasan dan bantuan WhatsApp CS.
+### B. Wajib Email pada Checkout Produk Top Up (`src/pages/Topup.jsx` & `src/components/topup/TopupPaymentStep.jsx`)
+- Menandai kolom **Alamat Email** sebagai **Wajib (`*`)** di `TopupPaymentStep.jsx` dengan keterangan bahwa invoice resmi Top Up akan dikirim otomatis ke email tersebut setelah lunas.
+- Memperbarui validasi `submit()` di `src/pages/Topup.jsx` agar mewajibkan email aktif yang valid sebelum membuat transaksi Duitku.
+
+### C. Input Pengiriman Akun Terstruktur di Panel Admin (`src/pages/Admin.jsx`)
+- Pada modal **Tambah / Edit Produk Beranda**, bagian **Info Akun / Pengiriman Data (`delivery_info`)** dilengkapi builder interaktif:
+  - **Input Kolom Terstruktur**: Pilihan cepat / input `Tipe Akun` (Gmail, Moonton, Google Play, Facebook, Hoyoverse, Riot, VK, Lainnya), kolom `Email / Username`, kolom `Password`, serta `Catatan Tambahan (Opsional)`.
+  - **Sinkronisasi Otomatis & Mode Tempel Langsung**: Setiap perubahan pada ketiga kolom otomatis membentuk format standar `[Tipe Akun] [Email] [Password]`, dan jika Admin menempelkan teks berformat `[Gmail] [contoh@gmail.com] [pass123]` pada kotak teks langsung, ketiga kolom otomatis terisi.
+
+### D. Kartu Akses Akun Terstruktur & Status Email di Halaman Pembayaran (`src/pages/PaymentSuccess.jsx`)
+- Menambahkan parser cerdas yang membaca `delivery_info` berformat `[Tipe Akun] [Email] [Password]` (maupun format baris/teks).
+- Menampilkan **Kartu Kredensial Akun** yang memisahkan baris **Tipe Akun**, **Email / Username**, dan **Password** lengkap dengan tombol **Salin** di masing-masing baris serta tombol **Salin Semua Format (`[Tipe] [Email] [Password]`)**.
+- Menampilkan indikator bahwa salinan akses akun (untuk produk Beranda) atau invoice resmi (untuk produk Top Up) telah dikirimkan ke alamat email pembeli (`buyer_email`), disertai tombol **Kirim Ulang ke Email** bila pembeli ingin menerima ulang di inbox.
 
 ---
 
-## 3. File yang Akan Dimodifikasi
-- `src/components/ProductModal.jsx`: Perombakan tata letak modal produk beranda, penyederhanaan input kontak pembeli (1 input pintar + auto-fill), perapian kartu pemilihan metode pembayaran (PayKita, Manual, Crypto), serta tetap mempertahankan seluruh atribut `data-testid` dan kompatibilitas API backend.
-- `src/pages/PaymentSuccess.jsx`: Penyederhanaan tampilan halaman pembayaran dan status transaksi agar lebih bersih, terstruktur dengan *step indicator* yang jelas, serta mempermudah penyalinan nomor rekening/nominal dan *upload* bukti bayar.
+## 3. Perubahan Backend & Pengiriman Email (`server.ts`)
 
----
+### A. Validasi Wajib Email Pembeli (`parseBuyer`)
+- Memperbarui fungsi `parseBuyer(body)` di `server.ts` agar memastikan `buyer_email` wajib diisi dan memiliki format email yang valid pada setiap pembuatan pesanan (`/api/payments/paykita/checkout`, `/api/payments/manual/checkout`, `/api/payments/crypto/checkout`, dan `/api/payments/topup/checkout`).
 
-## 4. Verifikasi
-- Memastikan seluruh alur checkout produk beranda (**PayKita QRIS Otomatis**, **Transfer Manual**, dan **Crypto**) berfungsi lancar dari modal produk hingga halaman pembayaran.
-- Menjalankan `compile_applet` untuk memastikan tidak ada *error* kompilasi atau *broken imports*.
+### B. Helper Parser & Formatter Pengiriman Akun
+- Menambahkan fungsi `parseStructuredDeliveryInfo(raw)` dan `formatStructuredDeliveryInfo(...)` di `server.ts` untuk mengekstrak `accountType`, `accountEmail`, `accountPassword`, dan `extraNotes` dari format `[tipe akun] [email] [password]` serta memperbarui data seed produk beranda agar menggunakan format standar `[Tipe Akun] [Email] [Password]`.
+
+### C. Pengiriman Email Akses Akun & Invoice Top Up Otomatis Saat Lunas
+- Membuat fungsi `sendOrderFulfillmentEmail(tx, req?)` menggunakan `renderBrandedEmailTemplate` dan `sendTransactionalEmail`:
+  1. **Untuk Produk Beranda (`product_type !== "topup"`)**: Mengirimkan email bertajuk **"📦 Akses Data Akun & Bukti Pembelian — {{product_title}}"** yang memuat blok kredensial `[Tipe Akun]`, `[Email / Username]`, `[Password]`, format lengkap `[tipe akun] [email] [password]`, serta detail invoice pesanan.
+  2. **Untuk Produk Top Up Game (`product_type === "topup"`)**: Mengirimkan email bertajuk **"🧾 Invoice Resmi Top Up {{game_name}} — {{denomination_label}}"** yang memuat Nomor Invoice (`session_id`), Nama Game & Item, Tujuan Akun (`customer_no` & `verified_nickname`), Metode Pembayaran (`destination_name`), Rincian Harga & Total Lunas, serta Waktu Lunas.
+- Memanggil `sendOrderFulfillmentEmail(tx)` secara otomatis dan idempoten (`tx.fulfillment_email_sent_at`) saat status transaksi berubah menjadi `paid` di:
+  - `markPaykitaTransactionPaid` (saat pembayaran QRIS PayKita atau Duitku terkonfirmasi lunas via cek status / webhook).
+  - `admin.post("/orders/:session_id/approve")` (saat Admin menyetujui pembayaran manual / crypto / pesanan).
+- Menambahkan endpoint `POST /api/payments/resend-order-email/:session_id` agar pembeli atau admin dapat mengirim ulang email akses akun / invoice kapan saja jika diperlukan.

@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana perombakan UI/UX checkout produk beranda (ProductModal & halaman instruksi pembayaran PaymentSuccess) agar lebih clean, dinamis, simpel, dan mudah digunakan.",
-  "updatedAt":  "2026-10-29T11:33:35.493843665Z",
+  "summary":  "Rencana implementasi format pengiriman data akun terstruktur [Tipe Akun] [Email] [Password], pengiriman otomatis akses data akun & invoice Top Up ke email pembeli saat lunas, serta kewajiban input email sebelum pembelian.",
+  "updatedAt":  "2026-10-29T12:17:45.457845495Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -17,12 +17,55 @@ import {
   RefreshCw,
   AlertTriangle,
   ShieldCheck,
+  Mail,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import { api, waLink, imgSrc, formatIDR, formatUSD } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { ReviewModal } from "@/components/ReviewModal";
+
+function parseClientDeliveryInfo(rawInput, serverStructured) {
+  if (serverStructured && serverStructured.is_structured) {
+    return {
+      isStructured: true,
+      accountType: serverStructured.account_type || "Gmail",
+      accountEmail: serverStructured.account_email || "",
+      accountPassword: serverStructured.account_password || "",
+      formattedBracket:
+        serverStructured.formatted_bracket ||
+        `[${serverStructured.account_type}] [${serverStructured.account_email}] [${serverStructured.account_password}]`,
+      extraNotes: serverStructured.extra_notes || "",
+    };
+  }
+  const raw = String(rawInput || "").trim();
+  const match = raw.match(/\[([^\]]+)\]\s*\[([^\]]+)\]\s*\[([^\]]+)\]/);
+  if (match) {
+    const accountType = match[1].trim();
+    const accountEmail = match[2].trim();
+    const accountPassword = match[3].trim();
+    return {
+      isStructured: true,
+      accountType,
+      accountEmail,
+      accountPassword,
+      formattedBracket: `[${accountType}] [${accountEmail}] [${accountPassword}]`,
+      extraNotes: raw
+        .replace(match[0], "")
+        .replace(/^\s*[-•|:]?\s*/, "")
+        .trim(),
+    };
+  }
+  return {
+    isStructured: false,
+    accountType: "",
+    accountEmail: "",
+    accountPassword: "",
+    formattedBracket: raw,
+    extraNotes: "",
+  };
+}
 
 function PureQrisImage({
   qrisString,
@@ -186,6 +229,7 @@ export default function PaymentSuccess() {
   const [submittingHash, setSubmittingHash] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [refreshingQris, setRefreshingQris] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
   const [now, setNow] = useState(Date.now());
   void paymentType;
 
@@ -316,10 +360,53 @@ export default function PaymentSuccess() {
     txData?.manual_destination?.type === "crypto";
 
   const isLink = /^https?:\/\//i.test(delivery.trim());
+  const parsedCred = parseClientDeliveryInfo(delivery, txData?.structured_delivery);
+  const isTopupOrder = txData?.product_type === "topup";
+
   const copyDelivery = () => {
+    const textToCopy = parsedCred.isStructured ? parsedCred.formattedBracket : delivery;
     navigator.clipboard
-      .writeText(delivery)
-      .then(() => toast.success("Info akun disalin"));
+      .writeText(textToCopy)
+      .then(() =>
+        toast.success(
+          parsedCred.isStructured
+            ? "Format penuh [Tipe Akun] [Email] [Password] berhasil disalin!"
+            : "Data pesanan berhasil disalin"
+        )
+      );
+  };
+
+  const copyFieldText = (label, value) => {
+    navigator.clipboard
+      .writeText(String(value || ""))
+      .then(() => toast.success(`${label} berhasil disalin`));
+  };
+
+  const handleResendOrderEmail = async () => {
+    if (!sessionId) return;
+    setResendingEmail(true);
+    try {
+      const { data } = await api.post(`/payments/resend-order-email/${sessionId}`);
+      toast.success(
+        data?.message ||
+          `Email berhasil dikirim ke ${data?.to_email || txData?.buyer_email}`
+      );
+      setTxData((prev) =>
+        prev
+          ? {
+              ...prev,
+              fulfillment_email_sent: true,
+              fulfillment_email_sent_at: data?.sent_at || new Date().toISOString(),
+            }
+          : prev
+      );
+    } catch (err) {
+      toast.error(
+        err.response?.data?.detail || "Gagal mengirim ulang email pesanan"
+      );
+    } finally {
+      setResendingEmail(false);
+    }
   };
 
   const checkNow = async () => {
@@ -501,28 +588,135 @@ export default function PaymentSuccess() {
               Pembayaran <span className="text-lime">Berhasil</span>
             </h1>
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-              Terima kasih, pembayaranmu telah terkonfirmasi otomatis.
+              {isTopupOrder
+                ? "Pembayaran Top Up kamu telah lunas dan invoice resmi telah dikirim ke email."
+                : "Pembayaran terkonfirmasi! Akses data akun telah dikirim ke email kamu & tersedia di bawah ini."}
             </p>
+
+            {/* Email Delivery Confirmation & Resend Banner */}
+            {txData?.buyer_email && (
+              <div
+                data-testid="email-delivery-banner"
+                className="mt-4 flex flex-wrap items-center justify-between gap-2.5 bg-lime/10 border border-lime/40 px-3.5 py-2.5 text-left"
+              >
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <Mail size={15} className="text-lime shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-lime">
+                      {isTopupOrder
+                        ? "Invoice Top Up Terkirim ke Email"
+                        : "Akses Data Akun Terkirim ke Email"}
+                    </p>
+                    <p
+                      className="text-xs font-mono text-slate-200 truncate"
+                      data-testid="paid-buyer-email"
+                    >
+                      {txData.buyer_email}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResendOrderEmail}
+                  disabled={resendingEmail}
+                  data-testid="resend-order-email-button"
+                  className="inline-flex items-center gap-1.5 border border-lime/50 bg-void/80 hover:bg-lime hover:text-void text-lime text-[11px] font-mono font-semibold px-2.5 py-1.5 transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
+                >
+                  {resendingEmail ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={12} />
+                  )}
+                  <span>{resendingEmail ? "Mengirim..." : "Kirim Ulang Email"}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Official Top Up Invoice Card when Top Up order is Paid */}
+            {isTopupOrder && txData && (
+              <div
+                data-testid="topup-invoice-card"
+                className="mt-4 text-left border border-neon/40 bg-void/80 p-4 space-y-2.5"
+              >
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-line/70">
+                  <div className="flex items-center gap-2">
+                    <FileText size={14} className="text-neon" />
+                    <span className="text-xs font-semibold text-neon uppercase tracking-wider">
+                      Invoice Resmi Top Up Game
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-lime bg-lime/10 border border-lime/30 px-2 py-0.5">
+                    LUNAS
+                  </span>
+                </div>
+                <dl className="space-y-1.5 text-xs font-mono">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-400">No. Invoice</dt>
+                    <dd className="text-slate-100 font-semibold">#{sessionId}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-400">Game</dt>
+                    <dd className="text-slate-100 font-semibold">
+                      {txData.game_name || txData.game?.name || "-"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-400">Item Nominal</dt>
+                    <dd className="text-neon font-bold">
+                      {txData.denomination_label || txData.product_title || "-"}
+                    </dd>
+                  </div>
+                  {(txData.customer_no || txData.destination) && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-slate-400">ID Tujuan</dt>
+                      <dd className="text-slate-200 text-right break-all">
+                        {txData.customer_no ||
+                          Object.values(txData.destination || {})
+                            .filter(Boolean)
+                            .join(" / ")}
+                      </dd>
+                    </div>
+                  )}
+                  {txData.verified_nickname && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-slate-400">Nickname</dt>
+                      <dd className="text-lime font-bold">{txData.verified_nickname}</dd>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-3 pt-1.5 border-t border-line/60">
+                    <dt className="text-slate-300 font-semibold">Total Dibayar</dt>
+                    <dd className="text-lime font-bold">
+                      {formatIDR(txData.pay_amount || txData.amount || 0)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            )}
 
             {delivery ? (
               <div
-                className="mt-5 text-left border border-neon/40 bg-void/80 p-4 space-y-3"
+                className="mt-4 text-left border border-neon/40 bg-void/80 p-4 space-y-3"
                 data-testid="delivery-info-box"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <KeyRound size={14} className="text-neon" />
                     <span className="text-xs font-semibold text-neon">
-                      Data Akun / Pesanan Kamu
+                      {parsedCred.isStructured
+                        ? "Data Akses Akun [Tipe Akun] [Email] [Password]"
+                        : "Data Akun / Pesanan Kamu"}
                     </span>
                   </div>
                   <button
+                    type="button"
                     onClick={copyDelivery}
                     data-testid="delivery-info-copy"
-                    className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-300 hover:text-neon transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs font-mono text-neon hover:text-lime transition-colors cursor-pointer"
                   >
                     <Copy size={12} />
-                    <span>Salin Data</span>
+                    <span>
+                      {parsedCred.isStructured ? "Salin Format Penuh" : "Salin Data"}
+                    </span>
                   </button>
                 </div>
 
@@ -537,6 +731,110 @@ export default function PaymentSuccess() {
                     <ExternalLink size={14} />
                     <span>Buka Akses Akun</span>
                   </a>
+                ) : parsedCred.isStructured ? (
+                  <div className="space-y-2.5">
+                    {/* Full [Tipe Akun] [Email] [Password] String */}
+                    <div className="bg-panel border border-neon/30 p-3">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                          Format Lengkap
+                        </span>
+                        <span className="text-[10px] font-mono text-lime">
+                          [Tipe Akun] [Email] [Password]
+                        </span>
+                      </div>
+                      <pre
+                        data-testid="delivery-info-text"
+                        className="whitespace-pre-wrap break-all font-mono text-xs font-bold text-neon leading-relaxed"
+                      >
+                        {parsedCred.formattedBracket}
+                      </pre>
+                    </div>
+
+                    {/* Per-Part Structured Credential Rows with Individual Copy Buttons */}
+                    <div className="divide-y divide-line/70 border border-line bg-panel/90">
+                      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-mono uppercase text-slate-400">
+                            Tipe Akun
+                          </p>
+                          <p
+                            className="text-xs font-mono font-bold text-slate-100 truncate"
+                            data-testid="delivery-account-type"
+                          >
+                            {parsedCred.accountType}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyFieldText("Tipe Akun", parsedCred.accountType)
+                          }
+                          data-testid="copy-account-type"
+                          className="inline-flex items-center gap-1 border border-line hover:border-neon px-2.5 py-1 text-[11px] font-mono text-slate-300 hover:text-neon transition-colors shrink-0 cursor-pointer"
+                        >
+                          <Copy size={11} />
+                          <span>Salin</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-mono uppercase text-slate-400">
+                            Email / Username
+                          </p>
+                          <p
+                            className="text-xs font-mono font-bold text-neon break-all"
+                            data-testid="delivery-account-email"
+                          >
+                            {parsedCred.accountEmail}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyFieldText("Email / Username", parsedCred.accountEmail)
+                          }
+                          data-testid="copy-account-email"
+                          className="inline-flex items-center gap-1 border border-line hover:border-neon px-2.5 py-1 text-[11px] font-mono text-slate-300 hover:text-neon transition-colors shrink-0 cursor-pointer"
+                        >
+                          <Copy size={11} />
+                          <span>Salin</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-mono uppercase text-slate-400">
+                            Password Akun
+                          </p>
+                          <p
+                            className="text-xs font-mono font-bold text-lime break-all"
+                            data-testid="delivery-account-password"
+                          >
+                            {parsedCred.accountPassword}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyFieldText("Password", parsedCred.accountPassword)
+                          }
+                          data-testid="copy-account-password"
+                          className="inline-flex items-center gap-1 border border-line hover:border-lime px-2.5 py-1 text-[11px] font-mono text-slate-300 hover:text-lime transition-colors shrink-0 cursor-pointer"
+                        >
+                          <Copy size={11} />
+                          <span>Salin</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {parsedCred.extraNotes && (
+                      <div className="bg-panel/60 border border-line/70 px-3 py-2 text-xs font-mono text-slate-300 whitespace-pre-line">
+                        {parsedCred.extraNotes}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <pre
                     data-testid="delivery-info-text"
@@ -547,12 +845,12 @@ export default function PaymentSuccess() {
                 )}
 
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Simpan informasi akun ini dengan aman. Jika membutuhkan bantuan, hubungi CS kami.
+                  Simpan informasi akun ini dengan aman. Salinan lengkap juga telah dikirimkan ke alamat email kamu.
                 </p>
               </div>
             ) : (
               <div className="mt-5 p-4 bg-void/70 border border-line text-xs text-slate-300 leading-relaxed">
-                Detail pesanan / data akun sedang dikirimkan ke WhatsApp atau Email yang kamu daftarkan (estimasi 5–15 menit).
+                Detail pesanan / data akun telah dikirimkan ke alamat Email yang kamu daftarkan.
               </div>
             )}
 

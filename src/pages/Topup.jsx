@@ -142,8 +142,17 @@ export default function Topup() {
 
   const submit = async () => {
     setSummaryError("");
-    if (!email.trim() && !wa.trim()) {
-      setSummaryError("Isi email atau nomor WhatsApp untuk pengiriman pesanan.");
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      const msg = "Wajib memasukkan alamat email aktif sebelum melakukan pembelian untuk pengiriman invoice Top Up.";
+      setSummaryError(msg);
+      toast.error(msg);
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      const msg = "Format alamat email tidak valid (contoh: nama@gmail.com).";
+      setSummaryError(msg);
+      toast.error(msg);
       return;
     }
     if (!duitkuChannel) {
@@ -158,7 +167,7 @@ export default function Topup() {
         product_id: productId,
         destination: values,
         verified_nickname: validation?.nickname || "",
-        buyer_email: email.trim(),
+        buyer_email: cleanEmail,
         buyer_whatsapp: wa.trim(),
         method: "duitku",
         duitku_channel: duitkuChannel,
