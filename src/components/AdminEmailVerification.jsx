@@ -20,7 +20,7 @@ import {
   Copy,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, STORE_LOGO_URL } from "@/lib/api";
 
 const SMTP_PRESETS = [
   { label: "Gmail (TLS 587)", host: "smtp.gmail.com", port: 587, secure: false },
@@ -41,6 +41,7 @@ const ACCENT_PRESETS = [
 const DEFAULT_TEMPLATE = {
   brand_name: "WillJustPlay",
   brand_tagline: "STORE & TOP-UP GAME BERGARANSI",
+  logo_url: STORE_LOGO_URL,
   accent_color: "#00F0FF",
   verify_subject: "⚡ Verifikasi Email Akun {{brand_name}} — Halo {{name}}!",
   verify_badge: "VERIFIKASI AKUN",
@@ -313,6 +314,8 @@ export function AdminEmailVerification() {
     const sampleUrl =
       previewMode === "verify"
         ? `${sampleOrigin}/verify-email?token=7f8a9d2c4e1b6a3f9012e8c7b5a4d3f2`
+        : previewMode === "invoice"
+        ? `${sampleOrigin}/payment/success?session_id=WJP-INV-882910`
         : `${sampleOrigin}/reset-password?token=4c9e1a8b3d7f2e6c0a5b9d1e4f8a2c6b`;
 
     const nowFormatted = "25 Okt 2026, 01:45 WIB";
@@ -330,19 +333,33 @@ export function AdminEmailVerification() {
     };
 
     const isVerify = previewMode === "verify";
+    const isInvoice = previewMode === "invoice";
     return {
       accent,
+      logoUrl: tpl.logo_url || STORE_LOGO_URL,
       brandName: tpl.brand_name || "WillJustPlay",
       brandTagline: tpl.brand_tagline || "STORE & TOP-UP GAME BERGARANSI",
       monogram: (tpl.brand_name || "W").trim().slice(0, 2).toUpperCase(),
-      subject: interpolatePreview(isVerify ? tpl.verify_subject : tpl.reset_subject, vars),
-      badge: isVerify ? tpl.verify_badge || "VERIFIKASI AKUN" : "RESET PASSWORD",
-      heading: interpolatePreview(isVerify ? tpl.verify_heading : tpl.reset_heading, vars),
-      body: interpolatePreview(isVerify ? tpl.verify_body : tpl.reset_body, vars),
-      buttonText: interpolatePreview(
-        isVerify ? tpl.verify_button_text : tpl.reset_button_text,
-        vars
-      ),
+      subject: isInvoice
+        ? `🧾 Invoice Resmi & Akses Akun #WJP-INV-882910 — ${tpl.brand_name || "WillJustPlay"}`
+        : interpolatePreview(isVerify ? tpl.verify_subject : tpl.reset_subject, vars),
+      badge: isInvoice
+        ? "INVOICE & VERIFIKASI"
+        : isVerify
+        ? tpl.verify_badge || "VERIFIKASI AKUN"
+        : "RESET PASSWORD",
+      heading: isInvoice
+        ? "Terima Kasih! Invoice #WJP-INV-882910 Terverifikasi Lunas"
+        : interpolatePreview(isVerify ? tpl.verify_heading : tpl.reset_heading, vars),
+      body: isInvoice
+        ? "Pembayaran Anda untuk produk Akun Sultan Mobile Legends Mythic Immortal telah terkonfirmasi LUNAS. Berikut adalah akses data akun beserta invoice resmi pembelian Anda:"
+        : interpolatePreview(isVerify ? tpl.verify_body : tpl.reset_body, vars),
+      buttonText: isInvoice
+        ? "LIHAT INVOICE & SALIN DATA"
+        : interpolatePreview(
+            isVerify ? tpl.verify_button_text : tpl.reset_button_text,
+            vars
+          ),
       expiryLabel: isVerify
         ? `${cfg.verify_token_ttl_hours || 24} Jam`
         : `${cfg.reset_token_ttl_minutes || 60} Menit`,
@@ -713,33 +730,44 @@ export function AdminEmailVerification() {
               </label>
             </div>
 
-            {/* Mode Switcher for Editing Verify vs Reset */}
-            <div className="flex border-b border-line pt-1">
+            {/* Mode Switcher for Editing Verify vs Invoice vs Reset */}
+            <div className="flex flex-wrap border-b border-line pt-1">
               <button
                 type="button"
                 onClick={() => setPreviewMode("verify")}
-                className={`px-4 py-2 text-xs font-display font-bold uppercase tracking-wider border-b-2 transition-colors ${
+                className={`px-3.5 py-2 text-xs font-display font-bold uppercase tracking-wider border-b-2 transition-colors ${
                   previewMode === "verify"
                     ? "border-neon text-neon bg-neon/5"
                     : "border-transparent text-slate-400 hover:text-white"
                 }`}
               >
-                Konten Email Verifikasi Masuk
+                Email Verifikasi Masuk
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewMode("invoice")}
+                className={`px-3.5 py-2 text-xs font-display font-bold uppercase tracking-wider border-b-2 transition-colors ${
+                  previewMode === "invoice"
+                    ? "border-neon text-neon bg-neon/5"
+                    : "border-transparent text-slate-400 hover:text-white"
+                }`}
+              >
+                Email Invoice & Akses
               </button>
               <button
                 type="button"
                 onClick={() => setPreviewMode("reset")}
-                className={`px-4 py-2 text-xs font-display font-bold uppercase tracking-wider border-b-2 transition-colors ${
+                className={`px-3.5 py-2 text-xs font-display font-bold uppercase tracking-wider border-b-2 transition-colors ${
                   previewMode === "reset"
                     ? "border-neon text-neon bg-neon/5"
                     : "border-transparent text-slate-400 hover:text-white"
                 }`}
               >
-                Konten Email Reset Password
+                Email Reset Password
               </button>
             </div>
 
-            {previewMode === "verify" ? (
+            {previewMode !== "reset" ? (
               <div className="space-y-3.5">
                 <div className="grid sm:grid-cols-3 gap-3">
                   <label className="block sm:col-span-2">
@@ -947,13 +975,17 @@ export function AdminEmailVerification() {
                 <div className="px-6 py-5 border-b border-[#151e30] bg-[#070b13] flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className="w-9 h-9 rounded-md flex items-center justify-center font-black text-sm shrink-0"
+                      className="w-11 h-11 rounded-lg flex items-center justify-center font-black text-sm shrink-0 overflow-hidden p-0.5 bg-[#05070c]"
                       style={{
-                        backgroundColor: previewComputed.accent,
-                        color: "#05070c",
+                        border: `1px solid ${previewComputed.accent}`,
+                        boxShadow: `0 0 12px ${previewComputed.accent}33`,
                       }}
                     >
-                      {previewComputed.monogram}
+                      <img
+                        src={previewComputed.logoUrl}
+                        alt={previewComputed.brandName}
+                        className="w-full h-full object-contain rounded-md"
+                      />
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-black uppercase tracking-wider text-white truncate">
@@ -994,45 +1026,88 @@ export function AdminEmailVerification() {
                     {previewComputed.body}
                   </p>
 
-                  {/* Dynamic Account Summary Card */}
+                  {previewMode === "invoice" && (
+                    <div className="bg-[#080C18] border border-lime rounded-lg p-3.5 space-y-2">
+                      <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-lime">
+                        🔐 DATA AKSES AKUN ANDA (FORMAT RESMI TERVERIFIKASI)
+                      </div>
+                      <div className="p-2.5 bg-[#05070F] border border-dashed border-[#1E293B] rounded font-mono text-[11px] font-bold text-neon break-all">
+                        [Moonton + Gmail] [{previewEmail || "jondoe@gmail.com"}] [Wjp#Sultan2026]
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dynamic Account / Invoice Summary Card */}
                   {previewComputed.showAccountCard && (
                     <div
                       className="bg-[#0b111e] border border-[#1e293b] rounded-lg p-3.5 space-y-2"
                       style={{ borderLeft: `3px solid ${previewComputed.accent}` }}
                     >
-                      <div
-                        className="text-[10px] font-mono font-bold uppercase tracking-widest"
-                        style={{ color: previewComputed.accent }}
-                      >
-                        RINGKASAN AKTIVITAS & DETAIL AKUN
+                      <div className="flex items-center justify-between gap-2 border-b border-[#151f32] pb-1.5">
+                        <div
+                          className="text-[10px] font-mono font-bold uppercase tracking-widest"
+                          style={{ color: previewComputed.accent }}
+                        >
+                          {previewMode === "invoice"
+                            ? "RINCIAN INVOICE RESMI & VERIFIKASI"
+                            : "DETAIL VERIFIKASI AKUN & OTENTIKASI"}
+                        </div>
+                        <span className="px-1.5 py-0.5 rounded bg-[#071318] border border-lime text-[9px] font-mono font-bold text-lime uppercase">
+                          &#10003; TERVERIFIKASI
+                        </span>
                       </div>
-                      <div className="divide-y divide-[#151f32] text-[11px]">
-                        <div className="py-1 flex justify-between gap-2">
-                          <span className="text-slate-400">Nama Pengguna</span>
-                          <span className="font-bold text-slate-100">{previewName || "jon doe"}</span>
+                      {previewMode === "invoice" ? (
+                        <div className="divide-y divide-[#151f32] text-[11px]">
+                          <div className="py-1 flex justify-between gap-2">
+                            <span className="text-slate-400">Nomor Invoice</span>
+                            <span className="font-mono font-bold" style={{ color: previewComputed.accent }}>
+                              #WJP-INV-882910
+                            </span>
+                          </div>
+                          <div className="py-1 flex justify-between gap-2">
+                            <span className="text-slate-400">Produk Dibeli</span>
+                            <span className="font-bold text-slate-100">Akun Sultan MLBB Mythic</span>
+                          </div>
+                          <div className="py-1 flex justify-between gap-2">
+                            <span className="text-slate-400">Total Dibayar</span>
+                            <span className="font-mono font-bold" style={{ color: previewComputed.accent }}>
+                              Rp 450.000
+                            </span>
+                          </div>
+                          <div className="py-1 flex justify-between gap-2">
+                            <span className="text-slate-400">Status Pembayaran</span>
+                            <span className="font-bold text-lime">LUNAS (TERVERIFIKASI)</span>
+                          </div>
                         </div>
-                        <div className="py-1 flex justify-between gap-2">
-                          <span className="text-slate-400">Email Terdaftar</span>
-                          <span
-                            className="font-mono font-bold break-all"
-                            style={{ color: previewComputed.accent }}
-                          >
-                            {previewEmail || "jondoe@gmail.com"}
-                          </span>
+                      ) : (
+                        <div className="divide-y divide-[#151f32] text-[11px]">
+                          <div className="py-1 flex justify-between gap-2">
+                            <span className="text-slate-400">Nama Pengguna</span>
+                            <span className="font-bold text-slate-100">{previewName || "jon doe"}</span>
+                          </div>
+                          <div className="py-1 flex justify-between gap-2">
+                            <span className="text-slate-400">Email Terdaftar</span>
+                            <span
+                              className="font-mono font-bold break-all"
+                              style={{ color: previewComputed.accent }}
+                            >
+                              {previewEmail || "jondoe@gmail.com"}
+                            </span>
+                          </div>
+                          <div className="py-1 flex justify-between gap-2">
+                            <span className="text-slate-400">Waktu Permintaan</span>
+                            <span className="font-bold text-slate-100">{previewComputed.nowFormatted}</span>
+                          </div>
+                          <div className="py-1 flex justify-between gap-2">
+                            <span className="text-slate-400">Status Verifikasi</span>
+                            <span className="font-bold text-slate-100">
+                              {previewMode === "verify"
+                                ? "Menunggu Konfirmasi Email"
+                                : "Permintaan Reset Sandi"}
+                            </span>
+                          </div>
                         </div>
-                        <div className="py-1 flex justify-between gap-2">
-                          <span className="text-slate-400">Waktu Permintaan</span>
-                          <span className="font-bold text-slate-100">{previewComputed.nowFormatted}</span>
-                        </div>
-                        <div className="py-1 flex justify-between gap-2">
-                          <span className="text-slate-400">Status</span>
-                          <span className="font-bold text-slate-100">
-                            {previewMode === "verify"
-                              ? "Menunggu Verifikasi Email"
-                              : "Permintaan Reset Sandi"}
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -1047,12 +1122,14 @@ export function AdminEmailVerification() {
                     >
                       {previewComputed.buttonText} &rarr;
                     </div>
-                    <div className="text-[11px] font-mono text-slate-400">
-                      &#9201; Tautan keamanan ini berlaku selama{" "}
-                      <strong style={{ color: previewComputed.accent }}>
-                        {previewComputed.expiryLabel}
-                      </strong>
-                    </div>
+                    {previewMode !== "invoice" && (
+                      <div className="text-[11px] font-mono text-slate-400">
+                        &#9201; Tautan keamanan ini berlaku selama{" "}
+                        <strong style={{ color: previewComputed.accent }}>
+                          {previewComputed.expiryLabel}
+                        </strong>
+                      </div>
+                    )}
                     {previewMode === "verify" && (
                       <div
                         className="inline-block bg-[#060a12] rounded-lg px-5 py-2.5 mt-1"
@@ -1519,8 +1596,9 @@ export function AdminEmailVerification() {
               data-testid="test-email-template-type-select"
               className="mt-1.5 w-full bg-void border border-line focus:border-neon outline-none text-xs font-mono px-3.5 py-2.5 text-white"
             >
-              <option value="verify_preview">Desain Email Verifikasi Dinamis</option>
-              <option value="connection">Tes Koneksi Server Standar</option>
+              <option value="verify_preview">Desain Email Verifikasi Dinamis (+ Logo)</option>
+              <option value="invoice_preview">Desain Email Invoice & Akses Akun (+ Logo)</option>
+              <option value="connection">Tes Koneksi Server Standar (+ Logo)</option>
             </select>
           </label>
 

@@ -492,7 +492,7 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                 className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border font-display font-bold text-[10px] min-[390px]:text-[11px] sm:text-xs uppercase tracking-[0.12em] sm:tracking-[0.16em] px-4 sm:px-5 py-3 sm:py-3.5 transition-all duration-300 active:scale-95 ${
                   socialOpen
                     ? "border-neon bg-neon/10 text-neon shadow-[0_0_20px_rgba(0,240,255,0.18)]"
-                    : "border-line bg-panel/70 hover:border-neon/60 text-slate-300 hover:text-neon"
+                    : "border-line/50 bg-transparent hover:bg-white/[0.04] hover:border-neon/60 text-slate-300 hover:text-neon"
                 }`}
               >
                 <Share2 size={14} className="text-neon shrink-0" />

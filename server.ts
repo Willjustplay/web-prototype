@@ -1350,11 +1350,13 @@ function getEmailAuthConfig() {
   const tplRaw = raw.template || {};
   const rawAccent = String(tplRaw.accent_color || "#00F0FF").trim();
   const accentColor = /^#[0-9a-fA-F]{6}$/.test(rawAccent) ? rawAccent.toUpperCase() : "#00F0FF";
+  const DEFAULT_STORE_LOGO = "/assets/aistudio/photo_2026-10-28_01-45-50_fca1f215.jpg";
   const template = {
     brand_name: String(tplRaw.brand_name || "WillJustPlay").trim() || "WillJustPlay",
     brand_tagline:
       String(tplRaw.brand_tagline || "STORE & TOP-UP GAME BERGARANSI").trim() ||
       "STORE & TOP-UP GAME BERGARANSI",
+    logo_url: String(tplRaw.logo_url || DEFAULT_STORE_LOGO).trim() || DEFAULT_STORE_LOGO,
     accent_color: accentColor,
     verify_subject:
       String(tplRaw.verify_subject || "⚡ Verifikasi Email Akun {{brand_name}} — Halo {{name}}!").trim() ||
@@ -1440,6 +1442,68 @@ function getEmailAuthConfig() {
     last_test: raw.last_test || null,
     updated_at: raw.updated_at || null,
   };
+}
+
+const DEFAULT_STORE_LOGO_REL_PATH = "/assets/aistudio/photo_2026-10-28_01-45-50_fca1f215.jpg";
+const STORE_LOGO_CID = "wjp-store-logo";
+
+function resolveStoreLogoAttachment(customLogoUrl?: string): {
+  filename: string;
+  contentType: string;
+  buffer: Buffer;
+  base64: string;
+  cid: string;
+} | null {
+  try {
+    const candidate = String(customLogoUrl || DEFAULT_STORE_LOGO_REL_PATH).trim();
+    if (candidate.startsWith("/api/files/")) {
+      const fileKey = candidate.replace(/^\/api\/files\//, "");
+      const stored = db?.files?.[fileKey];
+      if (stored && stored.dataBase64) {
+        const buffer = Buffer.from(stored.dataBase64, "base64");
+        return {
+          filename: stored.filename || "willjustplay-logo.jpg",
+          contentType: stored.content_type || "image/jpeg",
+          buffer,
+          base64: stored.dataBase64,
+          cid: STORE_LOGO_CID,
+        };
+      }
+    }
+
+    const relAsset = candidate.startsWith("/assets/")
+      ? candidate.replace(/^\/+/, "")
+      : DEFAULT_STORE_LOGO_REL_PATH.replace(/^\/+/, "");
+    const diskCandidates = [
+      path.join(__dirname, "public", relAsset),
+      path.join(__dirname, "dist", relAsset),
+      path.join(__dirname, "public", DEFAULT_STORE_LOGO_REL_PATH.replace(/^\/+/, "")),
+    ];
+    for (const fullPath of diskCandidates) {
+      if (fs.existsSync(fullPath)) {
+        const buffer = fs.readFileSync(fullPath);
+        const ext = path.extname(fullPath).toLowerCase();
+        const contentType =
+          ext === ".png"
+            ? "image/png"
+            : ext === ".webp"
+            ? "image/webp"
+            : ext === ".gif"
+            ? "image/gif"
+            : "image/jpeg";
+        return {
+          filename: `willjustplay-logo${ext || ".jpg"}`,
+          contentType,
+          buffer,
+          base64: buffer.toString("base64"),
+          cid: STORE_LOGO_CID,
+        };
+      }
+    }
+  } catch (err) {
+    console.error("[resolveStoreLogoAttachment] Failed to read logo:", err);
+  }
+  return null;
 }
 
 function toPublicReachableOrigin(rawUrl: string): string {
@@ -1529,23 +1593,35 @@ async function sendViaResend(
   opts: { to: string; subject: string; html: string; text: string }
 ): Promise<{ ok: boolean; provider_id?: string | null; error?: string }> {
   try {
-    const resp = await axios.post(
-      "https://api.resend.com/emails",
-      {
-        from: resendCfg.formatted_from,
-        to: [opts.to],
-        subject: opts.subject,
-        html: opts.html,
-        text: opts.text,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${resendCfg.api_key}`,
-          "Content-Type": "application/json",
+    const cfg = getEmailAuthConfig();
+    const logoAtt =
+      opts.html.includes(`cid:${STORE_LOGO_CID}`)
+        ? resolveStoreLogoAttachment(cfg.template?.logo_url)
+        : null;
+    const payload: any = {
+      from: resendCfg.formatted_from,
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+    };
+    if (logoAtt) {
+      payload.attachments = [
+        {
+          filename: logoAtt.filename,
+          content: logoAtt.base64,
+          content_type: logoAtt.contentType,
+          content_id: logoAtt.cid,
         },
-        timeout: 10000,
-      }
-    );
+      ];
+    }
+    const resp = await axios.post("https://api.resend.com/emails", payload, {
+      headers: {
+        Authorization: `Bearer ${resendCfg.api_key}`,
+        "Content-Type": "application/json",
+      },
+      timeout: 10000,
+    });
     return { ok: true, provider_id: resp.data?.id || null };
   } catch (err: any) {
     const errMsg =
@@ -1569,6 +1645,11 @@ async function sendViaSmtp(
   opts: { to: string; subject: string; html: string; text: string }
 ): Promise<{ ok: boolean; provider_id?: string | null; error?: string }> {
   try {
+    const cfg = getEmailAuthConfig();
+    const logoAtt =
+      opts.html.includes(`cid:${STORE_LOGO_CID}`)
+        ? resolveStoreLogoAttachment(cfg.template?.logo_url)
+        : null;
     const transporter = nodemailer.createTransport({
       host: smtpCfg.host,
       port: Number(smtpCfg.port || 587),
@@ -1587,6 +1668,17 @@ async function sendViaSmtp(
       subject: opts.subject,
       html: opts.html,
       text: opts.text,
+      attachments: logoAtt
+        ? [
+            {
+              filename: logoAtt.filename,
+              content: logoAtt.buffer,
+              contentType: logoAtt.contentType,
+              cid: logoAtt.cid,
+              contentDisposition: "inline",
+            },
+          ]
+        : undefined,
     });
     return { ok: true, provider_id: info?.messageId || null };
   } catch (err: any) {
@@ -1745,6 +1837,7 @@ function renderBrandedEmailTemplate(params: {
   ctaUrl?: string;
   otpCode?: string;
   expiryLabel?: string;
+  infoTitle?: string;
   infoRows?: Array<{ label: string; value: string; highlight?: boolean }>;
   showBenefits?: boolean;
   footerNote?: string;
@@ -1767,6 +1860,18 @@ function renderBrandedEmailTemplate(params: {
   const supportText = escapeHtml(params.supportText ?? tpl.support_text ?? "");
   const year = new Date().getFullYear();
   const monogram = escapeHtml((tpl.brand_name || "W").trim().slice(0, 2).toUpperCase());
+  const rawLogoUrl = String(tpl.logo_url || DEFAULT_STORE_LOGO_REL_PATH).trim();
+  const hasInlineLogo = Boolean(resolveStoreLogoAttachment(rawLogoUrl));
+  const originClean = String(params.originUrl || getAppOrigin()).replace(/\/+$/, "");
+  const logoSrc = hasInlineLogo
+    ? `cid:${STORE_LOGO_CID}`
+    : /^https?:\/\//i.test(rawLogoUrl)
+    ? escapeHtml(rawLogoUrl)
+    : `${originClean}${rawLogoUrl.startsWith("/") ? rawLogoUrl : `/${rawLogoUrl}`}`;
+
+  const infoTitleText = escapeHtml(
+    params.infoTitle || "RINGKASAN AKTIVITAS & DETAIL AKUN"
+  );
 
   const infoRowsHtml =
     params.infoRows && params.infoRows.length > 0
@@ -1774,9 +1879,20 @@ function renderBrandedEmailTemplate(params: {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;background-color:#0b111e;border:1px solid #1e293b;border-left:3px solid ${accent};border-radius:8px;overflow:hidden;">
           <tr>
             <td style="padding:14px 18px;">
-              <div style="font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:${accent};margin-bottom:10px;">
-                RINGKASAN AKTIVITAS &amp; DETAIL AKUN
-              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;border-bottom:1px solid #151f32;padding-bottom:8px;">
+                <tr>
+                  <td valign="middle">
+                    <div style="font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${accent};">
+                      ${infoTitleText}
+                    </div>
+                  </td>
+                  <td valign="middle" align="right">
+                    <span style="display:inline-block;padding:2px 7px;background-color:#071318;border:1px solid #a3e635;border-radius:4px;font-family:'Courier New',Courier,monospace;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a3e635;white-space:nowrap;">
+                      &#10003; TERVERIFIKASI
+                    </span>
+                  </td>
+                </tr>
+              </table>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 ${params.infoRows
                   .map(
@@ -1925,7 +2041,7 @@ function renderBrandedEmailTemplate(params: {
             <td bgcolor="${accent}" style="height:4px;background:linear-gradient(90deg, ${accent} 0%, #a3e635 100%);font-size:0;line-height:0;">&nbsp;</td>
           </tr>
 
-          <!-- Header -->
+          <!-- Header with Official Store Logo -->
           <tr>
             <td style="padding:22px 26px 18px;border-bottom:1px solid #151e30;background-color:#070b13;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -1933,8 +2049,8 @@ function renderBrandedEmailTemplate(params: {
                   <td valign="middle">
                     <table role="presentation" cellpadding="0" cellspacing="0">
                       <tr>
-                        <td valign="middle" align="center" style="width:36px;height:36px;background-color:${accent};color:#05070c;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-weight:900;font-size:14px;letter-spacing:1px;border-radius:6px;">
-                          ${monogram}
+                        <td valign="middle" align="center" style="width:44px;height:44px;background-color:#05070c;border:1px solid ${accent};border-radius:8px;overflow:hidden;padding:2px;">
+                          <img src="${logoSrc}" alt="${brandName}" width="40" height="40" style="display:block;width:40px;height:40px;object-fit:contain;border-radius:6px;border:0;outline:none;text-decoration:none;color:${accent};font-weight:900;font-size:12px;text-align:center;line-height:40px;" />
                         </td>
                         <td valign="middle" style="padding-left:12px;">
                           <div style="font-size:16px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:#ffffff;line-height:1.2;">
@@ -1996,7 +2112,7 @@ function renderBrandedEmailTemplate(params: {
                   : ""
               }
               <div style="font-size:11px;font-family:'Courier New',Courier,monospace;color:#475569;">
-                &copy; ${year} ${brandName} &bull; Sistem Otentikasi &amp; Keamanan Terenkripsi
+                &copy; ${year} ${brandName} &bull; Invoice &amp; Verifikasi Resmi Terenkripsi
               </div>
             </td>
           </tr>
@@ -2043,7 +2159,7 @@ async function sendVerificationEmail(user: any, rawToken: string, req?: Request,
         { label: "Email Terdaftar", value: user.email, highlight: true },
         ...(otpCode ? [{ label: "Kode Verifikasi (OTP)", value: otpCode, highlight: true }] : []),
         { label: "Waktu Pendaftaran", value: timestamp },
-        { label: "Status Akun", value: "Menunggu Verifikasi Email" },
+        { label: "Status Verifikasi", value: "Menunggu Konfirmasi Email" },
       ]
     : [];
 
@@ -2057,6 +2173,7 @@ async function sendVerificationEmail(user: any, rawToken: string, req?: Request,
     ctaUrl: verifyUrl,
     otpCode,
     expiryLabel: `${ttlHours} Jam`,
+    infoTitle: "DETAIL VERIFIKASI AKUN & OTENTIKASI",
     infoRows,
     showBenefits: tpl.show_benefits,
     footerNote,
@@ -2128,6 +2245,7 @@ async function sendPasswordResetEmail(user: any, rawToken: string, req?: Request
     ctaText: buttonText,
     ctaUrl: resetUrl,
     expiryLabel: `${ttlMin} Menit`,
+    infoTitle: "VERIFIKASI PERMINTAAN RESET SANDI",
     infoRows,
     showBenefits: false,
     footerNote,
@@ -2163,6 +2281,7 @@ async function sendSecurityNotification(user: any, eventTitle: string, message: 
     heading: eventTitle,
     greetingName: displayName,
     bodyHtml: escapeHtml(message),
+    infoTitle: "DETAIL VERIFIKASI KEAMANAN AKUN",
     infoRows: [
       { label: "Akun", value: user.email, highlight: true },
       { label: "Aktivitas", value: eventTitle },
@@ -2325,7 +2444,7 @@ async function sendOrderFulfillmentEmail(tx: any, req?: Request, forceResend = f
     )})</strong> telah <strong>terkonfirmasi LUNAS</strong>. Berikut adalah rincian invoice resmi transaksi Anda:
       <div style="margin-top:16px;padding:16px;background:#080C18;border:1px solid #00F0FF;border-radius:10px;">
         <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#00F0FF;margin-bottom:8px;">
-          STATUS TOP UP • LUNAS &amp; DIPROSES OTOMATIS
+          STATUS TOP UP • LUNAS &amp; TERVERIFIKASI OTOMATIS
         </div>
         <div style="font-size:14px;font-weight:700;color:#F8FAFC;margin-bottom:4px;">
           ${escapeHtml(gameName)} — ${escapeHtml(denomLabel)}
@@ -2360,6 +2479,7 @@ async function sendOrderFulfillmentEmail(tx: any, req?: Request, forceResend = f
       bodyHtml,
       ctaText: "LIHAT INVOICE & STATUS PESANAN",
       ctaUrl: orderUrl,
+      infoTitle: "RINCIAN INVOICE RESMI & VERIFIKASI PEMBAYARAN",
       infoRows,
       showBenefits: false,
       footerNote:
@@ -2427,7 +2547,7 @@ async function sendOrderFulfillmentEmail(tx: any, req?: Request, forceResend = f
     const structuredCardHtml = parsed.is_structured
       ? `<div style="margin-top:16px;padding:18px;background:#080C18;border:1px solid #A3E635;border-radius:10px;">
           <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#A3E635;margin-bottom:10px;">
-            🔐 DATA AKSES AKUN ANDA (FORMAT RESMI)
+            🔐 DATA AKSES AKUN ANDA (FORMAT RESMI TERVERIFIKASI)
           </div>
           <div style="padding:11px 13px;background:#05070F;border:1px dashed #1E293B;border-radius:8px;font-family:'JetBrains Mono',Consolas,monospace;font-size:13px;color:#00F0FF;font-weight:700;word-break:break-all;margin-bottom:12px;">
             ${escapeHtml(parsed.formatted_bracket)}
@@ -2486,6 +2606,7 @@ async function sendOrderFulfillmentEmail(tx: any, req?: Request, forceResend = f
         : []),
       { label: "Metode Pembayaran", value: paymentMethodLabel },
       { label: "Total Dibayar", value: totalIdr, highlight: true },
+      { label: "Status Pembayaran", value: "LUNAS (TERVERIFIKASI)" },
       { label: "Waktu Lunas", value: timestamp },
     ];
 
@@ -2497,6 +2618,7 @@ async function sendOrderFulfillmentEmail(tx: any, req?: Request, forceResend = f
       bodyHtml,
       ctaText: "BUKA HALAMAN PESANAN & SALIN DATA",
       ctaUrl: orderUrl,
+      infoTitle: "RINCIAN INVOICE RESMI & VERIFIKASI PEMBAYARAN",
       infoRows,
       showBenefits: false,
       footerNote:
@@ -8528,6 +8650,9 @@ admin.put("/settings/email", (req, res) => {
       brand_tagline:
         String(tplIn.brand_tagline ?? prevTpl.brand_tagline ?? "STORE & TOP-UP GAME BERGARANSI").trim() ||
         "STORE & TOP-UP GAME BERGARANSI",
+      logo_url:
+        String(tplIn.logo_url ?? prevTpl.logo_url ?? DEFAULT_STORE_LOGO_REL_PATH).trim() ||
+        DEFAULT_STORE_LOGO_REL_PATH,
       accent_color: validAccent,
       verify_subject:
         String(
@@ -8662,9 +8787,10 @@ admin.post("/settings/email/test", async (req, res) => {
       greetingName: sampleName,
       bodyHtml: `Ini adalah email uji koneksi dari <strong>Panel Admin ${escapeHtml(
         tpl.brand_name
-      )}</strong>. Konfigurasi jalur pengiriman email <strong>${targetProvider.toUpperCase()}</strong> Anda telah aktif dan siap mengirimkan email verifikasi masuk maupun reset password secara real-time.`,
+      )}</strong>. Konfigurasi jalur pengiriman email <strong>${targetProvider.toUpperCase()}</strong> Anda telah aktif dan siap mengirimkan email verifikasi masuk, invoice pembelian, maupun reset password secara real-time.`,
       ctaText: "BUKA PANEL ADMIN",
       ctaUrl: `${origin}/admin`,
+      infoTitle: "STATUS KONEKSI & VERIFIKASI SERVER",
       infoRows: [
         { label: "Jalur Provider", value: targetProvider.toUpperCase(), highlight: true },
         { label: "Email Penerima Tes", value: toEmail },
@@ -8677,6 +8803,61 @@ admin.post("/settings/email/test", async (req, res) => {
       originUrl: origin,
     });
     text = `Ini adalah email percobaan koneksi dari Panel Admin ${tpl.brand_name}.\nProvider: ${targetProvider.toUpperCase()}\nWaktu: ${timestamp}`;
+  } else if (testTemplateType === "invoice_preview") {
+    const sampleInvoiceId = "WJP-INV-882910";
+    const sampleOrderUrl = `${origin}/payment/success?session_id=${sampleInvoiceId}`;
+    subject = `🧾 Invoice Resmi & Akses Akun #${sampleInvoiceId} — ${tpl.brand_name}`;
+    const sampleBodyHtml = `Pembayaran Anda untuk pesanan <strong>Akun Sultan Mobile Legends Mythic Immortal</strong> telah <strong>terkonfirmasi LUNAS</strong>. Berikut adalah akses data akun beserta invoice resmi pembelian Anda:
+      <div style="margin-top:16px;padding:18px;background:#080C18;border:1px solid #A3E635;border-radius:10px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#A3E635;margin-bottom:10px;">
+          🔐 DATA AKSES AKUN ANDA (FORMAT RESMI TERVERIFIKASI)
+        </div>
+        <div style="padding:11px 13px;background:#05070F;border:1px dashed #1E293B;border-radius:8px;font-family:'JetBrains Mono',Consolas,monospace;font-size:13px;color:#00F0FF;font-weight:700;word-break:break-all;margin-bottom:12px;">
+          [Moonton + Gmail] [${escapeHtml(toEmail)}] [Wjp#Sultan2026]
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94A3B8;width:36%;">Tipe Akun</td>
+            <td style="padding:6px 0;font-size:13px;color:#F8FAFC;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace;">Moonton + Gmail</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94A3B8;border-top:1px solid #161F33;">Email / Username</td>
+            <td style="padding:6px 0;font-size:13px;color:#00F0FF;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace;border-top:1px solid #161F33;">${escapeHtml(
+              toEmail
+            )}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94A3B8;border-top:1px solid #161F33;">Password</td>
+            <td style="padding:6px 0;font-size:13px;color:#A3E635;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace;border-top:1px solid #161F33;">Wjp#Sultan2026</td>
+          </tr>
+        </table>
+      </div>`;
+
+    html = renderBrandedEmailTemplate({
+      templateCfg: tpl,
+      badgeText: "INVOICE & VERIFIKASI LUNAS",
+      heading: `Terima Kasih! Invoice #${sampleInvoiceId} Terverifikasi Lunas`,
+      greetingName: sampleName,
+      bodyHtml: sampleBodyHtml,
+      ctaText: "LIHAT INVOICE & SALIN DATA",
+      ctaUrl: sampleOrderUrl,
+      infoTitle: "RINCIAN INVOICE RESMI & VERIFIKASI PEMBAYARAN",
+      infoRows: [
+        { label: "Nomor Invoice", value: `#${sampleInvoiceId}`, highlight: true },
+        { label: "Produk / Layanan", value: "Akun Sultan MLBB Mythic Immortal", highlight: true },
+        { label: "Email Pembeli", value: toEmail },
+        { label: "Metode Pembayaran", value: "QRIS Instan Otomatis" },
+        { label: "Total Dibayar", value: "Rp 450.000", highlight: true },
+        { label: "Status Verifikasi", value: "LUNAS (TERVERIFIKASI)" },
+        { label: "Waktu Transaksi", value: timestamp },
+      ],
+      showBenefits: false,
+      footerNote:
+        "Simpan email ini sebagai bukti pembayaran resmi (Invoice) dari WillJustPlay. Demi keamanan akun, segera amankan kata sandi setelah login.",
+      supportText: tpl.support_text,
+      originUrl: origin,
+    });
+    text = `Halo ${sampleName},\n\nInvoice Resmi #${sampleInvoiceId} telah terverifikasi LUNAS.\nFormat Akses: [Moonton + Gmail] [${toEmail}] [Wjp#Sultan2026]\nTotal: Rp 450.000\nWaktu: ${timestamp}`;
   } else {
     subject = interpolateEmailTemplate(tpl.verify_subject, vars, false);
     const heading = interpolateEmailTemplate(tpl.verify_heading, vars, false);
@@ -8698,13 +8879,14 @@ admin.post("/settings/email/test", async (req, res) => {
       ctaUrl: sampleVerifyUrl,
       otpCode: "123456",
       expiryLabel: `${ttlHours} Jam`,
+      infoTitle: "DETAIL VERIFIKASI AKUN & OTENTIKASI",
       infoRows: tpl.show_account_card
         ? [
             { label: "Nama Pengguna", value: sampleName },
             { label: "Email Terdaftar", value: toEmail, highlight: true },
             { label: "Kode Verifikasi (OTP)", value: "123456 (Pratinjau)", highlight: true },
             { label: "Waktu Pendaftaran", value: timestamp },
-            { label: "Jalur Pengiriman", value: `${targetProvider.toUpperCase()} (Pratinjau Tes)` },
+            { label: "Status Verifikasi", value: `Aktif via ${targetProvider.toUpperCase()}` },
           ]
         : [],
       showBenefits: tpl.show_benefits,
