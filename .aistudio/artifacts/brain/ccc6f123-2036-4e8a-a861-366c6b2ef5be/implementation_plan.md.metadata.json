@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi sistem verifikasi email wajib sebelum login, lupa/reset kata sandi dengan token SHA-256 dan Resend API (beserta pratinjau tautan dev), penyimpanan persisten lokal + dukungan MongoDB, serta tab Manajemen Pengguna dan Audit Log di Panel Admin.",
-  "updatedAt":  "2026-10-24T17:43:01.266000699Z",
+  "summary":  "Rencana perombakan UI/UX checkout produk beranda (ProductModal & halaman instruksi pembayaran PaymentSuccess) agar lebih clean, dinamis, simpel, dan mudah digunakan.",
+  "updatedAt":  "2026-10-29T11:33:35.493843665Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

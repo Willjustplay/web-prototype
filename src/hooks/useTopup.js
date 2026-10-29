@@ -39,6 +39,10 @@ export const validateTopupDestination = async (gameSlug, destination) => {
       ok: !!data.valid,
       checked: !!data.checked,
       nickname: data.nickname || "",
+      customer_no: data.customer_no || "",
+      server_label: data.server_label || "",
+      provider: data.provider || "digiflazz",
+      verified_at: data.verified_at || null,
       message: data.message || "",
       destination: data.destination || destination,
     };
@@ -50,7 +54,7 @@ export const validateTopupDestination = async (gameSlug, destination) => {
     return {
       ok: true,
       checked: false,
-      message: "Validasi otomatis tidak tersedia. Lanjutkan, admin akan memverifikasi.",
+      message: "Validasi otomatis tidak tersedia. Lanjutkan, sistem akan memverifikasi.",
     };
   }
 };

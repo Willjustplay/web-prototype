@@ -22,11 +22,11 @@
       "role": "buyer",
       "status": "active",
       "wishlist": [],
-      "is_verified": false,
-      "verified_at": null,
-      "session_version": 0,
+      "is_verified": true,
+      "verified_at": "2026-10-28T09:54:00.443Z",
+      "session_version": 2,
       "created_at": "2026-10-24T18:34:22.417Z",
-      "updated_at": "2026-10-24T18:34:22.417Z",
+      "updated_at": "2026-10-28T09:59:34.089Z",
       "last_login_at": null
     }
   ],
@@ -53,16 +53,18 @@
       "warranty": "100%",
       "delivery_info": "o;ug;",
       "condition": "ready",
-      "paykita": {
-        "api_key": "",
-        "webhook_secret": "",
-        "clear": false
-      },
       "badge": "Diskon Hot",
       "id": "80528539",
       "rating_base": 5,
       "created_at": "2026-10-24T13:57:54.336Z",
-      "updated_at": "2026-10-24T13:58:32.238Z"
+      "updated_at": "2026-10-24T13:58:32.238Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-mobile-legends-86",
@@ -98,7 +100,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk ke akun 1-5 menit setelah pembayaran terverifikasi. Pastikan User ID & Server benar.",
       "description": "Top up 86 Diamond untuk Mobile Legends (Moonton). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.574Z"
+      "created_at": "2026-10-24T14:01:20.574Z",
+      "price_usd": 1.38,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-mobile-legends-172",
@@ -134,7 +143,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk ke akun 1-5 menit setelah pembayaran terverifikasi. Pastikan User ID & Server benar.",
       "description": "Top up 172 Diamond untuk Mobile Legends (Moonton). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 2.69,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-mobile-legends-257",
@@ -171,7 +187,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk ke akun 1-5 menit setelah pembayaran terverifikasi. Pastikan User ID & Server benar.",
       "description": "Top up 257 Diamond untuk Mobile Legends (Moonton). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 4,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-mobile-legends-355",
@@ -207,7 +230,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk ke akun 1-5 menit setelah pembayaran terverifikasi. Pastikan User ID & Server benar.",
       "description": "Top up 355 Diamond untuk Mobile Legends (Moonton). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 5.44,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-mobile-legends-706",
@@ -244,7 +274,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk ke akun 1-5 menit setelah pembayaran terverifikasi. Pastikan User ID & Server benar.",
       "description": "Top up 706 Diamond untuk Mobile Legends (Moonton). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 10.75,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-mobile-legends-2195",
@@ -280,7 +317,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk ke akun 1-5 menit setelah pembayaran terverifikasi. Pastikan User ID & Server benar.",
       "description": "Top up 2195 Diamond untuk Mobile Legends (Moonton). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 32.81,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-free-fire-70",
@@ -317,7 +361,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 70 Diamond untuk Free Fire (Garena). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-free-fire-140",
@@ -353,7 +404,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 140 Diamond untuk Free Fire (Garena). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 1.19,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-free-fire-355",
@@ -390,7 +448,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 355 Diamond untuk Free Fire (Garena). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 2.94,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-free-fire-720",
@@ -426,7 +491,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 720 Diamond untuk Free Fire (Garena). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 5.88,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-free-fire-2180",
@@ -462,7 +534,14 @@
       "warranty": "100%",
       "delivery_info": "Diamond masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 2180 Diamond untuk Free Fire (Garena). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 17.19,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-pubg-mobile-60",
@@ -498,7 +577,14 @@
       "warranty": "100%",
       "delivery_info": "UC masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 60 UC untuk PUBG Mobile (Tencent). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-pubg-mobile-325",
@@ -535,7 +621,14 @@
       "warranty": "100%",
       "delivery_info": "UC masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 325 UC untuk PUBG Mobile (Tencent). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 4.69,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-pubg-mobile-660",
@@ -571,7 +664,14 @@
       "warranty": "100%",
       "delivery_info": "UC masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 660 UC untuk PUBG Mobile (Tencent). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 9.38,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-pubg-mobile-1800",
@@ -607,7 +707,14 @@
       "warranty": "100%",
       "delivery_info": "UC masuk 1-5 menit setelah pembayaran terverifikasi.",
       "description": "Top up 1800 UC untuk PUBG Mobile (Tencent). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 25,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-genshin-impact-60",
@@ -643,7 +750,14 @@
       "warranty": "100%",
       "delivery_info": "Genesis Crystal masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 60 Genesis Crystal untuk Genshin Impact (HoYoverse). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-genshin-impact-300",
@@ -680,7 +794,14 @@
       "warranty": "100%",
       "delivery_info": "Genesis Crystal masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 300 + 30 Genesis Crystal untuk Genshin Impact (HoYoverse). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 4.94,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-genshin-impact-980",
@@ -717,7 +838,14 @@
       "warranty": "100%",
       "delivery_info": "Genesis Crystal masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 980 + 110 Genesis Crystal untuk Genshin Impact (HoYoverse). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 15.56,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-genshin-impact-1980",
@@ -753,7 +881,14 @@
       "warranty": "100%",
       "delivery_info": "Genesis Crystal masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 1980 + 260 Genesis Crystal untuk Genshin Impact (HoYoverse). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 29.94,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-honkai-star-rail-60",
@@ -789,7 +924,14 @@
       "warranty": "100%",
       "delivery_info": "Oneiric Shard masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 60 Oneiric Shard untuk Honkai Star Rail (HoYoverse). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-honkai-star-rail-330",
@@ -826,7 +968,14 @@
       "warranty": "100%",
       "delivery_info": "Oneiric Shard masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 330 Oneiric Shard untuk Honkai Star Rail (HoYoverse). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 4.94,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-honkai-star-rail-1090",
@@ -862,7 +1011,14 @@
       "warranty": "100%",
       "delivery_info": "Oneiric Shard masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 1090 Oneiric Shard untuk Honkai Star Rail (HoYoverse). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 15.56,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-valorant-420",
@@ -898,7 +1054,14 @@
       "warranty": "100%",
       "delivery_info": "Valorant Points masuk 5-30 menit setelah pembayaran terverifikasi.",
       "description": "Top up 420 VP untuk Valorant (Riot Games). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 2.81,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-valorant-875",
@@ -935,7 +1098,14 @@
       "warranty": "100%",
       "delivery_info": "Valorant Points masuk 5-30 menit setelah pembayaran terverifikasi.",
       "description": "Top up 875 VP untuk Valorant (Riot Games). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 5.63,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-valorant-2200",
@@ -971,7 +1141,14 @@
       "warranty": "100%",
       "delivery_info": "Valorant Points masuk 5-30 menit setelah pembayaran terverifikasi.",
       "description": "Top up 2200 VP untuk Valorant (Riot Games). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 13.75,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-honor-of-kings-80",
@@ -1007,7 +1184,14 @@
       "warranty": "100%",
       "delivery_info": "Token masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 80 Tokens untuk Honor of Kings (Tencent). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-honor-of-kings-400",
@@ -1044,7 +1228,14 @@
       "warranty": "100%",
       "delivery_info": "Token masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 400 Tokens untuk Honor of Kings (Tencent). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 4.5,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-honor-of-kings-2000",
@@ -1080,7 +1271,14 @@
       "warranty": "100%",
       "delivery_info": "Token masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 2000 Tokens untuk Honor of Kings (Tencent). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 21.88,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-call-of-duty-mobile-80",
@@ -1116,7 +1314,14 @@
       "warranty": "100%",
       "delivery_info": "CP masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 80 CP untuk Call of Duty Mobile (Activision). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-call-of-duty-mobile-420",
@@ -1153,7 +1358,14 @@
       "warranty": "100%",
       "delivery_info": "CP masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 420 CP untuk Call of Duty Mobile (Activision). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 4.56,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "id": "tp-call-of-duty-mobile-880",
@@ -1189,7 +1401,14 @@
       "warranty": "100%",
       "delivery_info": "CP masuk 1-10 menit setelah pembayaran terverifikasi.",
       "description": "Top up 880 CP untuk Call of Duty Mobile (Activision). Proses instan via User ID & Server, legal 100% tanpa login akun.",
-      "created_at": "2026-10-24T14:01:20.575Z"
+      "created_at": "2026-10-24T14:01:20.575Z",
+      "price_usd": 9.25,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     },
     {
       "game": "tgtg",
@@ -1210,15 +1429,455 @@
       "warranty": "100%",
       "delivery_info": "vrfgbbhb",
       "condition": "ready",
-      "paykita": {
-        "api_key": "dfsvgb",
-        "webhook_secret": "rgetgtg",
-        "clear": false
-      },
       "badge": "Diskon Hot",
       "id": "3753318a",
       "rating_base": 5,
-      "created_at": "2026-10-24T16:09:12.784Z"
+      "created_at": "2026-10-24T16:09:12.784Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-roblox-80",
+      "game": "Roblox",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "roblox",
+      "game_id": "gm-roblox-fdda",
+      "denomination_code": "80",
+      "denomination": {
+        "code": "80",
+        "label": "80 Robux",
+        "amount": 80,
+        "price_strike": 24000
+      },
+      "title": "Roblox — 80 Robux",
+      "price": 20000,
+      "price_strike": 24000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Populer",
+      "badges": [
+        "Populer",
+        "Robux Instan"
+      ],
+      "featured": false,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 0,
+      "warranty": "100%",
+      "delivery_info": "Robux / Kode Voucher Roblox dikirim otomatis via Digiflazz setelah pembayaran.",
+      "description": "Top up 80 Robux untuk Roblox (Roblox Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 1.25,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-roblox-400",
+      "game": "Roblox",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "roblox",
+      "game_id": "gm-roblox-fdda",
+      "denomination_code": "400",
+      "denomination": {
+        "code": "400",
+        "label": "400 Robux",
+        "amount": 400,
+        "price_strike": 95000
+      },
+      "title": "Roblox — 400 Robux",
+      "price": 82000,
+      "price_strike": 95000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Terlaris",
+      "badges": [
+        "Terlaris",
+        "Robux Instan"
+      ],
+      "featured": true,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 1,
+      "warranty": "100%",
+      "delivery_info": "Robux / Kode Voucher Roblox dikirim otomatis via Digiflazz setelah pembayaran.",
+      "description": "Top up 400 Robux untuk Roblox (Roblox Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 5.13,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-roblox-800",
+      "game": "Roblox",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "roblox",
+      "game_id": "gm-roblox-fdda",
+      "denomination_code": "800",
+      "denomination": {
+        "code": "800",
+        "label": "800 Robux",
+        "amount": 800,
+        "price_strike": 185000
+      },
+      "title": "Roblox — 800 Robux",
+      "price": 162000,
+      "price_strike": 185000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Hemat",
+      "badges": [
+        "Hemat",
+        "Robux Instan"
+      ],
+      "featured": false,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 2,
+      "warranty": "100%",
+      "delivery_info": "Robux / Kode Voucher Roblox dikirim otomatis via Digiflazz setelah pembayaran.",
+      "description": "Top up 800 Robux untuk Roblox (Roblox Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 10.13,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-roblox-1700",
+      "game": "Roblox",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "roblox",
+      "game_id": "gm-roblox-fdda",
+      "denomination_code": "1700",
+      "denomination": {
+        "code": "1700",
+        "label": "1700 Robux",
+        "amount": 1700,
+        "price_strike": 360000
+      },
+      "title": "Roblox — 1700 Robux",
+      "price": 320000,
+      "price_strike": 360000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Sultan",
+      "badges": [
+        "Sultan",
+        "Robux Instan"
+      ],
+      "featured": false,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 3,
+      "warranty": "100%",
+      "delivery_info": "Robux / Kode Voucher Roblox dikirim otomatis via Digiflazz setelah pembayaran.",
+      "description": "Top up 1700 Robux untuk Roblox (Roblox Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 20,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-steam-wallet-12",
+      "game": "Steam Wallet IDR",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "steam-wallet",
+      "game_id": "gm-steam-wallet-6d49",
+      "denomination_code": "12",
+      "denomination": {
+        "code": "12",
+        "label": "Steam Wallet Rp 12.000",
+        "amount": 12000,
+        "price_strike": 16000
+      },
+      "title": "Steam Wallet IDR — Steam Wallet Rp 12.000",
+      "price": 14000,
+      "price_strike": 16000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Voucher IDR Instan",
+      "badges": [
+        "Voucher IDR Instan"
+      ],
+      "featured": false,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 0,
+      "warranty": "100%",
+      "delivery_info": "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+      "description": "Top up Steam Wallet Rp 12.000 untuk Steam Wallet IDR (Valve Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 1,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-steam-wallet-45",
+      "game": "Steam Wallet IDR",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "steam-wallet",
+      "game_id": "gm-steam-wallet-6d49",
+      "denomination_code": "45",
+      "denomination": {
+        "code": "45",
+        "label": "Steam Wallet Rp 45.000",
+        "amount": 45000,
+        "price_strike": 55000
+      },
+      "title": "Steam Wallet IDR — Steam Wallet Rp 45.000",
+      "price": 50000,
+      "price_strike": 55000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Populer",
+      "badges": [
+        "Populer",
+        "Voucher IDR Instan"
+      ],
+      "featured": false,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 1,
+      "warranty": "100%",
+      "delivery_info": "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+      "description": "Top up Steam Wallet Rp 45.000 untuk Steam Wallet IDR (Valve Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 3.13,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-steam-wallet-60",
+      "game": "Steam Wallet IDR",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "steam-wallet",
+      "game_id": "gm-steam-wallet-6d49",
+      "denomination_code": "60",
+      "denomination": {
+        "code": "60",
+        "label": "Steam Wallet Rp 60.000",
+        "amount": 60000,
+        "price_strike": 72000
+      },
+      "title": "Steam Wallet IDR — Steam Wallet Rp 60.000",
+      "price": 66000,
+      "price_strike": 72000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Terlaris",
+      "badges": [
+        "Terlaris",
+        "Voucher IDR Instan"
+      ],
+      "featured": true,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 2,
+      "warranty": "100%",
+      "delivery_info": "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+      "description": "Top up Steam Wallet Rp 60.000 untuk Steam Wallet IDR (Valve Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 4.13,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-steam-wallet-90",
+      "game": "Steam Wallet IDR",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "steam-wallet",
+      "game_id": "gm-steam-wallet-6d49",
+      "denomination_code": "90",
+      "denomination": {
+        "code": "90",
+        "label": "Steam Wallet Rp 90.000",
+        "amount": 90000,
+        "price_strike": 108000
+      },
+      "title": "Steam Wallet IDR — Steam Wallet Rp 90.000",
+      "price": 98000,
+      "price_strike": 108000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Voucher IDR Instan",
+      "badges": [
+        "Voucher IDR Instan"
+      ],
+      "featured": false,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 3,
+      "warranty": "100%",
+      "delivery_info": "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+      "description": "Top up Steam Wallet Rp 90.000 untuk Steam Wallet IDR (Valve Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 6.13,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-steam-wallet-120",
+      "game": "Steam Wallet IDR",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "steam-wallet",
+      "game_id": "gm-steam-wallet-6d49",
+      "denomination_code": "120",
+      "denomination": {
+        "code": "120",
+        "label": "Steam Wallet Rp 120.000",
+        "amount": 120000,
+        "price_strike": 142000
+      },
+      "title": "Steam Wallet IDR — Steam Wallet Rp 120.000",
+      "price": 130000,
+      "price_strike": 142000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Hemat",
+      "badges": [
+        "Hemat",
+        "Voucher IDR Instan"
+      ],
+      "featured": false,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 4,
+      "warranty": "100%",
+      "delivery_info": "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+      "description": "Top up Steam Wallet Rp 120.000 untuk Steam Wallet IDR (Valve Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 8.13,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
+    },
+    {
+      "id": "tp-steam-wallet-250",
+      "game": "Steam Wallet IDR",
+      "category": "Topup Game",
+      "product_type": "topup",
+      "slug": "steam-wallet",
+      "game_id": "gm-steam-wallet-6d49",
+      "denomination_code": "250",
+      "denomination": {
+        "code": "250",
+        "label": "Steam Wallet Rp 250.000",
+        "amount": 250000,
+        "price_strike": 290000
+      },
+      "title": "Steam Wallet IDR — Steam Wallet Rp 250.000",
+      "price": 268000,
+      "price_strike": 290000,
+      "rank": "Via ID Server",
+      "image": "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+      "images": [],
+      "stock": 999,
+      "badge": "Sultan",
+      "badges": [
+        "Sultan",
+        "Voucher IDR Instan"
+      ],
+      "featured": false,
+      "sold": 0,
+      "rating": 4.9,
+      "rating_base": 4.9,
+      "condition": "ready",
+      "seq": 5,
+      "warranty": "100%",
+      "delivery_info": "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+      "description": "Top up Steam Wallet Rp 250.000 untuk Steam Wallet IDR (Valve Corporation). Proses instan via User ID & Server, legal 100% tanpa login akun.",
+      "created_at": "2026-10-29T11:20:33.779Z",
+      "price_usd": 16.75,
+      "payment_config": {
+        "paykita": true,
+        "manual": true,
+        "crypto": true,
+        "disabled_destinations": []
+      }
     }
   ],
   "games": [
@@ -1271,7 +1930,9 @@
           "stock": 500,
           "badge": "",
           "is_active": true,
-          "seq": 0
+          "seq": 0,
+          "vendor_sku": "MOBI86",
+          "modal_price": 19800
         },
         {
           "code": "172",
@@ -1282,7 +1943,9 @@
           "stock": 500,
           "badge": "",
           "is_active": true,
-          "seq": 1
+          "seq": 1,
+          "vendor_sku": "MOBI172",
+          "modal_price": 38700
         },
         {
           "code": "257",
@@ -1293,7 +1956,9 @@
           "stock": 400,
           "badge": "Populer",
           "is_active": true,
-          "seq": 2
+          "seq": 2,
+          "vendor_sku": "MOBI257",
+          "modal_price": 57600
         },
         {
           "code": "355",
@@ -1304,7 +1969,9 @@
           "stock": 300,
           "badge": "",
           "is_active": true,
-          "seq": 3
+          "seq": 3,
+          "vendor_sku": "MOBI355",
+          "modal_price": 78300
         },
         {
           "code": "706",
@@ -1315,7 +1982,9 @@
           "stock": 200,
           "badge": "Hemat",
           "is_active": true,
-          "seq": 4
+          "seq": 4,
+          "vendor_sku": "MOBI706",
+          "modal_price": 154800
         },
         {
           "code": "2195",
@@ -1326,9 +1995,14 @@
           "stock": 100,
           "badge": "",
           "is_active": true,
-          "seq": 5
+          "seq": 5,
+          "vendor_sku": "MOBI2195",
+          "modal_price": 472500
         }
-      ]
+      ],
+      "vendor_prefix": "MOBI",
+      "cek_id_sku": "CEKML",
+      "vendor_id": "vp-digiflazz"
     },
     {
       "id": "g-free-fire",
@@ -1367,7 +2041,9 @@
           "stock": 800,
           "badge": "Termurah",
           "is_active": true,
-          "seq": 0
+          "seq": 0,
+          "vendor_sku": "FREE70",
+          "modal_price": 9000
         },
         {
           "code": "140",
@@ -1378,7 +2054,9 @@
           "stock": 800,
           "badge": "",
           "is_active": true,
-          "seq": 1
+          "seq": 1,
+          "vendor_sku": "FREE140",
+          "modal_price": 17100
         },
         {
           "code": "355",
@@ -1389,7 +2067,9 @@
           "stock": 500,
           "badge": "Populer",
           "is_active": true,
-          "seq": 2
+          "seq": 2,
+          "vendor_sku": "FREE355",
+          "modal_price": 42300
         },
         {
           "code": "720",
@@ -1400,7 +2080,9 @@
           "stock": 300,
           "badge": "",
           "is_active": true,
-          "seq": 3
+          "seq": 3,
+          "vendor_sku": "FREE720",
+          "modal_price": 84600
         },
         {
           "code": "2180",
@@ -1411,9 +2093,14 @@
           "stock": 150,
           "badge": "",
           "is_active": true,
-          "seq": 4
+          "seq": 4,
+          "vendor_sku": "FREE2180",
+          "modal_price": 247500
         }
-      ]
+      ],
+      "vendor_prefix": "FREE",
+      "cek_id_sku": "CEKFF",
+      "vendor_id": "vp-digiflazz"
     },
     {
       "id": "g-pubg-mobile",
@@ -1452,7 +2139,9 @@
           "stock": 600,
           "badge": "",
           "is_active": true,
-          "seq": 0
+          "seq": 0,
+          "vendor_sku": "PUBG60",
+          "modal_price": 13500
         },
         {
           "code": "325",
@@ -1463,7 +2152,9 @@
           "stock": 400,
           "badge": "Populer",
           "is_active": true,
-          "seq": 1
+          "seq": 1,
+          "vendor_sku": "PUBG325",
+          "modal_price": 67500
         },
         {
           "code": "660",
@@ -1474,7 +2165,9 @@
           "stock": 250,
           "badge": "",
           "is_active": true,
-          "seq": 2
+          "seq": 2,
+          "vendor_sku": "PUBG660",
+          "modal_price": 135000
         },
         {
           "code": "1800",
@@ -1485,9 +2178,14 @@
           "stock": 120,
           "badge": "",
           "is_active": true,
-          "seq": 3
+          "seq": 3,
+          "vendor_sku": "PUBG1800",
+          "modal_price": 360000
         }
-      ]
+      ],
+      "vendor_prefix": "PUBG",
+      "cek_id_sku": "CEKPUBG",
+      "vendor_id": "vp-digiflazz"
     },
     {
       "id": "g-genshin-impact",
@@ -1538,7 +2236,9 @@
           "stock": 500,
           "badge": "",
           "is_active": true,
-          "seq": 0
+          "seq": 0,
+          "vendor_sku": "GENS60",
+          "modal_price": 14400
         },
         {
           "code": "300",
@@ -1549,7 +2249,9 @@
           "stock": 400,
           "badge": "Bonus",
           "is_active": true,
-          "seq": 1
+          "seq": 1,
+          "vendor_sku": "GENS300",
+          "modal_price": 71100
         },
         {
           "code": "980",
@@ -1560,7 +2262,9 @@
           "stock": 200,
           "badge": "Populer",
           "is_active": true,
-          "seq": 2
+          "seq": 2,
+          "vendor_sku": "GENS980",
+          "modal_price": 224100
         },
         {
           "code": "1980",
@@ -1571,9 +2275,14 @@
           "stock": 100,
           "badge": "",
           "is_active": true,
-          "seq": 3
+          "seq": 3,
+          "vendor_sku": "GENS1980",
+          "modal_price": 431100
         }
-      ]
+      ],
+      "vendor_prefix": "GENS",
+      "cek_id_sku": "CEKGI",
+      "vendor_id": "vp-digiflazz"
     },
     {
       "id": "g-honkai-star-rail",
@@ -1624,7 +2333,9 @@
           "stock": 400,
           "badge": "",
           "is_active": true,
-          "seq": 0
+          "seq": 0,
+          "vendor_sku": "HONK60",
+          "modal_price": 14400
         },
         {
           "code": "330",
@@ -1635,7 +2346,9 @@
           "stock": 300,
           "badge": "Populer",
           "is_active": true,
-          "seq": 1
+          "seq": 1,
+          "vendor_sku": "HONK330",
+          "modal_price": 71100
         },
         {
           "code": "1090",
@@ -1646,9 +2359,14 @@
           "stock": 150,
           "badge": "",
           "is_active": true,
-          "seq": 2
+          "seq": 2,
+          "vendor_sku": "HONK1090",
+          "modal_price": 224100
         }
-      ]
+      ],
+      "vendor_prefix": "HONK",
+      "cek_id_sku": "CEKHSR",
+      "vendor_id": "vp-digiflazz"
     },
     {
       "id": "g-valorant",
@@ -1687,7 +2405,9 @@
           "stock": 300,
           "badge": "",
           "is_active": true,
-          "seq": 0
+          "seq": 0,
+          "vendor_sku": "VALO420",
+          "modal_price": 40500
         },
         {
           "code": "875",
@@ -1698,7 +2418,9 @@
           "stock": 250,
           "badge": "Populer",
           "is_active": true,
-          "seq": 1
+          "seq": 1,
+          "vendor_sku": "VALO875",
+          "modal_price": 81000
         },
         {
           "code": "2200",
@@ -1709,9 +2431,14 @@
           "stock": 120,
           "badge": "",
           "is_active": true,
-          "seq": 2
+          "seq": 2,
+          "vendor_sku": "VALO2200",
+          "modal_price": 198000
         }
-      ]
+      ],
+      "vendor_prefix": "VALO",
+      "cek_id_sku": "CEKVAL",
+      "vendor_id": "vp-digiflazz"
     },
     {
       "id": "g-honor-of-kings",
@@ -1750,7 +2477,9 @@
           "stock": 400,
           "badge": "",
           "is_active": true,
-          "seq": 0
+          "seq": 0,
+          "vendor_sku": "HONO80",
+          "modal_price": 13500
         },
         {
           "code": "400",
@@ -1761,7 +2490,9 @@
           "stock": 250,
           "badge": "Populer",
           "is_active": true,
-          "seq": 1
+          "seq": 1,
+          "vendor_sku": "HONO400",
+          "modal_price": 64800
         },
         {
           "code": "2000",
@@ -1772,9 +2503,14 @@
           "stock": 100,
           "badge": "",
           "is_active": true,
-          "seq": 2
+          "seq": 2,
+          "vendor_sku": "HONO2000",
+          "modal_price": 315000
         }
-      ]
+      ],
+      "vendor_prefix": "HONO",
+      "cek_id_sku": "CEKHOK",
+      "vendor_id": "vp-digiflazz"
     },
     {
       "id": "g-call-of-duty-mobile",
@@ -1813,7 +2549,9 @@
           "stock": 400,
           "badge": "",
           "is_active": true,
-          "seq": 0
+          "seq": 0,
+          "vendor_sku": "CALL80",
+          "modal_price": 13500
         },
         {
           "code": "420",
@@ -1824,7 +2562,9 @@
           "stock": 250,
           "badge": "Populer",
           "is_active": true,
-          "seq": 1
+          "seq": 1,
+          "vendor_sku": "CALL420",
+          "modal_price": 65700
         },
         {
           "code": "880",
@@ -1835,9 +2575,224 @@
           "stock": 150,
           "badge": "",
           "is_active": true,
-          "seq": 2
+          "seq": 2,
+          "vendor_sku": "CALL880",
+          "modal_price": 133200
         }
-      ]
+      ],
+      "vendor_prefix": "CALL",
+      "cek_id_sku": "CEKCODM",
+      "vendor_id": "vp-digiflazz"
+    },
+    {
+      "id": "gm-roblox-fdda",
+      "name": "Roblox",
+      "slug": "roblox",
+      "publisher": "Roblox Corporation",
+      "currency": "Robux",
+      "icon": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&auto=format&fit=crop&q=80",
+      "banner": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
+      "notes": "Masukkan Username Roblox untuk verifikasi akun dan pengiriman Robux.",
+      "delivery_info": "Robux / Kode Voucher Roblox dikirim otomatis via Digiflazz setelah pembayaran.",
+      "vendor_prefix": "RBX",
+      "cek_id_sku": "CEKRBX",
+      "vendor_id": "vp-digiflazz",
+      "is_active": true,
+      "featured": false,
+      "seq": 8,
+      "fields": [
+        {
+          "key": "user_id",
+          "label": "Username Roblox",
+          "placeholder": "UsernameRoblox",
+          "type": "text",
+          "inputmode": "text",
+          "required": true,
+          "min_len": 3,
+          "max_len": 30,
+          "pattern": "",
+          "help": "Masukkan Username Roblox Anda"
+        }
+      ],
+      "denominations": [
+        {
+          "code": "80",
+          "label": "80 Robux",
+          "amount": 80,
+          "price": 20000,
+          "price_strike": 24000,
+          "modal_price": 17500,
+          "stock": 999,
+          "badge": "Populer",
+          "featured": false,
+          "is_active": true,
+          "vendor_sku": "RBX80",
+          "seq": 0
+        },
+        {
+          "code": "400",
+          "label": "400 Robux",
+          "amount": 400,
+          "price": 82000,
+          "price_strike": 95000,
+          "modal_price": 74000,
+          "stock": 999,
+          "badge": "Terlaris",
+          "featured": true,
+          "is_active": true,
+          "vendor_sku": "RBX400",
+          "seq": 1
+        },
+        {
+          "code": "800",
+          "label": "800 Robux",
+          "amount": 800,
+          "price": 162000,
+          "price_strike": 185000,
+          "modal_price": 146000,
+          "stock": 999,
+          "badge": "Hemat",
+          "featured": false,
+          "is_active": true,
+          "vendor_sku": "RBX800",
+          "seq": 2
+        },
+        {
+          "code": "1700",
+          "label": "1700 Robux",
+          "amount": 1700,
+          "price": 320000,
+          "price_strike": 360000,
+          "modal_price": 292000,
+          "stock": 999,
+          "badge": "Sultan",
+          "featured": false,
+          "is_active": true,
+          "vendor_sku": "RBX1700",
+          "seq": 3
+        }
+      ],
+      "created_at": "2026-10-29T11:20:33.776Z",
+      "updated_at": "2026-10-29T11:20:33.777Z"
+    },
+    {
+      "id": "gm-steam-wallet-6d49",
+      "name": "Steam Wallet IDR",
+      "slug": "steam-wallet",
+      "publisher": "Valve Corporation",
+      "currency": "Voucher IDR",
+      "icon": "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=400&auto=format&fit=crop&q=80",
+      "banner": "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+      "notes": "Masukkan Nomor WhatsApp atau Steam ID penerima untuk pengiriman kode voucher Steam Wallet IDR.",
+      "delivery_info": "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+      "vendor_prefix": "SW",
+      "cek_id_sku": "CEKSW",
+      "vendor_id": "vp-digiflazz",
+      "is_active": true,
+      "featured": false,
+      "seq": 9,
+      "fields": [
+        {
+          "key": "user_id",
+          "label": "Nomor WhatsApp / Steam ID",
+          "placeholder": "081234567890",
+          "type": "text",
+          "inputmode": "numeric",
+          "required": true,
+          "min_len": 5,
+          "max_len": 20,
+          "pattern": "",
+          "help": "Nomor penerima voucher / Steam ID"
+        }
+      ],
+      "denominations": [
+        {
+          "code": "12",
+          "label": "Steam Wallet Rp 12.000",
+          "amount": 12000,
+          "price": 14000,
+          "price_strike": 16000,
+          "modal_price": 12200,
+          "stock": 999,
+          "badge": "",
+          "featured": false,
+          "is_active": true,
+          "vendor_sku": "SW12",
+          "seq": 0
+        },
+        {
+          "code": "45",
+          "label": "Steam Wallet Rp 45.000",
+          "amount": 45000,
+          "price": 50000,
+          "price_strike": 55000,
+          "modal_price": 45500,
+          "stock": 999,
+          "badge": "Populer",
+          "featured": false,
+          "is_active": true,
+          "vendor_sku": "SW45",
+          "seq": 1
+        },
+        {
+          "code": "60",
+          "label": "Steam Wallet Rp 60.000",
+          "amount": 60000,
+          "price": 66000,
+          "price_strike": 72000,
+          "modal_price": 60500,
+          "stock": 999,
+          "badge": "Terlaris",
+          "featured": true,
+          "is_active": true,
+          "vendor_sku": "SW60",
+          "seq": 2
+        },
+        {
+          "code": "90",
+          "label": "Steam Wallet Rp 90.000",
+          "amount": 90000,
+          "price": 98000,
+          "price_strike": 108000,
+          "modal_price": 90500,
+          "stock": 999,
+          "badge": "",
+          "featured": false,
+          "is_active": true,
+          "vendor_sku": "SW90",
+          "seq": 3
+        },
+        {
+          "code": "120",
+          "label": "Steam Wallet Rp 120.000",
+          "amount": 120000,
+          "price": 130000,
+          "price_strike": 142000,
+          "modal_price": 120500,
+          "stock": 999,
+          "badge": "Hemat",
+          "featured": false,
+          "is_active": true,
+          "vendor_sku": "SW120",
+          "seq": 4
+        },
+        {
+          "code": "250",
+          "label": "Steam Wallet Rp 250.000",
+          "amount": 250000,
+          "price": 268000,
+          "price_strike": 290000,
+          "modal_price": 250500,
+          "stock": 999,
+          "badge": "Sultan",
+          "featured": false,
+          "is_active": true,
+          "vendor_sku": "SW250",
+          "seq": 5
+        }
+      ],
+      "created_at": "2026-10-29T11:20:33.777Z",
+      "updated_at": "2026-10-29T11:20:33.777Z"
     }
   ],
   "testimonials": [
@@ -1882,7 +2837,69 @@
       "text": "Diamond masuk 3 menit setelah bayar QRIS. Harganya paling murah dibanding tempat lain. Bakal langganan."
     }
   ],
-  "transactions": [],
+  "transactions": [
+    {
+      "buyer_email": "admin@willjustplay.com",
+      "buyer_whatsapp": null,
+      "session_id": "NXG-T-894048-IPAW",
+      "paykita_ref": "NXG-T-894048-IPAW",
+      "gateway_id": "duitku",
+      "gateway_name": "Duitku",
+      "duitku_channel": "M2",
+      "duitku_channel_name": "Mandiri Virtual Account",
+      "duitku_payment_flow": "va",
+      "va_number": "8902288894048",
+      "provider": "paykita",
+      "payment_type": "paykita",
+      "destination_id": "duitku-m2",
+      "destination_name": "Duitku — Mandiri Virtual Account",
+      "qris_string": "00020101021226680014ID.CO.QRIS.WWW01189360091800000001230217NXG-T-894048-IPAW0303UMI51470015ID.OR.GPNQR.WWW0217NXG-T-894048-IPAW0303UMI52045812530336054061720005802ID5912WILLJUSTPLAY6007JAKARTA62310117NXG-T-894048-IPAW0706TERM016304C009",
+      "qris_image": "data:image/png;base64,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",
+      "pay_url": null,
+      "base_amount": 172000,
+      "pay_amount": 172000,
+      "unique_code": 0,
+      "fee_amount": 0,
+      "qris_provider": "Mandiri VA (M2)",
+      "paykita_mode": "demo",
+      "paykita_error": "Kredensial Duitku masih menggunakan mode demo. Masukkan Merchant Code & API Key asli dari dashboard Duitku di Panel Admin → Pembayaran.",
+      "paykita_error_code": "demo_api_key",
+      "expired_at": "2026-10-29T11:36:34.613Z",
+      "product_id": "tp-mobile-legends-706",
+      "product_title": "Mobile Legends — 706 Diamond",
+      "product_type": "topup",
+      "category": "Topup Game",
+      "game_id": "g-mobile-legends",
+      "game_slug": "mobile-legends",
+      "game_name": "Mobile Legends",
+      "denomination_code": "706",
+      "denomination_label": "706 Diamond",
+      "vendor_sku": "MOBI706",
+      "vendor_kind": "digiflazz",
+      "customer_no": "12233333333335",
+      "verified_nickname": "Kazuha•Ronin_3335",
+      "destination": {
+        "user_id": "12233333333335",
+        "server_id": "2518"
+      },
+      "delivery_info": "Diamond masuk ke akun 1-5 menit setelah pembayaran terverifikasi. Pastikan User ID & Server benar. — Tujuan: User ID: 12233333333335 • Server: 2518 • Nickname: Kazuha•Ronin_3335",
+      "user_id": "admin-master-id",
+      "amount": 172000,
+      "amount_usd": 10.75,
+      "price_strike": 185000,
+      "currency": "idr",
+      "status": "pending",
+      "payment_status": "pending",
+      "paykita_confirmed": false,
+      "paykita_confirmed_by": null,
+      "paykita_confirmed_at": null,
+      "payment_proof": null,
+      "has_proof": false,
+      "stock_deducted": false,
+      "created_at": "2026-10-29T11:21:34.614Z",
+      "updated_at": "2026-10-29T11:21:34.614Z"
+    }
+  ],
   "manual_destinations": [
     {
       "id": "mp-qris-demo",
@@ -1903,6 +2920,54 @@
       "image": "",
       "is_active": true,
       "seq": 1
+    },
+    {
+      "id": "mp-crypto-usdt-trc20",
+      "type": "crypto",
+      "name": "USDT (Tether)",
+      "symbol": "USDT",
+      "network": "TRC20 (Tron)",
+      "account_name": "WillJustPlay Crypto",
+      "account_number": "TX9wXz7Y2kLmN8pQ4rS6tV1wXyZ3aBcDeF",
+      "image": "",
+      "is_active": true,
+      "seq": 2
+    },
+    {
+      "id": "mp-crypto-usdt-bep20",
+      "type": "crypto",
+      "name": "USDT (BNB Chain)",
+      "symbol": "USDT",
+      "network": "BEP20 (BSC)",
+      "account_name": "WillJustPlay Crypto",
+      "account_number": "0x71C95911E9a5D330f4D621842EC243EE1343292e",
+      "image": "",
+      "is_active": true,
+      "seq": 3
+    },
+    {
+      "id": "mp-crypto-sol",
+      "type": "crypto",
+      "name": "Solana (SOL / USDC)",
+      "symbol": "SOL",
+      "network": "SPL (Solana)",
+      "account_name": "WillJustPlay Web3",
+      "account_number": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "image": "",
+      "is_active": true,
+      "seq": 4
+    },
+    {
+      "id": "mp-crypto-btc",
+      "type": "crypto",
+      "name": "Bitcoin (BTC)",
+      "symbol": "BTC",
+      "network": "BTC (Native SegWit)",
+      "account_name": "WillJustPlay Vault",
+      "account_number": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+      "image": "",
+      "is_active": true,
+      "seq": 5
     }
   ],
   "files": {
@@ -1938,10 +3003,17 @@
   "settings": {
     "paykita": {
       "id": "paykita",
-      "api_key": "",
-      "webhook_secret": "",
+      "api_key": "pk_live_wjp_qris_99281746",
+      "webhook_secret": "whsec_wjp_qris_881920",
       "base_url": "https://pay.digikita.id",
-      "enabled": false
+      "enabled": true,
+      "last_test": {
+        "ok": true,
+        "project": "WillJustPlay Store",
+        "provider": "QRIS Dinamis (All E-Wallet & Bank)",
+        "mode": "production",
+        "tested_at": "2026-10-28T09:50:48.655Z"
+      }
     },
     "email_auth": {
       "id": "email_auth",
@@ -1976,6 +3048,74 @@
         "tested_at": "2026-10-24T18:31:25.978Z"
       },
       "updated_at": "2026-10-24T18:30:45.791Z"
+    },
+    "payment_gateways": {
+      "active_gateway": "paykita",
+      "beranda_gateway": "paykita",
+      "topup_gateway": "duitku",
+      "gateways": {
+        "paykita": {
+          "id": "paykita",
+          "name": "PayKita",
+          "subtitle": "QRIS Otomatis Produk Beranda",
+          "scope": "beranda",
+          "enabled": true,
+          "mode": "production",
+          "base_url": "https://pay.digikita.id",
+          "api_key": "pk_live_wjp_qris_99281746",
+          "webhook_secret": "whsec_wjp_qris_881920",
+          "payment_method": "QRIS",
+          "last_test": {
+            "ok": true,
+            "project": "WillJustPlay Store",
+            "provider": "QRIS Dinamis (All E-Wallet & Bank)",
+            "mode": "production",
+            "tested_at": "2026-10-28T09:50:48.655Z"
+          }
+        },
+        "duitku": {
+          "id": "duitku",
+          "name": "Duitku",
+          "subtitle": "Multi-Metode Pembayaran Produk Top Up",
+          "scope": "topup",
+          "enabled": true,
+          "mode": "production",
+          "base_url": "https://passport.duitku.com/webapi",
+          "merchant_code": "D18290",
+          "api_key": "dk_live_wjp_88291044ff",
+          "payment_method": "SP",
+          "enabled_methods": [
+            "SP",
+            "NQ",
+            "DQ",
+            "LA",
+            "DA",
+            "OV",
+            "SA",
+            "LF",
+            "BC",
+            "M2",
+            "I1",
+            "BR",
+            "B1",
+            "BT",
+            "BV",
+            "VA",
+            "NC",
+            "A1",
+            "IR",
+            "FT"
+          ],
+          "last_test": {
+            "ok": true,
+            "is_demo": true,
+            "project": "Duitku Payment Gateway",
+            "provider": "Multi-Payment (QRIS, E-Wallet, VA, Retail)",
+            "mode": "production",
+            "tested_at": "2026-10-29T11:20:33.780Z"
+          }
+        }
+      }
     }
   },
   "social_links": [
@@ -1998,14 +3138,26 @@
   ],
   "topup_providers": [
     {
-      "id": "vp-manual",
-      "kind": "manual",
-      "name": "Manual (Admin)",
-      "config": {},
+      "id": "vp-digiflazz",
+      "kind": "digiflazz",
+      "name": "Digiflazz Indonesia",
+      "config": {
+        "username": "wjp_digiflazz_id",
+        "api_key": "df_live_wjp88291044ff",
+        "dev_key": "df_dev_wjp88291044ff",
+        "use_dev": false,
+        "brand_override": ""
+      },
       "is_active": true,
-      "auto_dispatch": false,
-      "seq": 0,
-      "created_at": "2026-10-24T13:13:54.755Z"
+      "auto_dispatch": true,
+      "seq": 1,
+      "cached_balance": 15750000,
+      "last_test": {
+        "ok": true,
+        "message": "Digiflazz Indonesia terhubung & siap memproses transaksi",
+        "at": "2026-10-28T09:50:48.654Z"
+      },
+      "created_at": "2026-10-28T09:50:48.654Z"
     }
   ],
   "sessions": [
@@ -2077,6 +3229,47 @@
     }
   ],
   "audit_logs": [
+    {
+      "id": "aud-81d488396fc9",
+      "actor_user_id": "admin-master-id",
+      "actor_email": "admin@willjustplay.com",
+      "action": "user.role_changed",
+      "target_user_id": "usr-320e3d8232",
+      "target_email": "soimangoke@gmail.com",
+      "metadata": {
+        "before": "admin",
+        "after": "buyer"
+      },
+      "ip": "2404:c0:a702:b211:fcb0:4eb4:b299:cddb",
+      "created_at": "2026-10-28T09:59:34.131Z"
+    },
+    {
+      "id": "aud-aa5235e085a4",
+      "actor_user_id": "admin-master-id",
+      "actor_email": "admin@willjustplay.com",
+      "action": "user.role_changed",
+      "target_user_id": "usr-320e3d8232",
+      "target_email": "soimangoke@gmail.com",
+      "metadata": {
+        "before": "buyer",
+        "after": "admin"
+      },
+      "ip": "2404:c0:a702:b211:fcb0:4eb4:b299:cddb",
+      "created_at": "2026-10-28T09:59:23.658Z"
+    },
+    {
+      "id": "aud-6348592fbd8e",
+      "actor_user_id": "admin-master-id",
+      "actor_email": "admin@willjustplay.com",
+      "action": "user.verification_changed",
+      "target_user_id": "usr-320e3d8232",
+      "target_email": "soimangoke@gmail.com",
+      "metadata": {
+        "is_verified": true
+      },
+      "ip": "2404:c0:a702:b211:fcb0:4eb4:b299:cddb",
+      "created_at": "2026-10-28T09:54:00.475Z"
+    },
     {
       "id": "aud-e3f3037ec076",
       "actor_user_id": "usr-320e3d8232",

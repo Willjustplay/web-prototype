@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Zap, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
@@ -8,8 +7,9 @@ import { Footer } from "@/components/Footer";
 import { TopupGameGrid } from "@/components/topup/TopupGameGrid";
 import { TopupAccountForm } from "@/components/topup/TopupAccountForm";
 import { DenominationGrid } from "@/components/topup/DenominationGrid";
-import { TopupPaymentStep } from "@/components/topup/TopupPaymentStep";
-import { api, formatApiError } from "@/lib/api";
+import { TopupPaymentStep, DEFAULT_DUITKU_CHANNELS } from "@/components/topup/TopupPaymentStep";
+import { TopupStepper } from "@/components/topup/TopupStepper";
+import { api, formatApiError, formatIDR, imgSrc } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useTopupGames, validateTopupDestination, localFieldError } from "@/hooks/useTopup";
 
@@ -29,10 +29,8 @@ export default function Topup() {
   const [denomination, setDenomination] = useState(null);
   const [email, setEmail] = useState("");
   const [wa, setWa] = useState("");
-  const [destinations, setDestinations] = useState([]);
-  const [destinationId, setDestinationId] = useState("");
-  const [methods, setMethods] = useState([{ id: "manual", label: "Transfer Manual" }]);
-  const [method, setMethod] = useState("manual");
+  const [duitkuChannels, setDuitkuChannels] = useState(DEFAULT_DUITKU_CHANNELS);
+  const [duitkuChannel, setDuitkuChannel] = useState("SP");
   const [submitting, setSubmitting] = useState(false);
   const [summaryError, setSummaryError] = useState("");
 
@@ -43,37 +41,33 @@ export default function Topup() {
   }, [user?.email]);
 
   const productId = useMemo(
-    () => (game && denomination ? `topup-${slugifyId(game.slug)}-${slugifyId(denomination.code)}` : ""),
+    () => (game && denomination ? `tp-${slugifyId(game.slug)}-${slugifyId(denomination.code)}` : ""),
     [game, denomination]
   );
 
-  // Payment options depend on the chosen nominal (per-product PayKita overrides).
+  // Fetch enabled Duitku payment channels for Top Up products (manual methods removed).
   useEffect(() => {
     if (!game || !denomination) return;
     let alive = true;
-    Promise.allSettled([
-      api.get("/payments/manual-destinations"),
-      api.get("/payments/methods", { params: { product_id: productId } }),
-    ]).then(([d, m]) => {
-      if (!alive) return;
-      if (d.status === "fulfilled") {
-        const rows = Array.isArray(d.value.data) ? d.value.data : [];
-        setDestinations(rows);
-        const fiats = rows.filter((r) => r.type !== "crypto");
-        const firstRows = fiats.length ? fiats : rows;
-        setDestinationId((cur) => (firstRows.some((r) => r.id === cur) ? cur : firstRows[0]?.id || ""));
-      }
-      if (m.status === "fulfilled" && Array.isArray(m.value.data) && m.value.data.length) {
-        setMethods(m.value.data);
-        setMethod((cur) =>
-          m.value.data.some((x) => x.id === cur)
-            ? cur
-            : m.value.data.some((x) => x.id === "paykita")
-              ? "paykita"
-              : "manual"
+    api
+      .get("/payments/methods", { params: { product_id: productId, scope: "topup" } })
+      .then((res) => {
+        if (!alive) return;
+        const rows = Array.isArray(res.data) ? res.data : [];
+        const duitkuItem =
+          rows.find((x) => x.id === "duitku" || x.gateway_id === "duitku" || x.id === "paykita") ||
+          rows[0];
+        const channels =
+          Array.isArray(duitkuItem?.duitku_channels) && duitkuItem.duitku_channels.length > 0
+            ? duitkuItem.duitku_channels
+            : DEFAULT_DUITKU_CHANNELS;
+        setDuitkuChannels(channels);
+        const defaultCode = duitkuItem?.default_channel || channels[0]?.code || "SP";
+        setDuitkuChannel((cur) =>
+          channels.some((c) => c.code === cur) ? cur : defaultCode
         );
-      }
-    });
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -127,8 +121,14 @@ export default function Topup() {
     }
   };
 
-  const nextFromAccount = async () => {
-    if (await runValidate()) setStep("denomination");
+  const nextToPayment = async () => {
+    if (!denomination) {
+      toast.error("Pilih nominal top up terlebih dahulu");
+      return;
+    }
+    if (await runValidate()) {
+      setStep("payment");
+    }
   };
 
   const destinationLabel = useMemo(
@@ -146,12 +146,8 @@ export default function Topup() {
       setSummaryError("Isi email atau nomor WhatsApp untuk pengiriman pesanan.");
       return;
     }
-    if ((method === "manual" || method === "crypto") && !destinationId) {
-      setSummaryError(
-        method === "crypto"
-          ? "Pilih aset / wallet crypto terlebih dahulu."
-          : "Pilih tujuan transfer terlebih dahulu."
-      );
+    if (!duitkuChannel) {
+      setSummaryError("Pilih metode pembayaran Duitku terlebih dahulu.");
       return;
     }
     setSubmitting(true);
@@ -161,12 +157,14 @@ export default function Topup() {
         denomination_code: denomination.code,
         product_id: productId,
         destination: values,
+        verified_nickname: validation?.nickname || "",
         buyer_email: email.trim(),
         buyer_whatsapp: wa.trim(),
-        method,
+        method: "duitku",
+        duitku_channel: duitkuChannel,
+        payment_method: duitkuChannel,
         origin_url: window.location.origin,
       };
-      if (method === "manual" || method === "crypto") payload.destination_id = destinationId;
       const { data } = await api.post("/payments/topup/checkout", payload);
       window.location.href = data.checkout_url;
     } catch (e) {
@@ -179,201 +177,236 @@ export default function Topup() {
     }
   };
 
+  const canReachStep = useCallback(
+    (targetStep) => {
+      if (targetStep === "game") return true;
+      if (targetStep === "account" || targetStep === "denomination") return !!game;
+      if (targetStep === "payment") return !!game && !!destinationLabel && !!denomination;
+      return false;
+    },
+    [game, destinationLabel, denomination]
+  );
+
+  const stepSummaries = useMemo(
+    () => ({
+      game: game?.name || "Belum dipilih",
+      account:
+        denomination && destinationLabel
+          ? `${validation?.nickname ? `${validation.nickname} · ` : ""}${destinationLabel} · ${denomination.label}`
+          : denomination
+            ? denomination.label
+            : destinationLabel || "Isi ID & pilih paket",
+      payment: denomination ? formatIDR(denomination.price) : "Metode bayar",
+    }),
+    [game, destinationLabel, denomination, validation?.nickname]
+  );
+
+  const isConfigureStep = step === "account" || step === "denomination";
+
   return (
-    <main className="min-h-screen bg-void grid-bg">
+    <main className="min-h-screen bg-void grid-bg relative overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/4 w-[460px] h-[460px] bg-neon/5 rounded-full blur-[130px]" />
+        <div className="absolute top-1/2 -right-40 w-[400px] h-[400px] bg-lime/5 rounded-full blur-[130px]" />
+      </div>
+
       <Navbar />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-28 sm:pt-28 sm:pb-32">
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-[0.35em] text-neon mb-2">
-              Top Up Instan
-            </p>
-            <h1 className="font-display font-black text-2xl sm:text-3xl uppercase tracking-tight">
-              Top Up <span className="text-stroke">Game</span>
-            </h1>
-            <p className="mt-2 text-xs font-mono text-slate-500 max-w-lg">
-              Pilih game, masukkan User ID &amp; Server, pilih nominal, lalu bayar. Proses 1-10
-              menit setelah pembayaran terverifikasi.
-            </p>
-          </div>
-          <Link
-            to="/"
-            data-testid="topup-back-home"
-            className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-slate-400 hover:text-neon transition-colors"
-          >
-            <ArrowLeft size={13} /> Kembali ke Beranda
-          </Link>
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-28 sm:pt-28 sm:pb-32">
+        <div className="mb-6">
+          <p className="text-[10px] font-mono uppercase tracking-[0.35em] text-neon mb-1.5">
+            Top Up Instan 24/7 &middot; Digiflazz Official
+          </p>
+          <h1 className="font-display font-black text-2xl sm:text-3xl uppercase tracking-tight">
+            Top Up <span className="text-stroke">Game</span>
+          </h1>
         </div>
 
-        {step === "game" && (
-          <motion.section
-            key="game"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            aria-label="Pilih game"
-          >
-            <TopupGameGrid
-              games={games}
-              loading={loading}
-              error={error}
-              value={slug}
-              onSelect={chooseGame}
-              onRetry={reload}
-            />
-          </motion.section>
-        )}
+        <TopupStepper
+          current={step}
+          onGoTo={setStep}
+          reachable={canReachStep}
+          summaries={stepSummaries}
+        />
 
-        {step === "account" && (
-          <motion.section
-            key="account"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            aria-label="Isi tujuan top up"
-            className="border border-line bg-panel p-6 sm:p-8"
-          >
-            <TopupAccountForm
-              game={game}
-              values={values}
-              onChange={changeField}
-              errors={errors}
-              checking={checking}
-              validation={validation}
-              onValidate={runValidate}
-            />
-            <div className="mt-8 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setStep("game")}
-                data-testid="topup-prev-game"
-                className="inline-flex items-center gap-2 border border-line text-slate-400 font-mono text-[11px] uppercase tracking-widest px-5 py-3 hover:text-neon hover:border-neon/60 transition-colors"
-              >
-                <ArrowLeft size={13} /> Ganti Game
-              </button>
-              <button
-                type="button"
-                onClick={nextFromAccount}
-                disabled={checking}
-                data-testid="topup-next-denomination"
-                className="inline-flex items-center gap-2 bg-neon text-void font-display font-bold text-[11px] uppercase tracking-[0.2em] px-6 py-3 hover:bg-lime transition-colors disabled:opacity-60"
-              >
-                Pilih Nominal <ArrowRight size={13} />
-              </button>
-            </div>
-          </motion.section>
-        )}
+        <AnimatePresence mode="wait">
+          {step === "game" && (
+            <motion.section
+              key="game"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              aria-label="Pilih game"
+            >
+              <TopupGameGrid
+                games={games}
+                loading={loading}
+                error={error}
+                value={slug}
+                onSelect={chooseGame}
+                onRetry={reload}
+              />
+            </motion.section>
+          )}
 
-        {step === "denomination" && (
-          <motion.section
-            key="denomination"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            aria-label="Pilih nominal"
-            className="border border-line bg-panel p-6 sm:p-8"
-          >
-            <DenominationGrid
-              game={game}
-              value={denomination?.code}
-              onSelect={(d) => {
-                setDenomination(d);
-                setSummaryError("");
-              }}
-            />
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setStep("account")}
-                data-testid="topup-prev-account"
-                className="inline-flex items-center gap-2 border border-line text-slate-400 font-mono text-[11px] uppercase tracking-widest px-5 py-3 hover:text-neon hover:border-neon/60 transition-colors"
-              >
-                <ArrowLeft size={13} /> Ubah Tujuan
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!denomination) {
-                    toast.error("Pilih nominal top up terlebih dahulu");
-                    return;
-                  }
-                  setStep("payment");
-                }}
-                data-testid="topup-next-payment"
-                className="inline-flex items-center gap-2 bg-neon text-void font-display font-bold text-[11px] uppercase tracking-[0.2em] px-6 py-3 hover:bg-lime transition-colors"
-              >
-                Lanjut Bayar <ArrowRight size={13} />
-              </button>
-              {denomination && (
-                <span className="inline-flex items-center gap-2 text-[11px] font-mono text-lime self-center">
-                  <Zap size={12} /> {denomination.label} dipilih
-                </span>
+          {isConfigureStep && (
+            <motion.section
+              key="configure"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              aria-label="Isi tujuan dan pilih nominal top up"
+              className="space-y-5"
+            >
+              {/* Compact Selected Game Bar */}
+              {game && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-panel/90 px-4 py-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={imgSrc(game.icon || game.banner)}
+                      alt={game.name}
+                      loading="lazy"
+                      className="w-11 h-11 rounded-xl object-cover border border-neon/40 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-display font-bold text-sm sm:text-base text-slate-100 truncate">
+                        {game.name}
+                      </p>
+                      <p className="text-[11px] font-mono text-slate-400 truncate">
+                        {game.publisher || "Official Game"} &middot; Digiflazz Instan 24/7
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setStep("game")}
+                    data-testid="topup-prev-game"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-void/80 text-slate-300 font-mono text-[11px] uppercase tracking-wider px-3.5 py-2 hover:text-neon hover:border-neon/60 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft size={13} /> Ganti Game
+                  </button>
+                </div>
               )}
-            </div>
-          </motion.section>
-        )}
 
-        {step === "payment" && (
-          <motion.section
-            key="payment"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            aria-label="Pembayaran"
-          >
-            <TopupPaymentStep
-              game={game}
-              denomination={denomination}
-              destinationLabel={destinationLabel}
-              email={email}
-              wa={wa}
-              onEmail={setEmail}
-              onWa={setWa}
-              destinations={destinations}
-              destinationId={destinationId}
-              onDestination={setDestinationId}
-              methods={methods}
-              method={method}
-              onMethod={(nextM) => {
-                setMethod(nextM);
-                if (nextM === "crypto") {
-                  const cryptos = destinations.filter((d) => d.type === "crypto");
-                  if (!cryptos.some((d) => d.id === destinationId) && cryptos[0]) {
-                    setDestinationId(cryptos[0].id);
-                  }
-                } else if (nextM === "manual") {
-                  const fiats = destinations.filter((d) => d.type !== "crypto");
-                  if (!fiats.some((d) => d.id === destinationId) && fiats[0]) {
-                    setDestinationId(fiats[0].id);
-                  }
-                }
-              }}
-              submitting={submitting}
-              summaryError={summaryError}
-              onSubmit={submit}
-            />
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setStep("denomination")}
-                data-testid="topup-prev-denomination"
-                className="inline-flex items-center gap-2 border border-line text-slate-400 font-mono text-[11px] uppercase tracking-widest px-5 py-3 hover:text-neon hover:border-neon/60 transition-colors"
-              >
-                <ArrowLeft size={13} /> Ubah Nominal
-              </button>
-            </div>
-          </motion.section>
-        )}
+              {/* Unified Destination + Denomination Card */}
+              <div className="rounded-2xl border border-line bg-panel/90 p-5 sm:p-6 shadow-[0_14px_40px_rgba(0,0,0,0.45)] space-y-6">
+                <TopupAccountForm
+                  game={game}
+                  values={values}
+                  onChange={changeField}
+                  errors={errors}
+                  checking={checking}
+                  validation={validation}
+                  onValidate={runValidate}
+                />
+
+                <div className="border-t border-line/80 pt-6">
+                  <DenominationGrid
+                    game={game}
+                    value={denomination?.code}
+                    onSelect={(d) => {
+                      setDenomination(d);
+                      setSummaryError("");
+                    }}
+                  />
+                </div>
+
+                {/* Simple & Dynamic Bottom Action Bar */}
+                <div className="pt-5 border-t border-line flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    {denomination ? (
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                        <span className="inline-flex items-center gap-1.5 font-display font-bold text-xs sm:text-sm text-slate-100">
+                          <Zap size={13} className="text-neon shrink-0" />
+                          <span>{denomination.label}</span>
+                        </span>
+                        <span className="text-slate-600">&middot;</span>
+                        <span className="font-mono font-extrabold text-sm sm:text-base text-neon tabular-nums">
+                          {formatIDR(denomination.price)}
+                        </span>
+                        {validation?.nickname && (
+                          <span className="text-[11px] font-mono text-lime font-semibold">
+                            &bull; {validation.nickname}
+                          </span>
+                        )}
+                        {destinationLabel && (
+                          <span className="text-[11px] font-mono text-slate-400 truncate">
+                            ({destinationLabel})
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs font-mono text-slate-400">
+                        Isi ID tujuan, verifikasi ID game, dan pilih paket nominal di atas untuk melanjutkan.
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={nextToPayment}
+                    disabled={checking}
+                    data-testid="topup-next-payment"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-neon to-cyan-300 hover:from-lime hover:to-neon text-void font-display font-extrabold text-xs uppercase tracking-wider px-6 py-3.5 shadow-[0_0_22px_rgba(0,240,255,0.3)] transition-all disabled:opacity-60 cursor-pointer active:scale-95 shrink-0"
+                  >
+                    <span>{checking ? "Memverifikasi ID..." : "Verifikasi & Lanjut Checkout"}</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </motion.section>
+          )}
+
+          {step === "payment" && (
+            <motion.section
+              key="payment"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              aria-label="Pembayaran"
+            >
+              <TopupPaymentStep
+                game={game}
+                denomination={denomination}
+                destinationLabel={destinationLabel}
+                verifiedNickname={validation?.nickname || ""}
+                email={email}
+                wa={wa}
+                onEmail={setEmail}
+                onWa={setWa}
+                duitkuChannels={duitkuChannels}
+                duitkuChannel={duitkuChannel}
+                onSelectDuitkuChannel={setDuitkuChannel}
+                submitting={submitting}
+                summaryError={summaryError}
+                onSubmit={submit}
+              />
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => setStep("account")}
+                  data-testid="topup-prev-denomination"
+                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-panel/80 text-slate-300 font-mono text-xs uppercase tracking-wider px-5 py-3 hover:text-neon hover:border-neon/60 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft size={14} /> Ubah Tujuan &amp; Nominal
+                </button>
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
 
         {step !== "game" && error && (
           <button
             type="button"
             onClick={reload}
             data-testid="topup-reload-games"
-            className="mt-8 inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-slate-500 hover:text-neon transition-colors"
+            className="mt-8 inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400 hover:text-neon transition-colors cursor-pointer"
           >
-            <RefreshCw size={12} /> Muat ulang daftar game
+            <RefreshCw size={13} /> Muat ulang daftar game
           </button>
         )}
       </div>

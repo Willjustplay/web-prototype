@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, getLocalUserAvatar, saveLocalUserAvatar } from "@/lib/api";
 import { AuthModal } from "@/components/AuthModal";
 
 const AuthContext = createContext(null);
@@ -11,6 +11,19 @@ const TOKEN_KEY = "wjp_token";
 const setAuthHeader = (t) => {
   if (t) api.defaults.headers.common.Authorization = `Bearer ${t}`;
   else delete api.defaults.headers.common.Authorization;
+};
+
+const hydrateUserAvatar = (u) => {
+  if (!u || typeof u !== "object") return u;
+  const localAv = getLocalUserAvatar(u);
+  if (u.avatar && String(u.avatar).trim()) {
+    saveLocalUserAvatar(u, u.avatar);
+    return u;
+  }
+  if (localAv) {
+    return { ...u, avatar: localAv };
+  }
+  return u;
 };
 
 export const AuthProvider = ({ children }) => {
@@ -27,7 +40,7 @@ export const AuthProvider = ({ children }) => {
     setAuthHeader(token);
     api
       .get("/auth/me")
-      .then((r) => setUser(r.data))
+      .then((r) => setUser(hydrateUserAvatar(r.data)))
       .catch((err) => {
         if (err.response) {
           localStorage.removeItem(TOKEN_KEY);
@@ -40,7 +53,7 @@ export const AuthProvider = ({ children }) => {
   const persist = (token, u) => {
     localStorage.setItem(TOKEN_KEY, token);
     setAuthHeader(token);
-    setUser(u);
+    setUser(hydrateUserAvatar(u));
   };
 
   const login = async (email, password) => {
@@ -95,19 +108,68 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const updateProfile = async (name) => {
-    const { data } = await api.patch("/me/profile", { name });
-    if (data?.user) {
-      setUser((u) => ({ ...u, ...data.user }));
+  const updateProfile = async (nameOrPayload, maybeAvatar) => {
+    const rawBody =
+      nameOrPayload && typeof nameOrPayload === "object"
+        ? nameOrPayload
+        : {
+            ...(nameOrPayload !== undefined ? { name: nameOrPayload } : {}),
+            ...(maybeAvatar !== undefined ? { avatar: maybeAvatar } : {}),
+          };
+
+    const nextName =
+      rawBody.name !== undefined && String(rawBody.name).trim()
+        ? String(rawBody.name).trim()
+        : user?.name || "Member";
+    const nextAvatar =
+      rawBody.avatar !== undefined ? String(rawBody.avatar).trim() : user?.avatar;
+
+    if (nextAvatar) {
+      saveLocalUserAvatar(user, nextAvatar);
     }
-    return data;
+
+    // Optimistic state update so UI reflects avatar/name change immediately
+    setUser((u) =>
+      u
+        ? {
+            ...u,
+            name: nextName,
+            ...(nextAvatar !== undefined ? { avatar: nextAvatar } : {}),
+          }
+        : u
+    );
+
+    const payload = {
+      name: nextName,
+      ...(nextAvatar !== undefined ? { avatar: nextAvatar } : {}),
+    };
+
+    try {
+      const { data } = await api.patch("/me/profile", payload);
+      if (data?.user) {
+        setUser((u) => ({
+          ...u,
+          ...data.user,
+          name: data.user.name || nextName,
+          avatar: nextAvatar || data.user.avatar || u?.avatar || "",
+        }));
+      }
+      return data;
+    } catch (err) {
+      // If only changing avatar and backend route wasn't restarted yet, keep local avatar change working smoothly
+      if (rawBody.avatar !== undefined && rawBody.name === undefined) {
+        return { user: { ...user, name: nextName, avatar: nextAvatar } };
+      }
+      throw err;
+    }
   };
 
   const refreshUser = async () => {
     try {
       const { data } = await api.get("/auth/me");
-      setUser(data);
-      return data;
+      const hydrated = hydrateUserAvatar(data);
+      setUser(hydrated);
+      return hydrated;
     } catch {
       return null;
     }

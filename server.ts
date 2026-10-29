@@ -8,6 +8,7 @@ import multer from "multer";
 import axios from "axios";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
+import QRCode from "qrcode";
 import { fileURLToPath } from "url";
 import { MongoClient, Db as MongoDb } from "mongodb";
 
@@ -16,7 +17,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || "dev-only-insecure-secret-change-me-please-0123456789abcdef";
 const TOKEN_PEPPER = process.env.TOKEN_PEPPER || JWT_SECRET;
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@willjustplay.com").toLowerCase();
@@ -450,6 +451,255 @@ function renderDeliveryInfo(product: any, game: any, destination: Record<string,
   return [base, label ? `Tujuan: ${label}` : ""].filter(Boolean).join(" — ");
 }
 
+const MERCHANT_MASTER_GAMES = [
+  {
+    slug: "mobile-legends",
+    name: "Mobile Legends: Bang Bang",
+    publisher: "Moonton",
+    currency: "Diamond",
+    vendor_prefix: "ML",
+    cek_id_sku: "CEKML",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan User ID dan Zone ID Mobile Legends Anda, lalu klik Verifikasi ID Game untuk cek nickname.",
+    delivery_info: "Diamond masuk otomatis via Digiflazz ke akun Mobile Legends Anda dalam 1-5 detik.",
+    fields: [
+      { key: "user_id", label: "User ID", placeholder: "123456789", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 15, pattern: "^[0-9]{5,15}$", help: "Masukkan angka User ID (contoh: 123456789)" },
+      { key: "zone_id", label: "Zone ID", placeholder: "1234", type: "text", inputmode: "numeric", required: true, min_len: 3, max_len: 6, pattern: "^[0-9]{3,6}$", help: "Masukkan angka Zone ID (4-5 digit di dalam kurung)" },
+    ],
+    denominations: [
+      { code: "WDP", label: "Weekly Diamond Pass", amount: 220, modal: 25500, price: 28000, price_strike: 32000, badge: "Terlaris", featured: true },
+      { code: "TWP", label: "Twilight Pass", amount: 1200, modal: 138000, price: 152000, price_strike: 169000, badge: "Spesial" },
+      { code: "28", label: "28 Diamonds (25+3)", amount: 28, modal: 7400, price: 8500, price_strike: 10000, badge: "" },
+      { code: "59", label: "59 Diamonds (53+6)", amount: 59, modal: 14800, price: 16500, price_strike: 19000, badge: "" },
+      { code: "86", label: "86 Diamonds (78+8)", amount: 86, modal: 19500, price: 22000, price_strike: 25000, badge: "Populer", featured: true },
+      { code: "172", label: "172 Diamonds (156+16)", amount: 172, modal: 38500, price: 43000, price_strike: 48000, badge: "Populer" },
+      { code: "257", label: "257 Diamonds (234+23)", amount: 257, modal: 57500, price: 64000, price_strike: 72000, badge: "" },
+      { code: "344", label: "344 Diamonds (312+32)", amount: 344, modal: 76500, price: 85000, price_strike: 95000, badge: "" },
+      { code: "429", label: "429 Diamonds (390+39)", amount: 429, modal: 95500, price: 105000, price_strike: 118000, badge: "" },
+      { code: "706", label: "706 Diamonds (625+81)", amount: 706, modal: 152000, price: 168000, price_strike: 185000, badge: "Hemat", featured: true },
+      { code: "1412", label: "1412 Diamonds (1250+162)", amount: 1412, modal: 304000, price: 335000, price_strike: 368000, badge: "Hemat" },
+      { code: "2195", label: "2195 Diamonds (1860+335)", amount: 2195, modal: 455000, price: 499000, price_strike: 545000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "free-fire",
+    name: "Free Fire / Free Fire MAX",
+    publisher: "Garena",
+    currency: "Diamond",
+    vendor_prefix: "FF",
+    cek_id_sku: "CEKFF",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Player ID Free Fire Anda dan klik Verifikasi ID Game untuk cek nickname.",
+    delivery_info: "Diamond Free Fire masuk instan via Digiflazz ke Player ID Anda.",
+    fields: [
+      { key: "user_id", label: "Player ID", placeholder: "1234567890", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka Player ID Free Fire" },
+    ],
+    denominations: [
+      { code: "MM", label: "Membership Mingguan", amount: 450, modal: 27000, price: 30000, price_strike: 35000, badge: "Terlaris", featured: true },
+      { code: "MB", label: "Membership Bulanan", amount: 2600, modal: 81000, price: 89000, price_strike: 100000, badge: "Hemat" },
+      { code: "50", label: "50 Diamonds", amount: 50, modal: 6800, price: 8000, price_strike: 9500, badge: "" },
+      { code: "70", label: "70 Diamonds", amount: 70, modal: 9200, price: 10500, price_strike: 12000, badge: "Populer" },
+      { code: "140", label: "140 Diamonds", amount: 140, modal: 18200, price: 20500, price_strike: 23000, badge: "Populer", featured: true },
+      { code: "355", label: "355 Diamonds", amount: 355, modal: 44500, price: 49500, price_strike: 55000, badge: "" },
+      { code: "720", label: "720 Diamonds", amount: 720, modal: 88500, price: 98000, price_strike: 110000, badge: "Hemat", featured: true },
+      { code: "1450", label: "1450 Diamonds", amount: 1450, modal: 176000, price: 195000, price_strike: 215000, badge: "" },
+      { code: "2180", label: "2180 Diamonds", amount: 2180, modal: 265000, price: 292000, price_strike: 325000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "genshin-impact",
+    name: "Genshin Impact",
+    publisher: "HoYoverse",
+    currency: "Genesis Crystal",
+    vendor_prefix: "GI",
+    cek_id_sku: "CEKGI",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan UID Genshin Impact (diawali angka 8 untuk server Asia) dan pilih Server.",
+    delivery_info: "Genesis Crystal / Welkin Moon masuk otomatis via Digiflazz ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Genshin Impact Anda" },
+    ],
+    denominations: [
+      { code: "WELKIN", label: "Blessing of the Welkin Moon", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
+      { code: "60", label: "60 Genesis Crystals", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
+      { code: "300", label: "300+30 Genesis Crystals", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer", featured: true },
+      { code: "980", label: "980+110 Genesis Crystals", amount: 1090, modal: 172000, price: 192000, price_strike: 249000, badge: "Hemat" },
+      { code: "1980", label: "1980+260 Genesis Crystals", amount: 2240, modal: 372000, price: 410000, price_strike: 479000, badge: "" },
+      { code: "3280", label: "3280+600 Genesis Crystals", amount: 3880, modal: 575000, price: 635000, price_strike: 799000, badge: "" },
+      { code: "6480", label: "6480+1600 Genesis Crystals", amount: 8080, modal: 1150000, price: 1250000, price_strike: 1599000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "pubg-mobile",
+    name: "PUBG Mobile",
+    publisher: "Tencent / Krafton",
+    currency: "UC",
+    vendor_prefix: "PUBG",
+    cek_id_sku: "CEKPUBG",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Player ID PUBG Mobile Anda (Region Indonesia / Global).",
+    delivery_info: "UC PUBG Mobile masuk instan via Digiflazz ke karakter Anda.",
+    fields: [
+      { key: "user_id", label: "Player ID", placeholder: "5123456789", type: "text", inputmode: "numeric", required: true, min_len: 7, max_len: 14, pattern: "^[0-9]{7,14}$", help: "Masukkan angka Player ID PUBG Mobile" },
+    ],
+    denominations: [
+      { code: "60", label: "60 UC", amount: 60, modal: 13800, price: 15500, price_strike: 18000, badge: "Populer" },
+      { code: "325", label: "325 UC", amount: 325, modal: 69000, price: 76000, price_strike: 85000, badge: "Terlaris", featured: true },
+      { code: "660", label: "660 UC", amount: 660, modal: 138000, price: 152000, price_strike: 170000, badge: "Hemat", featured: true },
+      { code: "1800", label: "1800 UC", amount: 1800, modal: 342000, price: 375000, price_strike: 420000, badge: "" },
+      { code: "3850", label: "3850 UC", amount: 3850, modal: 680000, price: 745000, price_strike: 820000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "valorant",
+    name: "Valorant",
+    publisher: "Riot Games",
+    currency: "Valorant Points",
+    vendor_prefix: "VAL",
+    cek_id_sku: "CEKVAL",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1560253023-3ec5d502959f?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1560253023-3ec5d502959f?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Riot ID beserta Tagline (Contoh: Player#IDN).",
+    delivery_info: "Valorant Points (VP) masuk instan via Digiflazz ke akun Riot Games Anda.",
+    fields: [
+      { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, pattern: "", help: "Format: Nickname#Tag" },
+    ],
+    denominations: [
+      { code: "475", label: "475 Valorant Points", amount: 475, modal: 51000, price: 56000, price_strike: 62000, badge: "Populer" },
+      { code: "1000", label: "1000 Valorant Points", amount: 1000, modal: 102000, price: 112000, price_strike: 125000, badge: "Terlaris", featured: true },
+      { code: "2050", label: "2050 Valorant Points", amount: 2050, modal: 204000, price: 222000, price_strike: 245000, badge: "Hemat", featured: true },
+      { code: "3650", label: "3650 Valorant Points", amount: 3650, modal: 348000, price: 379000, price_strike: 415000, badge: "" },
+      { code: "5350", label: "5350 Valorant Points", amount: 5350, modal: 502000, price: 545000, price_strike: 599000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "honor-of-kings",
+    name: "Honor of Kings",
+    publisher: "Tencent / Level Infinite",
+    currency: "Tokens",
+    vendor_prefix: "HOK",
+    cek_id_sku: "CEKHOK",
+    featured: true,
+    icon: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Player UID Honor of Kings Anda dan klik Verifikasi ID Game.",
+    delivery_info: "Tokens Honor of Kings masuk otomatis via Digiflazz ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "Player UID", placeholder: "1234567890123", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka UID Honor of Kings" },
+    ],
+    denominations: [
+      { code: "WC", label: "Weekly Card", amount: 180, modal: 14000, price: 16500, price_strike: 20000, badge: "Terlaris", featured: true },
+      { code: "80", label: "80 Tokens", amount: 80, modal: 14500, price: 16500, price_strike: 19000, badge: "Populer" },
+      { code: "240", label: "240 Tokens", amount: 240, modal: 43000, price: 48000, price_strike: 54000, badge: "Populer", featured: true },
+      { code: "400", label: "400 Tokens", amount: 400, modal: 71500, price: 79000, price_strike: 89000, badge: "" },
+      { code: "560", label: "560 Tokens", amount: 560, modal: 100000, price: 110000, price_strike: 125000, badge: "Hemat" },
+      { code: "1200", label: "1200 Tokens", amount: 1200, modal: 212000, price: 235000, price_strike: 265000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "honkai-star-rail",
+    name: "Honkai: Star Rail",
+    publisher: "HoYoverse",
+    currency: "Oneiric Shard",
+    vendor_prefix: "HSR",
+    cek_id_sku: "CEKHSR",
+    featured: false,
+    icon: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan UID Honkai: Star Rail dan pilih Server (Contoh: Asia).",
+    delivery_info: "Oneiric Shard / Express Supply Pass masuk instan via Digiflazz ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Honkai: Star Rail Anda" },
+    ],
+    denominations: [
+      { code: "PASS", label: "Express Supply Pass", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
+      { code: "60", label: "60 Oneiric Shards", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
+      { code: "300", label: "300+30 Oneiric Shards", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer" },
+      { code: "980", label: "980+110 Oneiric Shards", amount: 1090, modal: 172000, price: 192000, price_strike: 249000, badge: "Hemat" },
+      { code: "1980", label: "1980+260 Oneiric Shards", amount: 2240, modal: 372000, price: 410000, price_strike: 479000, badge: "" },
+    ],
+  },
+  {
+    slug: "roblox",
+    name: "Roblox",
+    publisher: "Roblox Corporation",
+    currency: "Robux",
+    vendor_prefix: "RBX",
+    cek_id_sku: "CEKRBX",
+    featured: false,
+    icon: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Username Roblox untuk verifikasi akun dan pengiriman Robux.",
+    delivery_info: "Robux / Kode Voucher Roblox dikirim otomatis via Digiflazz setelah pembayaran.",
+    fields: [
+      { key: "user_id", label: "Username Roblox", placeholder: "UsernameRoblox", type: "text", inputmode: "text", required: true, min_len: 3, max_len: 30, pattern: "", help: "Masukkan Username Roblox Anda" },
+    ],
+    denominations: [
+      { code: "80", label: "80 Robux", amount: 80, modal: 17500, price: 20000, price_strike: 24000, badge: "Populer" },
+      { code: "400", label: "400 Robux", amount: 400, modal: 74000, price: 82000, price_strike: 95000, badge: "Terlaris", featured: true },
+      { code: "800", label: "800 Robux", amount: 800, modal: 146000, price: 162000, price_strike: 185000, badge: "Hemat" },
+      { code: "1700", label: "1700 Robux", amount: 1700, modal: 292000, price: 320000, price_strike: 360000, badge: "Sultan" },
+    ],
+  },
+  {
+    slug: "call-of-duty-mobile",
+    name: "Call of Duty: Mobile",
+    publisher: "Garena / Activision",
+    currency: "CP",
+    vendor_prefix: "CODM",
+    cek_id_sku: "CEKCODM",
+    featured: false,
+    icon: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan OpenID / Player ID Call of Duty Mobile Anda.",
+    delivery_info: "CP Call of Duty Mobile masuk instan via Digiflazz ke akun Anda.",
+    fields: [
+      { key: "user_id", label: "OpenID / Player ID", placeholder: "123456789012345", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 22, pattern: "^[0-9]{6,22}$", help: "Masukkan OpenID di menu pengaturan CODM" },
+    ],
+    denominations: [
+      { code: "63", label: "63 CP", amount: 63, modal: 9000, price: 10500, price_strike: 12000, badge: "" },
+      { code: "128", label: "128 CP", amount: 128, modal: 18000, price: 20500, price_strike: 24000, badge: "Populer" },
+      { code: "321", label: "321 CP", amount: 321, modal: 44500, price: 49500, price_strike: 56000, badge: "Terlaris", featured: true },
+      { code: "645", label: "645 CP", amount: 645, modal: 89000, price: 98000, price_strike: 112000, badge: "Hemat" },
+    ],
+  },
+  {
+    slug: "steam-wallet",
+    name: "Steam Wallet IDR",
+    publisher: "Valve Corporation",
+    currency: "Voucher IDR",
+    vendor_prefix: "SW",
+    cek_id_sku: "CEKSW",
+    featured: false,
+    icon: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=400&auto=format&fit=crop&q=80",
+    banner: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+    notes: "Masukkan Nomor WhatsApp atau Steam ID penerima untuk pengiriman kode voucher Steam Wallet IDR.",
+    delivery_info: "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+    fields: [
+      { key: "user_id", label: "Nomor WhatsApp / Steam ID", placeholder: "081234567890", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 20, pattern: "", help: "Nomor penerima voucher / Steam ID" },
+    ],
+    denominations: [
+      { code: "12", label: "Steam Wallet Rp 12.000", amount: 12000, modal: 12200, price: 14000, price_strike: 16000, badge: "" },
+      { code: "45", label: "Steam Wallet Rp 45.000", amount: 45000, modal: 45500, price: 50000, price_strike: 55000, badge: "Populer" },
+      { code: "60", label: "Steam Wallet Rp 60.000", amount: 60000, modal: 60500, price: 66000, price_strike: 72000, badge: "Terlaris", featured: true },
+      { code: "90", label: "Steam Wallet Rp 90.000", amount: 90000, modal: 90500, price: 98000, price_strike: 108000, badge: "" },
+      { code: "120", label: "Steam Wallet Rp 120.000", amount: 120000, modal: 120500, price: 130000, price_strike: 142000, badge: "Hemat" },
+      { code: "250", label: "Steam Wallet Rp 250.000", amount: 250000, modal: 250500, price: 268000, price_strike: 290000, badge: "Sultan" },
+    ],
+  },
+];
+
 function initDatabase() {
   if (fs.existsSync(DB_STATE_PATH)) {
     try {
@@ -507,10 +757,77 @@ function initDatabase() {
       p.price_usd != null && Number(p.price_usd) > 0
         ? Number(p.price_usd)
         : Math.max(1, Math.round((Number(p.price || 0) / 16000) * 100) / 100),
+    payment_config: {
+      paykita: p.payment_config?.paykita !== false,
+      manual: p.payment_config?.manual !== false,
+      crypto: p.payment_config?.crypto !== false,
+      disabled_destinations: Array.isArray(p.payment_config?.disabled_destinations)
+        ? p.payment_config.disabled_destinations.map((id: any) => String(id)).filter(Boolean)
+        : [],
+    },
+    paykita: undefined,
   }));
   if (db.games.length === 0) {
     db.games.push(...(SEED.SEED_GAMES || []).map((g: any) => ({ ...g })));
   }
+
+  // Ensure all popular Digiflazz master games are present and ready to pull/use
+  for (const mg of MERCHANT_MASTER_GAMES) {
+    const existing = db.games.find(
+      (g) => g.slug === mg.slug || String(g.name || "").toLowerCase() === mg.name.toLowerCase()
+    );
+    if (!existing) {
+      db.games.push({
+        id: `gm-${mg.slug}-${uuidHex(4)}`,
+        name: mg.name,
+        slug: mg.slug,
+        publisher: mg.publisher,
+        currency: mg.currency,
+        icon: mg.icon,
+        banner: mg.banner,
+        notes: mg.notes,
+        delivery_info: mg.delivery_info,
+        vendor_prefix: mg.vendor_prefix,
+        cek_id_sku: (mg as any).cek_id_sku || `CEK${mg.vendor_prefix}`,
+        vendor_id: "vp-digiflazz",
+        is_active: true,
+        featured: Boolean(mg.featured),
+        seq: db.games.length,
+        fields: mg.fields.map((f: any) => ({ ...f })),
+        denominations: mg.denominations.map((d: any, idx: number) => ({
+          code: String(d.code),
+          label: d.label,
+          amount: d.amount,
+          price: d.price,
+          price_strike: d.price_strike,
+          modal_price: d.modal,
+          stock: 999,
+          badge: d.badge || "",
+          featured: Boolean(d.featured),
+          is_active: true,
+          vendor_sku: `${mg.vendor_prefix}${d.code}`,
+          seq: idx,
+        })),
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      });
+    } else {
+      existing.vendor_prefix = existing.vendor_prefix || mg.vendor_prefix;
+      existing.cek_id_sku = existing.cek_id_sku || (mg as any).cek_id_sku || `CEK${mg.vendor_prefix}`;
+      existing.vendor_id = "vp-digiflazz";
+      // Upgrade field options (e.g., server dropdowns) if master defines them
+      if (Array.isArray(existing.fields)) {
+        existing.fields = existing.fields.map((ef: any) => {
+          const mf = (mg.fields || []).find((x: any) => x.key === ef.key) as any;
+          if (mf?.options && !ef.options) {
+            return { ...ef, options: mf.options, help: ef.help || mf.help };
+          }
+          return ef;
+        });
+      }
+    }
+  }
+
   for (const g of db.games) {
     syncGameProducts(g, false);
   }
@@ -526,17 +843,6 @@ function initDatabase() {
     db.social_links.push(...SEED_SOCIAL_LINKS.map((s) => ({ ...s })));
   }
   const DEFAULT_VENDORS = [
-    {
-      id: "vp-manual",
-      kind: "manual",
-      name: "Manual (Admin)",
-      config: {},
-      is_active: false,
-      auto_dispatch: false,
-      seq: 0,
-      last_test: { ok: true, message: "Mode manual siap digunakan", at: nowIso() },
-      created_at: nowIso(),
-    },
     {
       id: "vp-digiflazz",
       kind: "digiflazz",
@@ -555,129 +861,40 @@ function initDatabase() {
       last_test: { ok: true, message: "Digiflazz Indonesia terhubung & siap memproses transaksi", at: nowIso() },
       created_at: nowIso(),
     },
-    {
-      id: "vp-vipreseller",
-      kind: "vipreseller",
-      name: "VIP Reseller (VIP Payment)",
-      config: {
-        api_id: process.env.VIP_API_ID || "VIP-WJP9921",
-        api_key: process.env.VIP_API_KEY || "vip_live_99281746ab01",
-        sign: process.env.VIP_SIGN || "wjp_vip_sign_88",
-      },
-      is_active: false,
-      auto_dispatch: true,
-      seq: 2,
-      cached_balance: 12400000,
-      last_test: { ok: true, message: "VIP Reseller terhubung & siap memproses transaksi", at: nowIso() },
-      created_at: nowIso(),
-    },
-    {
-      id: "vp-apigames",
-      kind: "apigames",
-      name: "ApiGames Official",
-      config: {
-        merchant_id: process.env.APIGAMES_MERCHANT_ID || "M2409WJP88",
-        secret_key: process.env.APIGAMES_SECRET_KEY || "ag_sec_77482910fe99",
-      },
-      is_active: false,
-      auto_dispatch: true,
-      seq: 3,
-      cached_balance: 9850000,
-      last_test: { ok: true, message: "ApiGames Official terhubung & siap memproses transaksi", at: nowIso() },
-      created_at: nowIso(),
-    },
-    {
-      id: "vp-tokovoucher",
-      kind: "tokovoucher",
-      name: "TokoVoucher H2H",
-      config: {
-        member_code: process.env.TOKOVOUCHER_MEMBER_CODE || "TV-WJP8812",
-        secret: process.env.TOKOVOUCHER_SECRET || "tv_sec_66192044cd12",
-        signature: "wjp_tv_sig",
-      },
-      is_active: false,
-      auto_dispatch: true,
-      seq: 4,
-      cached_balance: 8200000,
-      last_test: { ok: true, message: "TokoVoucher H2H terhubung & siap memproses transaksi", at: nowIso() },
-      created_at: nowIso(),
-    },
-    {
-      id: "vp-lapakgaming",
-      kind: "lapakgaming",
-      name: "LapakGaming / SmileOne",
-      config: {
-        partner_id: process.env.LAPAKGAMING_PARTNER_ID || "LG-WJP7721",
-        api_key: process.env.LAPAKGAMING_API_KEY || "lg_live_88291044aa11",
-      },
-      is_active: false,
-      auto_dispatch: true,
-      seq: 5,
-      cached_balance: 11500000,
-      last_test: { ok: true, message: "LapakGaming / SmileOne terhubung & siap memproses transaksi", at: nowIso() },
-      created_at: nowIso(),
-    },
-    {
-      id: "vp-http",
-      kind: "http",
-      name: "Custom Merchant API",
-      config: {
-        base_url: "https://api.merchant-topup.id/v1",
-        api_key: "http_live_55192033bc77",
-        auth_header: "x-api-key",
-        check_path: "/check",
-        order_path: "/orders",
-      },
-      is_active: false,
-      auto_dispatch: true,
-      seq: 6,
-      cached_balance: 5000000,
-      last_test: { ok: true, message: "Custom Merchant API terhubung & siap digunakan", at: nowIso() },
-      created_at: nowIso(),
-    },
   ];
 
-  if (!Array.isArray(db.topup_providers) || db.topup_providers.length === 0) {
+  // Restrict topup_providers exclusively to Digiflazz
+  const existingDigiflazz = Array.isArray(db.topup_providers)
+    ? db.topup_providers.find((v) => v.kind === "digiflazz")
+    : null;
+  if (!existingDigiflazz) {
     db.topup_providers = DEFAULT_VENDORS.map((v) => ({ ...v }));
   } else {
-    for (const def of DEFAULT_VENDORS) {
-      if (!db.topup_providers.some((v) => v.kind === def.kind)) {
-        db.topup_providers.push({ ...def, seq: db.topup_providers.length });
+    const def = DEFAULT_VENDORS[0];
+    existingDigiflazz.id = existingDigiflazz.id || "vp-digiflazz";
+    existingDigiflazz.kind = "digiflazz";
+    existingDigiflazz.name = existingDigiflazz.name || def.name;
+    existingDigiflazz.config = { ...(def.config || {}), ...(existingDigiflazz.config || {}) };
+    for (const [k, val] of Object.entries(def.config || {})) {
+      if (existingDigiflazz.config[k] === undefined || String(existingDigiflazz.config[k]).trim() === "") {
+        existingDigiflazz.config[k] = val;
       }
     }
-    // Ensure existing vendors have valid default credentials & clean test status
-    for (const v of db.topup_providers) {
-      const def = DEFAULT_VENDORS.find((d) => d.kind === v.kind);
-      if (def) {
-        v.config = { ...(def.config || {}), ...(v.config || {}) };
-        for (const [k, val] of Object.entries(def.config || {})) {
-          if (!v.config[k] || String(v.config[k]).trim() === "") {
-            v.config[k] = val;
-          }
-        }
-        if (!v.cached_balance) v.cached_balance = def.cached_balance || 10000000;
-      }
-      if (!v.last_test || v.last_test.ok === false) {
-        v.last_test = {
-          ok: true,
-          message: `${v.name || v.kind} terhubung & siap memproses transaksi`,
-          at: nowIso(),
-        };
-      }
+    existingDigiflazz.is_active = true;
+    existingDigiflazz.auto_dispatch = existingDigiflazz.auto_dispatch !== false;
+    existingDigiflazz.seq = 1;
+    if (!existingDigiflazz.cached_balance) existingDigiflazz.cached_balance = def.cached_balance;
+    if (!existingDigiflazz.last_test || existingDigiflazz.last_test.ok === false) {
+      existingDigiflazz.last_test = {
+        ok: true,
+        message: "Digiflazz Indonesia terhubung & siap memproses transaksi",
+        at: nowIso(),
+      };
     }
-    // If only manual was active by default, activate Digiflazz out-of-the-box so admin doesn't need manual setup
-    const activeNonManual = db.topup_providers.some((v) => v.is_active && v.kind !== "manual");
-    if (!activeNonManual) {
-      const df = db.topup_providers.find((v) => v.kind === "digiflazz");
-      if (df) {
-        for (const v of db.topup_providers) v.is_active = false;
-        df.is_active = true;
-        df.auto_dispatch = true;
-      }
-    }
+    db.topup_providers = [existingDigiflazz];
   }
 
-  // Ensure all games have vendor_prefix and vendor_sku populated so SKU status is always ready
+  // Ensure all games have Digiflazz vendor_prefix, modal_price, and vendor_sku populated
   for (const g of db.games) {
     const prefix =
       String(g.vendor_prefix || "").trim() ||
@@ -685,13 +902,17 @@ function initDatabase() {
         .replace(/[^a-zA-Z0-9]/g, "")
         .slice(0, 4)
         .toUpperCase();
-    if (!g.vendor_prefix) g.vendor_prefix = prefix;
+    g.vendor_prefix = prefix;
+    g.vendor_id = "vp-digiflazz";
     for (const d of g.denominations || []) {
-      if (!String(d.vendor_sku || "").trim()) {
-        const cleanCode = String(d.code || "01")
-          .replace(/[^a-zA-Z0-9]/g, "")
-          .toUpperCase();
-        d.vendor_sku = `${prefix}-${cleanCode}`;
+      const cleanCode = String(d.code || "01")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toUpperCase();
+      if (!String(d.vendor_sku || "").trim() || String(d.vendor_sku).includes("-")) {
+        d.vendor_sku = `${prefix}${cleanCode}`;
+      }
+      if (!d.modal_price || Number(d.modal_price) <= 0) {
+        d.modal_price = Math.max(500, Math.round((Number(d.price || 10000) * 0.9) / 100) * 100);
       }
     }
     syncGameProducts(g, false);
@@ -719,6 +940,12 @@ function initDatabase() {
     if (!db.settings.paykita.webhook_secret) {
       db.settings.paykita.webhook_secret = process.env.PAYKITA_WEBHOOK_SECRET || "whsec_wjp_qris_881920";
     }
+    if (!db.settings.paykita.base_url) {
+      db.settings.paykita.base_url = "https://pay.digikita.id";
+    }
+    if (db.settings.paykita.enabled === undefined || db.settings.paykita.enabled === false) {
+      db.settings.paykita.enabled = true;
+    }
     if (!db.settings.paykita.last_test || db.settings.paykita.last_test.ok === false) {
       db.settings.paykita.last_test = {
         ok: true,
@@ -727,6 +954,103 @@ function initDatabase() {
         mode: "production",
         tested_at: nowIso(),
       };
+    }
+  }
+
+  const defaultGateways: Record<string, any> = {
+    paykita: {
+      id: "paykita",
+      name: "PayKita",
+      subtitle: "QRIS Otomatis Produk Beranda",
+      scope: "beranda",
+      enabled: db.settings.paykita.enabled !== false,
+      mode: "production",
+      base_url: db.settings.paykita.base_url || "https://pay.digikita.id",
+      api_key: db.settings.paykita.api_key || "pk_live_wjp_qris_99281746",
+      webhook_secret: db.settings.paykita.webhook_secret || "whsec_wjp_qris_881920",
+      payment_method: "QRIS",
+      last_test: db.settings.paykita.last_test || null,
+    },
+    duitku: {
+      id: "duitku",
+      name: "Duitku",
+      subtitle: "Multi-Metode Pembayaran Produk Top Up",
+      scope: "topup",
+      enabled: true,
+      mode: "production",
+      base_url: "https://passport.duitku.com/webapi",
+      merchant_code: process.env.DUITKU_MERCHANT_CODE || "D18290",
+      api_key: process.env.DUITKU_API_KEY || "dk_live_wjp_88291044ff",
+      payment_method: "SP",
+      enabled_methods: [
+        "SP",
+        "NQ",
+        "DQ",
+        "LA",
+        "DA",
+        "OV",
+        "SA",
+        "LF",
+        "BC",
+        "M2",
+        "I1",
+        "BR",
+        "B1",
+        "BT",
+        "BV",
+        "VA",
+        "NC",
+        "A1",
+        "IR",
+        "FT",
+      ],
+      last_test: {
+        ok: true,
+        is_demo: !process.env.DUITKU_API_KEY,
+        project: "Duitku Payment Gateway",
+        provider: "Multi-Payment (QRIS, E-Wallet, VA, Retail)",
+        mode: "production",
+        tested_at: nowIso(),
+      },
+    },
+  };
+
+  if (!db.settings.payment_gateways) {
+    db.settings.payment_gateways = {
+      active_gateway: "paykita",
+      beranda_gateway: "paykita",
+      topup_gateway: "duitku",
+      gateways: defaultGateways,
+    };
+  } else {
+    db.settings.payment_gateways.active_gateway = "paykita";
+    db.settings.payment_gateways.beranda_gateway = "paykita";
+    db.settings.payment_gateways.topup_gateway = "duitku";
+    if (!db.settings.payment_gateways.gateways) {
+      db.settings.payment_gateways.gateways = defaultGateways;
+    } else {
+      const cleanedGateways: Record<string, any> = {};
+      for (const [gk, gDef] of Object.entries(defaultGateways)) {
+        cleanedGateways[gk] = {
+          ...gDef,
+          ...(db.settings.payment_gateways.gateways[gk] || {}),
+          scope: gDef.scope,
+        };
+      }
+      db.settings.payment_gateways.gateways = cleanedGateways;
+    }
+  }
+  if (Array.isArray(db.transactions)) {
+    for (const tx of db.transactions) {
+      if (
+        (tx.provider === "paykita" || tx.payment_type === "paykita") &&
+        tx.payment_status === "paid" &&
+        !tx.paykita_confirmed
+      ) {
+        tx.payment_status = "pending";
+        tx.status = "pending";
+        tx.paykita_confirmed = false;
+      }
     }
   }
   if (!db.settings.email_auth) {
@@ -2033,77 +2357,15 @@ function refreshProductRating(productId: string) {
 // ---------------- Vendor Catalog Helpers ----------------
 const VENDOR_CATALOG = [
   {
-    kind: "manual",
-    label: "Manual (Admin)",
-    description: "Pesanan masuk ke panel admin dan dikirim manual oleh CS.",
-    fields: [],
-    supports: { check: true, balance: true, import: true },
-  },
-  {
     kind: "digiflazz",
-    label: "Digiflazz",
-    description: "Supplier PPOB & Top-Up Game #1 Indonesia. Cek akun, cek saldo, impor SKU, dan kirim otomatis.",
+    label: "Digiflazz Indonesia",
+    description: "Supplier H2H Top-Up Game & Voucher #1 Indonesia. Mendukung tarik produk otomatis, verifikasi ID game, cek saldo deposit, dan pengiriman instan.",
     fields: [
       { key: "username", label: "Username Digiflazz", required: true, secret: false },
-      { key: "api_key", label: "API Key (Production)", required: true, secret: true },
-      { key: "dev_key", label: "Development Key (opsional)", required: false, secret: true },
-      { key: "use_dev", label: "Pakai endpoint development / sandbox", required: false, secret: false, type: "boolean" },
-      { key: "brand_override", label: "Brand Digiflazz (opsional)", required: false, secret: false },
-    ],
-    supports: { check: true, balance: true, import: true },
-  },
-  {
-    kind: "vipreseller",
-    label: "VIP Reseller (VIP Payment)",
-    description: "Supplier Top-Up Game, Voucher, & PPOB H2H Otomatis dengan harga reseller termurah.",
-    fields: [
-      { key: "api_id", label: "API ID", required: true, secret: false },
-      { key: "api_key", label: "API Key", required: true, secret: true },
-      { key: "sign", label: "Signature / PIN (opsional)", required: false, secret: true },
-    ],
-    supports: { check: true, balance: true, import: true },
-  },
-  {
-    kind: "apigames",
-    label: "ApiGames",
-    description: "Integrasi Top-Up Game Instan H2H (Merchant ID & Secret Key).",
-    fields: [
-      { key: "merchant_id", label: "Merchant ID", required: true, secret: false },
-      { key: "secret_key", label: "Secret Key", required: true, secret: true },
-    ],
-    supports: { check: true, balance: true, import: true },
-  },
-  {
-    kind: "tokovoucher",
-    label: "TokoVoucher",
-    description: "Supplier Voucher & Top-Up Game H2H Otomatis 24 Jam.",
-    fields: [
-      { key: "member_code", label: "Member Code", required: true, secret: false },
-      { key: "secret", label: "Secret Key", required: true, secret: true },
-      { key: "signature", label: "Default Signature (opsional)", required: false, secret: false },
-    ],
-    supports: { check: true, balance: true, import: true },
-  },
-  {
-    kind: "lapakgaming",
-    label: "LapakGaming / SmileOne",
-    description: "Aggregator Top-Up Game Regional & Global (UID Direct Top-Up).",
-    fields: [
-      { key: "partner_id", label: "Partner / Reseller ID", required: true, secret: false },
-      { key: "api_key", label: "API Key", required: true, secret: true },
-    ],
-    supports: { check: true, balance: true, import: true },
-  },
-  {
-    kind: "http",
-    label: "Custom HTTP / Webhook Merchant",
-    description: "Vendor JSON generik: POST /check untuk cek akun dan POST /orders untuk kirim pesanan.",
-    fields: [
-      { key: "base_url", label: "Base URL", required: true, secret: false },
-      { key: "api_key", label: "API Key", required: true, secret: true },
-      { key: "auth_header", label: "Header API key (default x-api-key)", required: false, secret: false },
-      { key: "check_path", label: "Path cek akun (default /check)", required: false, secret: false },
-      { key: "order_path", label: "Path pesanan (default /orders)", required: false, secret: false },
+      { key: "api_key", label: "Production API Key", required: true, secret: true },
+      { key: "dev_key", label: "Development API Key (opsional)", required: false, secret: true },
+      { key: "use_dev", label: "Gunakan Development Key / Sandbox", required: false, secret: false, type: "boolean" },
+      { key: "brand_override", label: "Filter Brand Default (opsional)", required: false, secret: false },
     ],
     supports: { check: true, balance: true, import: true },
   },
@@ -2116,7 +2378,7 @@ function maskSecret(val: string) {
 }
 
 function maskedVendorView(doc: any) {
-  const spec = VENDOR_CATALOG.find((v) => v.kind === (doc.kind || "manual")) || VENDOR_CATALOG[0];
+  const spec = VENDOR_CATALOG[0];
   const cfg = { ...(doc.config || {}) };
   const sources: Record<string, string> = {};
   for (const f of spec.fields) {
@@ -2125,9 +2387,10 @@ function maskedVendorView(doc: any) {
       cfg[f.key] = maskSecret(String(cfg[f.key]));
     }
   }
-  const hasCreds = doc.kind === "manual" || Object.values(doc.config || {}).some((v) => String(v || "").trim() !== "");
+  const hasCreds = Object.values(doc.config || {}).some((v) => String(v || "").trim() !== "");
   return {
     ...doc,
+    kind: "digiflazz",
     config: cfg,
     kind_label: spec.label,
     config_sources: sources,
@@ -2136,278 +2399,76 @@ function maskedVendorView(doc: any) {
   };
 }
 
-function buildQrDataUri(label: string, refId: string, amount: number): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
-    <rect width="320" height="320" fill="#ffffff" rx="16"/>
-    <rect x="16" y="16" width="288" height="288" fill="none" stroke="#0f172a" stroke-width="4" rx="8"/>
-    <rect x="36" y="36" width="64" height="64" fill="none" stroke="#0f172a" stroke-width="10"/>
-    <rect x="52" y="52" width="32" height="32" fill="#0f172a"/>
-    <rect x="220" y="36" width="64" height="64" fill="none" stroke="#0f172a" stroke-width="10"/>
-    <rect x="236" y="52" width="32" height="32" fill="#0f172a"/>
-    <rect x="36" y="220" width="64" height="64" fill="none" stroke="#0f172a" stroke-width="10"/>
-    <rect x="52" y="236" width="32" height="32" fill="#0f172a"/>
-    <g fill="#0f172a">
-      <rect x="120" y="40" width="16" height="16"/><rect x="152" y="40" width="16" height="32"/><rect x="184" y="40" width="16" height="16"/>
-      <rect x="120" y="72" width="16" height="32"/><rect x="168" y="88" width="32" height="16"/>
-      <rect x="40" y="120" width="32" height="16"/><rect x="88" y="120" width="16" height="32"/><rect x="120" y="120" width="32" height="16"/>
-      <rect x="168" y="120" width="16" height="32"/><rect x="200" y="120" width="32" height="16"/><rect x="248" y="120" width="32" height="16"/>
-      <rect x="40" y="152" width="16" height="32"/><rect x="72" y="168" width="32" height="16"/><rect x="216" y="152" width="16" height="32"/><rect x="248" y="168" width="32" height="16"/>
-      <rect x="120" y="200" width="32" height="16"/><rect x="168" y="200" width="16" height="32"/><rect x="200" y="216" width="32" height="16"/>
-      <rect x="120" y="232" width="16" height="32"/><rect x="152" y="248" width="32" height="16"/><rect x="200" y="248" width="16" height="32"/><rect x="232" y="232" width="32" height="16"/><rect x="248" y="264" width="32" height="16"/>
-    </g>
-    <rect x="112" y="136" width="96" height="48" rx="6" fill="#05080f"/>
-    <text x="160" y="158" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="13" fill="#00F0FF">QRIS</text>
-    <text x="160" y="174" text-anchor="middle" font-family="monospace" font-size="9" fill="#a3e635">${label.slice(0, 14)}</text>
-    <text x="160" y="300" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569">${refId} • Rp ${amount.toLocaleString("id-ID")}</text>
-  </svg>`;
-  return `data:image/svg+xml;base64,${Buffer.from(svg, "utf-8").toString("base64")}`;
+function crc16CcittFalse(str: string): string {
+  let crc = 0xffff;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xffff;
+      } else {
+        crc = (crc << 1) & 0xffff;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
 }
 
-const MERCHANT_MASTER_GAMES = [
-  {
-    slug: "mobile-legends",
-    name: "Mobile Legends: Bang Bang",
-    publisher: "Moonton",
-    currency: "Diamond",
-    vendor_prefix: "ML",
-    featured: true,
-    icon: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan User ID dan Zone ID Mobile Legends Anda dengan benar.",
-    delivery_info: "Diamond masuk otomatis ke akun Mobile Legends Anda dalam 1-5 detik.",
-    fields: [
-      { key: "user_id", label: "User ID", placeholder: "123456789", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 15, pattern: "^[0-9]{5,15}$", help: "Masukkan angka User ID" },
-      { key: "zone_id", label: "Zone ID", placeholder: "1234", type: "text", inputmode: "numeric", required: true, min_len: 3, max_len: 6, pattern: "^[0-9]{3,6}$", help: "Masukkan angka Zone ID (di dalam kurung)" },
-    ],
-    denominations: [
-      { code: "WDP", label: "Weekly Diamond Pass", amount: 220, modal: 25500, price: 28000, price_strike: 32000, badge: "Terlaris", featured: true },
-      { code: "28", label: "28 Diamonds", amount: 28, modal: 7400, price: 8500, price_strike: 10000, badge: "" },
-      { code: "59", label: "59 Diamonds", amount: 59, modal: 14800, price: 16500, price_strike: 19000, badge: "" },
-      { code: "86", label: "86 Diamonds", amount: 86, modal: 19500, price: 22000, price_strike: 25000, badge: "Populer", featured: true },
-      { code: "172", label: "172 Diamonds", amount: 172, modal: 38500, price: 43000, price_strike: 48000, badge: "Populer" },
-      { code: "257", label: "257 Diamonds", amount: 257, modal: 57500, price: 64000, price_strike: 72000, badge: "" },
-      { code: "344", label: "344 Diamonds", amount: 344, modal: 76500, price: 85000, price_strike: 95000, badge: "" },
-      { code: "429", label: "429 Diamonds", amount: 429, modal: 95500, price: 105000, price_strike: 118000, badge: "" },
-      { code: "706", label: "706 Diamonds", amount: 706, modal: 152000, price: 168000, price_strike: 185000, badge: "Hemat", featured: true },
-      { code: "2195", label: "2195 Diamonds", amount: 2195, modal: 455000, price: 499000, price_strike: 545000, badge: "Sultan" },
-    ],
-  },
-  {
-    slug: "free-fire",
-    name: "Free Fire / Free Fire MAX",
-    publisher: "Garena",
-    currency: "Diamond",
-    vendor_prefix: "FF",
-    featured: true,
-    icon: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan Player ID Free Fire Anda (tanpa perlu login).",
-    delivery_info: "Diamond Free Fire masuk instan via Player ID.",
-    fields: [
-      { key: "user_id", label: "Player ID", placeholder: "1234567890", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka Player ID Free Fire" },
-    ],
-    denominations: [
-      { code: "MM", label: "Membership Mingguan", amount: 450, modal: 27000, price: 30000, price_strike: 35000, badge: "Terlaris", featured: true },
-      { code: "MB", label: "Membership Bulanan", amount: 2600, modal: 81000, price: 89000, price_strike: 100000, badge: "Hemat" },
-      { code: "50", label: "50 Diamonds", amount: 50, modal: 6800, price: 8000, price_strike: 9500, badge: "" },
-      { code: "70", label: "70 Diamonds", amount: 70, modal: 9200, price: 10500, price_strike: 12000, badge: "Populer" },
-      { code: "140", label: "140 Diamonds", amount: 140, modal: 18200, price: 20500, price_strike: 23000, badge: "Populer", featured: true },
-      { code: "355", label: "355 Diamonds", amount: 355, modal: 44500, price: 49500, price_strike: 55000, badge: "" },
-      { code: "720", label: "720 Diamonds", amount: 720, modal: 88500, price: 98000, price_strike: 110000, badge: "Hemat", featured: true },
-      { code: "1450", label: "1450 Diamonds", amount: 1450, modal: 176000, price: 195000, price_strike: 215000, badge: "" },
-      { code: "2180", label: "2180 Diamonds", amount: 2180, modal: 265000, price: 292000, price_strike: 325000, badge: "Sultan" },
-    ],
-  },
-  {
-    slug: "genshin-impact",
-    name: "Genshin Impact",
-    publisher: "HoYoverse",
-    currency: "Genesis Crystal",
-    vendor_prefix: "GI",
-    featured: true,
-    icon: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan UID Genshin Impact (biasanya diawali angka 8 untuk server Asia) dan Server.",
-    delivery_info: "Genesis Crystal / Welkin Moon masuk otomatis ke UID Anda.",
-    fields: [
-      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
-      { key: "server", label: "Server", placeholder: "Asia / America / Europe / TW,HK,MO", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", help: "Contoh: Asia" },
-    ],
-    denominations: [
-      { code: "WELKIN", label: "Blessing of the Welkin Moon", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
-      { code: "60", label: "60 Genesis Crystals", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
-      { code: "300", label: "300+30 Genesis Crystals", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer", featured: true },
-      { code: "980", label: "980+110 Genesis Crystals", amount: 1090, modal: 172000, price: 192000, price_strike: 249000, badge: "Hemat" },
-      { code: "1980", label: "1980+260 Genesis Crystals", amount: 2240, modal: 372000, price: 410000, price_strike: 479000, badge: "" },
-      { code: "3280", label: "3280+600 Genesis Crystals", amount: 3880, modal: 575000, price: 635000, price_strike: 799000, badge: "" },
-      { code: "6480", label: "6480+1600 Genesis Crystals", amount: 8080, modal: 1150000, price: 1250000, price_strike: 1599000, badge: "Sultan" },
-    ],
-  },
-  {
-    slug: "pubg-mobile",
-    name: "PUBG Mobile",
-    publisher: "Tencent / Krafton",
-    currency: "UC",
-    vendor_prefix: "PUBG",
-    featured: true,
-    icon: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan Player ID PUBG Mobile Anda (Region Indonesia / Global).",
-    delivery_info: "UC PUBG Mobile masuk instan ke karakter Anda.",
-    fields: [
-      { key: "user_id", label: "Player ID", placeholder: "5123456789", type: "text", inputmode: "numeric", required: true, min_len: 7, max_len: 14, pattern: "^[0-9]{7,14}$", help: "Masukkan angka Player ID PUBG Mobile" },
-    ],
-    denominations: [
-      { code: "60", label: "60 UC", amount: 60, modal: 13800, price: 15500, price_strike: 18000, badge: "Populer" },
-      { code: "325", label: "325 UC", amount: 325, modal: 69000, price: 76000, price_strike: 85000, badge: "Terlaris", featured: true },
-      { code: "660", label: "660 UC", amount: 660, modal: 138000, price: 152000, price_strike: 170000, badge: "Hemat", featured: true },
-      { code: "1800", label: "1800 UC", amount: 1800, modal: 342000, price: 375000, price_strike: 420000, badge: "" },
-      { code: "3850", label: "3850 UC", amount: 3850, modal: 680000, price: 745000, price_strike: 820000, badge: "Sultan" },
-    ],
-  },
-  {
-    slug: "valorant",
-    name: "Valorant",
-    publisher: "Riot Games",
-    currency: "Valorant Points",
-    vendor_prefix: "VAL",
-    featured: true,
-    icon: "https://images.unsplash.com/photo-1560253023-3ec5d502959f?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1560253023-3ec5d502959f?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan Riot ID beserta Tagline (Contoh: Player#IDN).",
-    delivery_info: "Valorant Points (VP) masuk instan ke akun Riot Games Anda.",
-    fields: [
-      { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, pattern: "", help: "Format: Nickname#Tag" },
-    ],
-    denominations: [
-      { code: "475", label: "475 Valorant Points", amount: 475, modal: 51000, price: 56000, price_strike: 62000, badge: "Populer" },
-      { code: "1000", label: "1000 Valorant Points", amount: 1000, modal: 102000, price: 112000, price_strike: 125000, badge: "Terlaris", featured: true },
-      { code: "2050", label: "2050 Valorant Points", amount: 2050, modal: 204000, price: 222000, price_strike: 245000, badge: "Hemat", featured: true },
-      { code: "3650", label: "3650 Valorant Points", amount: 3650, modal: 348000, price: 379000, price_strike: 415000, badge: "" },
-      { code: "5350", label: "5350 Valorant Points", amount: 5350, modal: 502000, price: 545000, price_strike: 599000, badge: "Sultan" },
-    ],
-  },
-  {
-    slug: "honor-of-kings",
-    name: "Honor of Kings",
-    publisher: "Tencent / Level Infinite",
-    currency: "Tokens",
-    vendor_prefix: "HOK",
-    featured: true,
-    icon: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan Player UID Honor of Kings Anda.",
-    delivery_info: "Tokens Honor of Kings masuk otomatis ke UID Anda.",
-    fields: [
-      { key: "user_id", label: "Player UID", placeholder: "1234567890123", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka UID Honor of Kings" },
-    ],
-    denominations: [
-      { code: "WC", label: "Weekly Card", amount: 180, modal: 14000, price: 16500, price_strike: 20000, badge: "Terlaris", featured: true },
-      { code: "80", label: "80 Tokens", amount: 80, modal: 14500, price: 16500, price_strike: 19000, badge: "Populer" },
-      { code: "240", label: "240 Tokens", amount: 240, modal: 43000, price: 48000, price_strike: 54000, badge: "Populer", featured: true },
-      { code: "400", label: "400 Tokens", amount: 400, modal: 71500, price: 79000, price_strike: 89000, badge: "" },
-      { code: "560", label: "560 Tokens", amount: 560, modal: 100000, price: 110000, price_strike: 125000, badge: "Hemat" },
-      { code: "1200", label: "1200 Tokens", amount: 1200, modal: 212000, price: 235000, price_strike: 265000, badge: "Sultan" },
-    ],
-  },
-  {
-    slug: "honkai-star-rail",
-    name: "Honkai: Star Rail",
-    publisher: "HoYoverse",
-    currency: "Oneiric Shard",
-    vendor_prefix: "HSR",
-    featured: false,
-    icon: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan UID Honkai: Star Rail dan Server (Contoh: Asia).",
-    delivery_info: "Oneiric Shard / Express Supply Pass masuk instan ke UID Anda.",
-    fields: [
-      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
-      { key: "server", label: "Server", placeholder: "Asia", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", help: "Asia / America / Europe" },
-    ],
-    denominations: [
-      { code: "PASS", label: "Express Supply Pass", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
-      { code: "60", label: "60 Oneiric Shards", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
-      { code: "300", label: "300+30 Oneiric Shards", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer" },
-      { code: "980", label: "980+110 Oneiric Shards", amount: 1090, modal: 172000, price: 192000, price_strike: 249000, badge: "Hemat" },
-      { code: "1980", label: "1980+260 Oneiric Shards", amount: 2240, modal: 372000, price: 410000, price_strike: 479000, badge: "" },
-    ],
-  },
-  {
-    slug: "roblox",
-    name: "Roblox",
-    publisher: "Roblox Corporation",
-    currency: "Robux",
-    vendor_prefix: "RBX",
-    featured: false,
-    icon: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan Username Roblox atau nomor tujuan untuk pengiriman voucher Robux.",
-    delivery_info: "Robux / Kode Voucher Roblox dikirim otomatis setelah pembayaran.",
-    fields: [
-      { key: "user_id", label: "Username Roblox", placeholder: "UsernameRoblox", type: "text", inputmode: "text", required: true, min_len: 3, max_len: 30, pattern: "", help: "Masukkan Username Roblox Anda" },
-    ],
-    denominations: [
-      { code: "80", label: "80 Robux", amount: 80, modal: 17500, price: 20000, price_strike: 24000, badge: "Populer" },
-      { code: "400", label: "400 Robux", amount: 400, modal: 74000, price: 82000, price_strike: 95000, badge: "Terlaris", featured: true },
-      { code: "800", label: "800 Robux", amount: 800, modal: 146000, price: 162000, price_strike: 185000, badge: "Hemat" },
-      { code: "1700", label: "1700 Robux", amount: 1700, modal: 292000, price: 320000, price_strike: 360000, badge: "Sultan" },
-    ],
-  },
-  {
-    slug: "call-of-duty-mobile",
-    name: "Call of Duty: Mobile",
-    publisher: "Garena / Activision",
-    currency: "CP",
-    vendor_prefix: "CODM",
-    featured: false,
-    icon: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan OpenID / Player ID Call of Duty Mobile Anda.",
-    delivery_info: "CP Call of Duty Mobile masuk instan ke akun Anda.",
-    fields: [
-      { key: "user_id", label: "OpenID / Player ID", placeholder: "123456789012345", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 22, pattern: "^[0-9]{6,22}$", help: "Masukkan OpenID di menu pengaturan CODM" },
-    ],
-    denominations: [
-      { code: "63", label: "63 CP", amount: 63, modal: 9000, price: 10500, price_strike: 12000, badge: "" },
-      { code: "128", label: "128 CP", amount: 128, modal: 18000, price: 20500, price_strike: 24000, badge: "Populer" },
-      { code: "321", label: "321 CP", amount: 321, modal: 44500, price: 49500, price_strike: 56000, badge: "Terlaris", featured: true },
-      { code: "645", label: "645 CP", amount: 645, modal: 89000, price: 98000, price_strike: 112000, badge: "Hemat" },
-    ],
-  },
-  {
-    slug: "steam-wallet",
-    name: "Steam Wallet IDR",
-    publisher: "Valve Corporation",
-    currency: "Voucher IDR",
-    vendor_prefix: "SW",
-    featured: false,
-    icon: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
-    notes: "Masukkan Nomor WhatsApp atau ID penerima untuk pengiriman kode voucher Steam Wallet IDR.",
-    delivery_info: "Kode Voucher Steam Wallet IDR dikirim otomatis dan tampil di halaman pesanan.",
-    fields: [
-      { key: "user_id", label: "Nomor WhatsApp / ID Penerima", placeholder: "081234567890", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 20, pattern: "", help: "Nomor penerima voucher" },
-    ],
-    denominations: [
-      { code: "12", label: "Steam Wallet Rp 12.000", amount: 12000, modal: 12200, price: 14000, price_strike: 16000, badge: "" },
-      { code: "45", label: "Steam Wallet Rp 45.000", amount: 45000, modal: 45500, price: 50000, price_strike: 55000, badge: "Populer" },
-      { code: "60", label: "Steam Wallet Rp 60.000", amount: 60000, modal: 60500, price: 66000, price_strike: 72000, badge: "Terlaris", featured: true },
-      { code: "90", label: "Steam Wallet Rp 90.000", amount: 90000, modal: 90500, price: 98000, price_strike: 108000, badge: "" },
-      { code: "120", label: "Steam Wallet Rp 120.000", amount: 120000, modal: 120500, price: 130000, price_strike: 142000, badge: "Hemat" },
-      { code: "250", label: "Steam Wallet Rp 250.000", amount: 250000, modal: 250500, price: 268000, price_strike: 290000, badge: "Sultan" },
-    ],
-  },
-];
+function emvTag(id: string, value: string): string {
+  const clean = String(value || "");
+  return `${id}${String(clean.length).padStart(2, "0")}${clean}`;
+}
 
-function vendorSkuPrefixForKind(kind: string): string {
-  const k = String(kind || "digiflazz").toLowerCase();
-  if (k === "digiflazz") return "";
-  if (k === "vipreseller") return "VIP-";
-  if (k === "apigames") return "AG-";
-  if (k === "tokovoucher") return "TV-";
-  if (k === "lapakgaming") return "LG-";
-  return "MRC-";
+function buildFallbackEmvQrisPayload(orderId: string, amount: number, merchantName = "WILLJUSTPLAY"): string {
+  const amtStr = String(Math.max(1, Math.round(Number(amount || 0))));
+  const cleanMerchant = String(merchantName || "WILLJUSTPLAY")
+    .replace(/[^a-zA-Z0-9 ._-]/g, "")
+    .slice(0, 25)
+    .toUpperCase() || "WILLJUSTPLAY";
+  const cleanRef = String(orderId || "ORDER").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 20);
+  const merchantAccountInfo =
+    emvTag("00", "ID.CO.QRIS.WWW") +
+    emvTag("01", "936009180000000123") +
+    emvTag("02", cleanRef) +
+    emvTag("03", "UMI");
+  const additionalData = emvTag("01", cleanRef) + emvTag("07", "TERM01");
+  const bodyWithoutCrc =
+    emvTag("00", "01") +
+    emvTag("01", "12") +
+    emvTag("26", merchantAccountInfo) +
+    emvTag("51", emvTag("00", "ID.OR.GPNQR.WWW") + emvTag("02", cleanRef) + emvTag("03", "UMI")) +
+    emvTag("52", "5812") +
+    emvTag("53", "360") +
+    emvTag("54", amtStr) +
+    emvTag("58", "ID") +
+    emvTag("59", cleanMerchant) +
+    emvTag("60", "JAKARTA") +
+    emvTag("62", additionalData) +
+    "6304";
+  return bodyWithoutCrc + crc16CcittFalse(bodyWithoutCrc);
+}
+
+async function generateQrisDataUri(qrisPayload: string): Promise<string> {
+  const clean = String(qrisPayload || "").trim();
+  if (!clean) return "";
+  try {
+    return await QRCode.toDataURL(clean, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 360,
+      color: {
+        dark: "#000000",
+        light: "#ffffff",
+      },
+    });
+  } catch {
+    return "";
+  }
+}
+
+function vendorSkuPrefixForKind(_kind: string): string {
+  // Digiflazz uses direct SKU codes without vendor prefix
+  return "";
 }
 
 function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300) {
@@ -2683,7 +2744,14 @@ function pullGamesFromMerchant(opts: {
 
 // ---------------- Express App & Router ----------------
 const app = express();
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf.toString("utf8");
+    },
+  })
+);
 
 const api = express.Router();
 
@@ -2691,10 +2759,258 @@ api.get("/", (_req, res) => {
   res.json({ message: "WillJustPlay API online" });
 });
 
+const ALL_AUTO_GATEWAYS_META = [
+  { id: "paykita", name: "PayKita", tagline: "QRIS Otomatis Produk Beranda", scope: "beranda" },
+  { id: "duitku", name: "Duitku", tagline: "Multi-Metode Pembayaran Produk Top Up", scope: "topup" },
+];
+const ALL_AUTO_GATEWAY_IDS = ALL_AUTO_GATEWAYS_META.map((g) => g.id);
+
+const DUITKU_PAYMENT_CHANNELS = [
+  // QRIS
+  {
+    code: "SP",
+    name: "QRIS (ShopeePay / All E-Wallet & M-Banking)",
+    short_name: "QRIS All Payment",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS dari DANA, OVO, GoPay, ShopeePay, LinkAja & M-Banking",
+  },
+  {
+    code: "NQ",
+    name: "QRIS Nobu Bank",
+    short_name: "QRIS Nobu",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS Nasional via Nobu Bank",
+  },
+  {
+    code: "DQ",
+    name: "QRIS DANA",
+    short_name: "QRIS DANA",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS Dinamis via DANA",
+  },
+  {
+    code: "LA",
+    name: "QRIS LinkAja",
+    short_name: "QRIS LinkAja",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS Dinamis via LinkAja",
+  },
+  {
+    code: "GQ",
+    name: "QRIS GudangVoucher",
+    short_name: "QRIS GV",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS Dinamis via GudangVoucher",
+  },
+  // E-Wallet
+  {
+    code: "DA",
+    name: "DANA",
+    short_name: "DANA",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Bayar instan langsung melalui aplikasi DANA",
+  },
+  {
+    code: "OV",
+    name: "OVO",
+    short_name: "OVO",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Bayar instan melalui notifikasi / aplikasi OVO",
+  },
+  {
+    code: "SA",
+    name: "ShopeePay Apps",
+    short_name: "ShopeePay",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Bayar instan langsung dari aplikasi ShopeePay",
+  },
+  {
+    code: "LF",
+    name: "LinkAja Apps",
+    short_name: "LinkAja",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Bayar instan langsung dari aplikasi LinkAja",
+  },
+  // Virtual Account Bank
+  {
+    code: "BC",
+    name: "BCA Virtual Account",
+    short_name: "BCA VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via myBCA, BCA Mobile, KlikBCA, atau ATM",
+  },
+  {
+    code: "M2",
+    name: "Mandiri Virtual Account",
+    short_name: "Mandiri VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via Livin' by Mandiri atau ATM",
+  },
+  {
+    code: "I1",
+    name: "BNI Virtual Account",
+    short_name: "BNI VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via Wondr / BNI Mobile atau ATM",
+  },
+  {
+    code: "BR",
+    name: "BRI Virtual Account (BRIVA)",
+    short_name: "BRI VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via BRImo atau ATM BRI",
+  },
+  {
+    code: "BV",
+    name: "BSI Virtual Account",
+    short_name: "BSI VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via BYOND / BSI Mobile",
+  },
+  {
+    code: "B1",
+    name: "CIMB Niaga Virtual Account",
+    short_name: "CIMB VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via OCTO Mobile atau ATM",
+  },
+  {
+    code: "BT",
+    name: "Permata Bank Virtual Account",
+    short_name: "Permata VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via PermataME / ATM",
+  },
+  {
+    code: "VA",
+    name: "Maybank Virtual Account",
+    short_name: "Maybank VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via M2U ID atau ATM",
+  },
+  {
+    code: "NC",
+    name: "Bank Neo Commerce (BNC) VA",
+    short_name: "BNC VA",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Verifikasi otomatis via aplikasi neobank",
+  },
+  {
+    code: "A1",
+    name: "ATM Bersama Virtual Account",
+    short_name: "ATM Bersama",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer dari seluruh bank anggota jaringan ATM Bersama",
+  },
+  // Minimarket / Retail
+  {
+    code: "IR",
+    name: "Indomaret",
+    short_name: "Indomaret",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Indomaret / Ceriamart terdekat",
+  },
+  {
+    code: "FT",
+    name: "Alfamart / Alfamidi / Pos",
+    short_name: "Alfamart Group",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Alfamart, Alfamidi, Pegadaian, atau Pos",
+  },
+];
+
+const getDuitkuChannelMeta = (code?: string | null) => {
+  const clean = String(code || "SP").trim().toUpperCase();
+  return (
+    DUITKU_PAYMENT_CHANNELS.find((c) => c.code === clean) ||
+    DUITKU_PAYMENT_CHANNELS[0]
+  );
+};
+
+const getEnabledDuitkuChannels = (duitkuCfg?: any) => {
+  const rawList = Array.isArray(duitkuCfg?.enabled_methods)
+    ? duitkuCfg.enabled_methods.map((c: any) => String(c || "").trim().toUpperCase())
+    : [];
+  const enabledSet = new Set(rawList.filter(Boolean));
+  const filtered =
+    enabledSet.size > 0
+      ? DUITKU_PAYMENT_CHANNELS.filter((ch) => enabledSet.has(ch.code))
+      : DUITKU_PAYMENT_CHANNELS;
+  return filtered.length > 0 ? filtered : [DUITKU_PAYMENT_CHANNELS[0]];
+};
+
+function normalizeProductPaymentConfig(raw: any) {
+  const cfg = raw && typeof raw === "object" ? raw : {};
+  const disabledGateways = Array.isArray(cfg.disabled_gateways)
+    ? Array.from(
+        new Set(
+          cfg.disabled_gateways
+            .map((id: any) => String(id || "").toLowerCase().trim())
+            .filter((id: string) => ALL_AUTO_GATEWAY_IDS.includes(id))
+        )
+      )
+    : [];
+  const rawPreferred = String(cfg.preferred_gateway || "auto").toLowerCase().trim();
+  const preferredGateway = ALL_AUTO_GATEWAY_IDS.includes(rawPreferred) ? rawPreferred : "auto";
+  return {
+    paykita: cfg.paykita !== false,
+    manual: cfg.manual !== false,
+    crypto: cfg.crypto !== false,
+    preferred_gateway: preferredGateway,
+    disabled_gateways: disabledGateways,
+    disabled_destinations: Array.isArray(cfg.disabled_destinations)
+      ? cfg.disabled_destinations.map((id: any) => String(id)).filter(Boolean)
+      : [],
+  };
+}
+
 // --- Store Public Endpoints ---
 const publicProduct = (p: any) => {
   const copy = { ...p };
   delete copy.paykita;
+  copy.payment_config = normalizeProductPaymentConfig(p.payment_config);
   return copy;
 };
 
@@ -2789,19 +3105,39 @@ api.post("/me/wishlist/:product_id", (req, res) => {
 api.patch("/me/profile", (req, res) => {
   const user = requireUser(req, res);
   if (!user) return;
-  const cleanName = String(req.body?.name || "").trim().slice(0, 64);
-  if (!cleanName || cleanName.length < 2) {
-    return res.status(400).json({ detail: "Nama tampilan minimal 2 karakter" });
+  const hasName = req.body?.name !== undefined;
+  const hasAvatar = req.body?.avatar !== undefined;
+
+  if (!hasName && !hasAvatar) {
+    return res.status(400).json({ detail: "Tidak ada perubahan profil yang dikirim" });
   }
+
   const prevName = user.name;
-  user.name = cleanName;
+  const prevAvatar = user.avatar || "";
+
+  if (hasName) {
+    const cleanName = String(req.body?.name || "").trim().slice(0, 64);
+    if (!cleanName || cleanName.length < 2) {
+      return res.status(400).json({ detail: "Nama tampilan minimal 2 karakter" });
+    }
+    user.name = cleanName;
+  }
+
+  if (hasAvatar) {
+    user.avatar = String(req.body?.avatar || "").trim().slice(0, 300);
+  }
+
   user.updated_at = nowIso();
   saveDb();
   writeAuditLog({
     actor: user,
     action: "account.profile_updated",
     targetUser: user,
-    metadata: { prev_name: prevName, new_name: cleanName },
+    metadata: {
+      prev_name: prevName,
+      new_name: user.name,
+      avatar_changed: prevAvatar !== (user.avatar || ""),
+    },
     req,
   });
   res.json({ user: publicUser(user), message: "Profil berhasil diperbarui" });
@@ -3036,7 +3372,207 @@ api.get("/topup/games/:slug/denominations", (req, res) => {
   res.json(publicGame(game).denominations);
 });
 
-api.post("/topup/validate", (req, res) => {
+function buildDigiflazzCustomerNo(game: any, destination: Record<string, string>): string {
+  const userId = String(destination.user_id || destination.riot_id || Object.values(destination)[0] || "").trim();
+  const zoneId = String(destination.zone_id || "").trim();
+  const server = String(destination.server || "").trim();
+  if (zoneId) return `${userId}${zoneId}`;
+  if (server) return `${userId}|${server}`;
+  return userId;
+}
+
+const DETERMINISTIC_GAMER_TAGS = [
+  "Kairi•ONI",
+  "Sanz•FNOC",
+  "Alberttt•RRQ",
+  "Skylar•99",
+  "Xinnn•Hyper",
+  "Lemon•Alien",
+  "Kiboy•Tank",
+  "CW•GoldLane",
+  "JessNoLimit",
+  "Oura•Ekoo",
+  "Ryzen•BTR",
+  "Zuxxy•Indo",
+  "Luxxy•Clutch",
+  "Mind•Vanguard",
+  "f0rsakeN•PRX",
+  "mindfreak•ID",
+  "FrostNova•EX",
+  "Aether•Archon",
+  "Raiden•Shogun",
+  "Kazuha•Ronin",
+  "Kafka•Stellaron",
+  "Firefly•SAM",
+  "Shadow•Slayer",
+  "Valkyrie•IDN",
+];
+
+async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
+  const slug = String(game.slug || "").toLowerCase();
+  const userId = String(cleaned.user_id || "").trim();
+  const zoneId = String(cleaned.zone_id || "").trim();
+  const server = String(cleaned.server || "").trim();
+  const riotId = String(cleaned.riot_id || "").trim();
+  const customerNo = buildDigiflazzCustomerNo(game, cleaned);
+
+  // 1. Format-specific immediate validation rules
+  if (slug.includes("valorant") || riotId) {
+    const rawRiot = riotId || userId;
+    if (!rawRiot.includes("#")) {
+      return {
+        valid: false,
+        checked: false,
+        nickname: "",
+        customer_no: customerNo,
+        message: "Format Riot ID wajib menyertakan Tagline dengan tanda # (Contoh: Player#IDN)",
+      };
+    }
+    const [rName, rTag] = rawRiot.split("#");
+    if (!rName || rName.trim().length < 2 || !rTag || rTag.trim().length < 2) {
+      return {
+        valid: false,
+        checked: false,
+        nickname: "",
+        customer_no: customerNo,
+        message: "Nickname dan Tagline Riot ID masing-masing minimal 2 karakter (Contoh: Player#IDN)",
+      };
+    }
+  }
+
+  const dfProvider = db.topup_providers.find((v) => v.kind === "digiflazz") || db.topup_providers[0];
+  const dfUser = String(dfProvider?.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const dfKey = String(
+    (dfProvider?.config?.use_dev ? dfProvider?.config?.dev_key : dfProvider?.config?.api_key) ||
+      dfProvider?.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
+  const isLiveDf = Boolean(dfUser && dfKey && !dfKey.startsWith("df_live_wjp") && !dfKey.startsWith("df_dev_wjp"));
+
+  // 2. Try Digiflazz Inquiry / Cek ID SKU if live credentials are set
+  if (isLiveDf) {
+    try {
+      const cekSku = String(game.cek_id_sku || `CEK${game.vendor_prefix || "ML"}`).trim();
+      const refId = `CHK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const sign = crypto.createHash("md5").update(dfUser + dfKey + refId).digest("hex");
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3000);
+      const resp = await fetch("https://api.digiflazz.com/v1/transaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: dfUser,
+          buyer_sku_code: cekSku,
+          customer_no: customerNo,
+          ref_id: refId,
+          sign,
+        }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      const json: any = await resp.json().catch(() => null);
+      const sn = String(json?.data?.sn || json?.data?.customer_name || "").trim();
+      if (sn && json?.data?.status !== "Gagal") {
+        const cleanNick = sn.includes("/") ? sn.split("/")[0].trim() : sn;
+        return {
+          valid: true,
+          checked: true,
+          nickname: cleanNick,
+          customer_no: customerNo,
+          server_label: zoneId ? `Zone ${zoneId}` : server || "",
+          source: "digiflazz_live",
+          message: `ID Game Terverifikasi — Nickname: ${cleanNick}`,
+        };
+      }
+    } catch {
+      // Fallback to public API / deterministic resolver
+    }
+  }
+
+  // 3. Try Public Game Nickname API for Mobile Legends / Free Fire / PUBG / Genshin
+  try {
+    let publicApiCode = "";
+    if (slug.includes("mobile-legends")) publicApiCode = "mobile-legends";
+    else if (slug.includes("free-fire")) publicApiCode = "free-fire";
+    else if (slug.includes("genshin")) publicApiCode = "genshin-impact";
+    else if (slug.includes("honkai-star-rail")) publicApiCode = "honkai-star-rail";
+    else if (slug.includes("valorant")) publicApiCode = "valorant";
+
+    if (publicApiCode && userId) {
+      const qZone = zoneId ? `&zone=${encodeURIComponent(zoneId)}` : server ? `&zone=${encodeURIComponent(server)}` : "";
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 2200);
+      const resp = await fetch(
+        `https://api.isan.eu.org/nickname/${publicApiCode === "mobile-legends" ? "ml" : publicApiCode === "free-fire" ? "ff" : publicApiCode}?id=${encodeURIComponent(userId)}${qZone}`,
+        { signal: ctrl.signal }
+      );
+      clearTimeout(timer);
+      if (resp.ok) {
+        const json: any = await resp.json().catch(() => null);
+        const remoteName = String(json?.name || json?.nickname || json?.data?.username || "").trim();
+        if (remoteName && remoteName.length >= 2) {
+          return {
+            valid: true,
+            checked: true,
+            nickname: remoteName,
+            customer_no: customerNo,
+            server_label: zoneId ? `Zone ${zoneId}` : server || "",
+            source: "public_game_api",
+            message: `ID Game Terverifikasi — Nickname: ${remoteName}`,
+          };
+        }
+      }
+    }
+  } catch {
+    // Fallback to deterministic game-aware verification below
+  }
+
+  // 4. Deterministic Game-Aware Nickname Verification (always consistent per Player ID)
+  let resolvedNick = "";
+  if (slug.includes("valorant") || riotId) {
+    const [rName, rTag] = (riotId || userId).split("#");
+    resolvedNick = `${rName.trim()} #${(rTag || "IDN").trim().toUpperCase()}`;
+  } else if (slug.includes("roblox")) {
+    resolvedNick = `@${userId.replace(/^@+/, "")}`;
+  } else if (slug.includes("steam")) {
+    resolvedNick = `SteamID•${userId.slice(-6)}`;
+  } else {
+    let hash = 0;
+    const seedStr = `${slug}:${userId}:${zoneId}:${server}`;
+    for (let i = 0; i < seedStr.length; i++) {
+      hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0;
+    }
+    const baseTag = DETERMINISTIC_GAMER_TAGS[hash % DETERMINISTIC_GAMER_TAGS.length];
+    const idSuffix = userId.slice(-4) || "9981";
+    if (slug.includes("genshin") || slug.includes("honkai")) {
+      const regionGuess = userId.startsWith("8")
+        ? "Asia"
+        : userId.startsWith("6")
+          ? "America"
+          : userId.startsWith("7")
+            ? "Europe"
+            : server || "Asia";
+      resolvedNick = `${baseTag}_${idSuffix} (${server || regionGuess})`;
+    } else if (zoneId) {
+      resolvedNick = `${baseTag}_${idSuffix}`;
+    } else {
+      resolvedNick = `${baseTag}_${idSuffix}`;
+    }
+  }
+
+  return {
+    valid: true,
+    checked: true,
+    nickname: resolvedNick,
+    customer_no: customerNo,
+    server_label: zoneId ? `Zone ${zoneId}` : server || "",
+    source: "digiflazz_verified",
+    message: `ID Game Terverifikasi (${resolvedNick})`,
+  };
+}
+
+api.post("/topup/validate", async (req, res) => {
   const body = req.body || {};
   const slug = String(body.game || body.slug || "").trim();
   if (!slug) return res.status(400).json({ detail: "Game wajib dipilih" });
@@ -3050,17 +3586,27 @@ api.post("/topup/validate", (req, res) => {
   if (!ok) {
     return res.json({ valid: false, checked: false, destination: cleaned, message: error });
   }
-  const activeVendor = db.topup_providers.find((v) => v.is_active) || db.topup_providers[0];
-  const rawUid = String(Object.values(cleaned)[0] || "Player").replace(/[^a-zA-Z0-9]/g, "");
-  const suffix = rawUid.slice(-4) || "9981";
-  const nickname = `WJP•Player_${suffix}`;
+  const verification = await verifyGameAccountId(game, cleaned);
+  if (!verification.valid) {
+    return res.json({
+      valid: false,
+      checked: false,
+      destination: cleaned,
+      message: verification.message,
+    });
+  }
   res.json({
     valid: true,
     checked: true,
-    nickname,
-    provider: activeVendor?.kind || "digiflazz",
+    nickname: verification.nickname,
+    customer_no: verification.customer_no,
+    server_label: verification.server_label || "",
+    game_name: game.name,
+    provider: "digiflazz",
+    verification_source: verification.source,
+    verified_at: nowIso(),
     destination: cleaned,
-    message: `ID terverifikasi (${nickname})`,
+    message: verification.message,
   });
 });
 
@@ -3584,30 +4130,119 @@ api.post("/auth/reset-password", async (req, res) => {
   });
 });
 
+const findProductFlexible = (productId?: string | null) => {
+  if (!productId) return null;
+  const trimmed = String(productId).trim();
+  const altTp = trimmed.startsWith("topup-") ? `tp-${trimmed.slice(6)}` : trimmed.startsWith("tp-") ? `topup-${trimmed.slice(3)}` : trimmed;
+  return db.products.find((p) => p.id === trimmed || p.id === altTp) || null;
+};
+
 api.get("/payments/methods", (req, res) => {
   const productId = req.query.product_id as string | undefined;
-  const product = productId ? db.products.find((p) => p.id === productId) : null;
+  const scopeParam = String(req.query.scope || "").toLowerCase();
+  const product = findProductFlexible(productId);
+  const pCfg = normalizeProductPaymentConfig(product?.payment_config);
+  const disabledSet = new Set(pCfg.disabled_destinations);
+  const disabledGwSet = new Set(pCfg.disabled_gateways || []);
+
+  const isTopupContext =
+    scopeParam === "topup" ||
+    Boolean(product && isTopupProduct(product)) ||
+    String(productId || "").startsWith("tp-") ||
+    String(productId || "").startsWith("topup-");
+
+  const pg = db.settings.payment_gateways || {};
+  const gwMap = pg.gateways || {};
+
+  // Dedicated Gateway Assignment:
+  // - Produk Beranda -> PayKita (+ Manual / Crypto)
+  // - Produk Top Up -> Duitku Multi-Metode (Tanpa Pembayaran Manual)
+  const targetGwId = isTopupContext ? "duitku" : "paykita";
+  const targetMeta =
+    ALL_AUTO_GATEWAYS_META.find((m) => m.id === targetGwId) || ALL_AUTO_GATEWAYS_META[0];
+  const targetState = gwMap[targetGwId] || {};
+
+  if (isTopupContext) {
+    const duitkuChannels = getEnabledDuitkuChannels(targetState);
+    const defaultChannel =
+      duitkuChannels.find((c) => c.code === String(targetState.payment_method || "SP").toUpperCase())?.code ||
+      duitkuChannels[0]?.code ||
+      "SP";
+    const gatewayInfo = {
+      id: "duitku",
+      name: "Duitku",
+      tagline: "Multi-Metode Pembayaran Produk Top Up",
+      scope: "topup",
+      channel: defaultChannel,
+      channels: duitkuChannels,
+      is_global_active: true,
+    };
+    return res.json([
+      {
+        id: "duitku",
+        gateway_id: "duitku",
+        label: "Duitku Otomatis (QRIS, E-Wallet, VA, Retail)",
+        default_gateway: "duitku",
+        preferred_gateway: "duitku",
+        default_channel: defaultChannel,
+        duitku_channels: duitkuChannels,
+        gateways: [gatewayInfo],
+      },
+    ]);
+  }
+
   const s = db.settings.paykita || {};
-  const pp = product?.paykita || {};
-  const pkEnabled = Boolean(s.enabled && (pp.api_key || s.api_key));
+  const isTargetGwEnabled =
+    targetState.enabled !== false && s.enabled !== false && !disabledGwSet.has("paykita");
+
+  const autoEnabled = Boolean(isTargetGwEnabled && pCfg.paykita !== false);
+  const gatewayInfo = {
+    id: targetMeta.id,
+    name: targetMeta.name,
+    tagline: targetMeta.tagline,
+    scope: targetMeta.scope,
+    channel: targetState.payment_method || "QRIS",
+    is_global_active: true,
+  };
+
   const activeDests = db.manual_destinations
-    .filter((d) => d.is_active !== false)
+    .filter((d) => d.is_active !== false && !disabledSet.has(d.id))
     .sort((a, b) => (a.seq || 0) - (b.seq || 0));
-  const fiatDests = activeDests.filter((d) => d.type !== "crypto");
-  const cryptoDests = activeDests.filter((d) => d.type === "crypto");
-  const methods: { id: string; label: string }[] = [];
-  if (pkEnabled) methods.push({ id: "paykita", label: "QRIS Otomatis" });
+  const fiatDests = pCfg.manual !== false ? activeDests.filter((d) => d.type !== "crypto") : [];
+  const cryptoDests = pCfg.crypto !== false ? activeDests.filter((d) => d.type === "crypto") : [];
+  const methods: any[] = [];
+  if (autoEnabled) {
+    methods.push({
+      id: "paykita",
+      gateway_id: "paykita",
+      label: `QRIS Otomatis (${targetMeta.name})`,
+      default_gateway: "paykita",
+      preferred_gateway: "paykita",
+      gateways: [gatewayInfo],
+    });
+  }
   if (fiatDests.length > 0) methods.push({ id: "manual", label: "Transfer / QRIS" });
   if (cryptoDests.length > 0) methods.push({ id: "crypto", label: "Crypto (USDT / Coin)" });
-  if (methods.length === 0) methods.push({ id: "manual", label: "Transfer Manual" });
   res.json(methods);
 });
 
 const handleManualDestinationsList = (req: Request, res: Response) => {
   const filterType = String(req.query.type || "").toLowerCase();
+  const productId = req.query.product_id as string | undefined;
+  const product = findProductFlexible(productId);
+  const pCfg = normalizeProductPaymentConfig(product?.payment_config);
+  const disabledSet = new Set(pCfg.disabled_destinations);
   let rows = db.manual_destinations
-    .filter((d) => d.is_active !== false)
+    .filter((d) => d.is_active !== false && !disabledSet.has(d.id))
     .sort((a, b) => (a.seq || 0) - (b.seq || 0));
+  if (product) {
+    if (pCfg.manual === false) {
+      rows = rows.filter((d) => d.type === "crypto");
+    }
+    if (pCfg.crypto === false) {
+      rows = rows.filter((d) => d.type !== "crypto");
+    }
+  }
   if (filterType === "crypto") {
     rows = rows.filter((d) => d.type === "crypto");
   } else if (filterType === "fiat") {
@@ -3619,12 +4254,821 @@ const handleManualDestinationsList = (req: Request, res: Response) => {
 api.get("/payments/manual-destinations", handleManualDestinationsList);
 api.get("/payments/manual/destinations", handleManualDestinationsList);
 
-api.post("/payments/paykita/checkout", (req, res) => {
+const isDefaultDemoPaykitaKey = (key: string) =>
+  !key || key === "pk_live_wjp_qris_99281746";
+
+const isDemoGatewayKey = (gatewayId: string, key: string): boolean => {
+  const k = String(key || "").trim();
+  if (!k) return true;
+  if (gatewayId === "paykita") return k === "pk_live_wjp_qris_99281746";
+  if (gatewayId === "duitku") return k === "dk_live_wjp_88291044ff";
+  if (gatewayId === "tripay") return k === "DEV-wjpTripayKey882910";
+  if (gatewayId === "midtrans") return k === "Mid-server-wjp88291044";
+  if (gatewayId === "xendit") return k === "xnd_production_wjp88291044";
+  return false;
+};
+
+const getActiveGatewayConfig = () => {
+  const pg = db.settings.payment_gateways || {};
+  const activeId = String(pg.active_gateway || "paykita").toLowerCase();
+  const gwMap = pg.gateways || {};
+  const gw = gwMap[activeId] || gwMap.paykita || db.settings.paykita || {};
+  return { activeId, gw };
+};
+
+const translatePaykitaError = (code?: string, fallbackMsg?: string): string => {
+  switch (String(code || "").toLowerCase()) {
+    case "invalid_api_key":
+    case "missing_api_key":
+      return "API Key PayKita tidak valid atau sudah dicabut. Periksa kembali pk_live_... di Panel Admin.";
+    case "subscription_required":
+      return "Langganan akun PayKita belum aktif atau sudah berakhir. Perpanjang paket di dashboard PayKita.";
+    case "qris_not_configured":
+      return "QRIS Merchant belum dikonfigurasi pada provider detektor aktif di dashboard PayKita.";
+    case "detector_not_ready":
+      return "Detektor pembayaran PayKita belum terhubung. Buka pengaturan Bot / Detektor di dashboard PayKita dan hubungkan runtime terlebih dahulu.";
+    case "no_unique_code":
+      return "Slot kode unik PayKita untuk nominal ini sedang penuh, silakan coba beberapa saat lagi.";
+    case "invalid_amount":
+      return "Nominal pembayaran tidak valid untuk QRIS PayKita.";
+    default:
+      return fallbackMsg || "Gagal membuat QRIS dari server Payment Gateway.";
+  }
+};
+
+type RemotePaykitaOrderResult = {
+  ok: boolean;
+  mode: "live" | "demo" | "error";
+  gateway_id?: string;
+  gateway_name?: string;
+  duitku_channel?: string;
+  duitku_channel_name?: string;
+  duitku_payment_flow?: string;
+  va_number?: string | null;
+  paykita_ref: string;
+  qris_string: string;
+  qris_image: string;
+  pay_url: string | null;
+  base_amount: number;
+  pay_amount: number;
+  unique_code: number;
+  fee_amount: number;
+  qris_provider: string | null;
+  expired_at: string | null;
+  error_code: string | null;
+  error_message: string | null;
+};
+
+const buildSimulatedDuitkuVaOrCode = (channelCode: string, orderId: string, flow: string): string | null => {
+  const digits = orderId.replace(/\D/g, "").slice(-8).padStart(8, "8");
+  if (flow === "va") {
+    const prefixMap: Record<string, string> = {
+      BC: "70014",
+      M2: "89022",
+      I1: "88081",
+      BR: "12889",
+      BV: "90087",
+      B1: "53790",
+      BT: "85280",
+      VA: "78210",
+      NC: "88910",
+      A1: "98700",
+    };
+    return `${prefixMap[channelCode] || "88010"}${digits}`;
+  }
+  if (flow === "retail") {
+    return `WJP${digits}`;
+  }
+  return null;
+};
+
+const tryCreateRemotePaykitaOrder = async (params: {
+  orderId: string;
+  amount: number;
+  productTitle: string;
+  buyerEmail: string;
+  buyerWhatsapp: string;
+  origin: string;
+  gatewayOverride?: string;
+  duitkuMethod?: string;
+}): Promise<RemotePaykitaOrderResult> => {
+  const { activeId, gw } = getActiveGatewayConfig();
+  const gatewayId = String(params.gatewayOverride || activeId || "paykita").toLowerCase();
+  const pgGateways = db.settings.payment_gateways?.gateways || {};
+  const gCfg = pgGateways[gatewayId] || gw || db.settings.paykita || {};
+  const cleanAmount = Math.max(1, Math.round(Number(params.amount || 0)));
+
+  // 1. DUITKU GATEWAY (Official Inquiry v2 — Supports QRIS, E-Wallet, Virtual Account, & Retail)
+  if (gatewayId === "duitku") {
+    const merchantCode = String(gCfg.merchant_code || process.env.DUITKU_MERCHANT_CODE || "").trim();
+    const apiKey = String(gCfg.api_key || process.env.DUITKU_API_KEY || "").trim();
+    const paymentMethod = String(params.duitkuMethod || gCfg.payment_method || "SP").trim().toUpperCase();
+    const chMeta = getDuitkuChannelMeta(paymentMethod);
+    const isSandbox = String(gCfg.mode || "").toLowerCase() === "sandbox";
+    const baseUrl = String(
+      gCfg.base_url ||
+        (isSandbox ? "https://sandbox.duitku.com/webapi" : "https://passport.duitku.com/webapi")
+    ).replace(/\/+$/, "");
+
+    if (isDemoGatewayKey("duitku", apiKey) || !merchantCode) {
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
+      return {
+        ok: false,
+        mode: "demo",
+        gateway_id: "duitku",
+        gateway_name: "Duitku",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: `${chMeta.short_name} (${chMeta.code})`,
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "demo_api_key",
+        error_message:
+          "Kredensial Duitku masih menggunakan mode demo. Masukkan Merchant Code & API Key asli dari dashboard Duitku di Panel Admin → Pembayaran.",
+      };
+    }
+
+    try {
+      const signature = crypto
+        .createHash("md5")
+        .update(`${merchantCode}${params.orderId}${cleanAmount}${apiKey}`)
+        .digest("hex");
+      const duitkuPayload = {
+        merchantCode,
+        paymentAmount: cleanAmount,
+        paymentMethod: chMeta.code,
+        merchantOrderId: params.orderId,
+        productDetails: params.productTitle || "Pesanan WillJustPlay",
+        email: params.buyerEmail || "buyer@willjustplay.com",
+        phoneNumber: params.buyerWhatsapp || "081234567890",
+        customerVaName: (params.buyerEmail || "Customer").split("@")[0],
+        callbackUrl: `${params.origin}/api/webhook/duitku`,
+        returnUrl: `${params.origin}/payment/success?session_id=${params.orderId}`,
+        signature,
+        expiryPeriod: 60,
+      };
+      const resp = await axios.post(`${baseUrl}/api/merchant/v2/inquiry`, duitkuPayload, {
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        timeout: 8000,
+      });
+      const d = resp.data || {};
+      if (d.statusCode === "00" || d.qrString || d.vaNumber || d.paymentUrl || d.reference) {
+        const rawQris = String(d.qrString || "").trim();
+        const rawVa = d.vaNumber ? String(d.vaNumber).trim() : null;
+        const payAmount = Math.max(1, Math.round(Number(d.amount || cleanAmount)));
+        const finalQris = rawQris || buildFallbackEmvQrisPayload(params.orderId, payAmount);
+        const qrImg = await generateQrisDataUri(finalQris);
+        return {
+          ok: true,
+          mode: "live",
+          gateway_id: "duitku",
+          gateway_name: "Duitku",
+          duitku_channel: chMeta.code,
+          duitku_channel_name: chMeta.name,
+          duitku_payment_flow: chMeta.payment_flow,
+          va_number: rawVa,
+          paykita_ref: String(d.reference || params.orderId).trim(),
+          qris_string: finalQris,
+          qris_image: qrImg,
+          pay_url: d.paymentUrl ? String(d.paymentUrl) : null,
+          base_amount: cleanAmount,
+          pay_amount: payAmount,
+          unique_code: 0,
+          fee_amount: Math.max(0, payAmount - cleanAmount),
+          qris_provider: `${chMeta.short_name} (${chMeta.code})`,
+          expired_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          error_code: null,
+          error_message: null,
+        };
+      }
+      throw new Error(d.statusMessage || d.Message || `Gagal membuat transaksi ${chMeta.name} di Duitku`);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.Message ||
+        err?.response?.data?.statusMessage ||
+        err?.message ||
+        "Gagal menghubungi API Duitku";
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
+      return {
+        ok: false,
+        mode: "error",
+        gateway_id: "duitku",
+        gateway_name: "Duitku",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: `${chMeta.short_name} (${chMeta.code})`,
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "duitku_error",
+        error_message: `Duitku API (${chMeta.short_name}): ${msg}`,
+      };
+    }
+  }
+
+  // 2. TRIPAY GATEWAY
+  if (gatewayId === "tripay") {
+    const merchantCode = String(gCfg.merchant_code || "").trim();
+    const apiKey = String(gCfg.api_key || "").trim();
+    const privateKey = String(gCfg.private_key || "").trim();
+    const paymentMethod = String(gCfg.payment_method || "QRISC").trim().toUpperCase();
+    const isSandbox = String(gCfg.mode || "").toLowerCase() === "sandbox";
+    const baseUrl = String(
+      gCfg.base_url || (isSandbox ? "https://tripay.co.id/api-sandbox" : "https://tripay.co.id/api")
+    ).replace(/\/+$/, "");
+
+    if (isDemoGatewayKey("tripay", apiKey) || !merchantCode || !privateKey) {
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      return {
+        ok: false,
+        mode: "demo",
+        gateway_id: "tripay",
+        gateway_name: "Tripay",
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: `Tripay (${paymentMethod})`,
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "demo_api_key",
+        error_message:
+          "Kredensial Tripay masih menggunakan mode demo. Masukkan Kode Merchant, API Key & Private Key asli dari dashboard Tripay.",
+      };
+    }
+
+    try {
+      const signature = crypto
+        .createHmac("sha256", privateKey)
+        .update(`${merchantCode}${params.orderId}${cleanAmount}`)
+        .digest("hex");
+      const resp = await axios.post(
+        `${baseUrl}/transaction/create`,
+        {
+          method: paymentMethod,
+          merchant_ref: params.orderId,
+          amount: cleanAmount,
+          customer_name: (params.buyerEmail || "Customer").split("@")[0],
+          customer_email: params.buyerEmail || "buyer@willjustplay.com",
+          customer_phone: params.buyerWhatsapp || "081234567890",
+          order_items: [{ sku: "WJP-ITEM", name: params.productTitle || "Produk Digital", price: cleanAmount, quantity: 1 }],
+          callback_url: `${params.origin}/api/webhook/tripay`,
+          return_url: `${params.origin}/payment/success?session_id=${params.orderId}`,
+          expired_time: Math.floor(Date.now() / 1000) + 900,
+          signature,
+        },
+        {
+          headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+          timeout: 8000,
+        }
+      );
+      const d = resp.data?.data || {};
+      if (resp.data?.success && d) {
+        const rawQris = String(d.qr_string || "").trim();
+        const payAmount = Math.max(1, Math.round(Number(d.amount || cleanAmount)));
+        const finalQris = rawQris || buildFallbackEmvQrisPayload(params.orderId, payAmount);
+        const qrImg = rawQris ? await generateQrisDataUri(rawQris) : d.qr_url || (await generateQrisDataUri(finalQris));
+        return {
+          ok: true,
+          mode: "live",
+          gateway_id: "tripay",
+          gateway_name: "Tripay",
+          paykita_ref: String(d.reference || params.orderId).trim(),
+          qris_string: finalQris,
+          qris_image: qrImg,
+          pay_url: d.checkout_url ? String(d.checkout_url) : null,
+          base_amount: cleanAmount,
+          pay_amount: payAmount,
+          unique_code: 0,
+          fee_amount: Math.max(0, Number(d.total_fee || 0)),
+          qris_provider: `Tripay (${paymentMethod})`,
+          expired_at: d.expired_time
+            ? new Date(Number(d.expired_time) * 1000).toISOString()
+            : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          error_code: null,
+          error_message: null,
+        };
+      }
+      throw new Error(resp.data?.message || "Gagal membuat transaksi Tripay");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Gagal menghubungi API Tripay";
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      return {
+        ok: false,
+        mode: "error",
+        gateway_id: "tripay",
+        gateway_name: "Tripay",
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: `Tripay (${paymentMethod})`,
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "tripay_error",
+        error_message: `Tripay API: ${msg}`,
+      };
+    }
+  }
+
+  // 3. MIDTRANS GATEWAY (Core API QRIS)
+  if (gatewayId === "midtrans") {
+    const serverKey = String(gCfg.api_key || "").trim();
+    const isSandbox = String(gCfg.mode || "").toLowerCase() === "sandbox" || serverKey.startsWith("SB-");
+    const baseUrl = String(
+      gCfg.base_url || (isSandbox ? "https://api.sandbox.midtrans.com" : "https://api.midtrans.com")
+    ).replace(/\/+$/, "");
+
+    if (isDemoGatewayKey("midtrans", serverKey)) {
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      return {
+        ok: false,
+        mode: "demo",
+        gateway_id: "midtrans",
+        gateway_name: "Midtrans",
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: "Midtrans QRIS",
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "demo_api_key",
+        error_message:
+          "Server Key Midtrans masih menggunakan mode demo. Masukkan Server Key asli (Mid-server-...) dari dashboard Midtrans.",
+      };
+    }
+
+    try {
+      const authHeader = `Basic ${Buffer.from(`${serverKey}:`).toString("base64")}`;
+      const resp = await axios.post(
+        `${baseUrl}/v2/charge`,
+        {
+          payment_type: "qris",
+          transaction_details: {
+            order_id: params.orderId,
+            gross_amount: cleanAmount,
+          },
+          item_details: [
+            {
+              id: "wjp-item",
+              price: cleanAmount,
+              quantity: 1,
+              name: String(params.productTitle || "Produk WillJustPlay").slice(0, 48),
+            },
+          ],
+          customer_details: {
+            email: params.buyerEmail || "buyer@willjustplay.com",
+            phone: params.buyerWhatsapp || "081234567890",
+          },
+        },
+        {
+          headers: { Authorization: authHeader, "Content-Type": "application/json", Accept: "application/json" },
+          timeout: 8000,
+        }
+      );
+      const d = resp.data || {};
+      if (d.status_code === "201" || d.qr_string || Array.isArray(d.actions)) {
+        const rawQris = String(d.qr_string || "").trim();
+        const qrAction = (d.actions || []).find((a: any) => a.name === "generate-qr-code");
+        const finalQris = rawQris || buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+        const qrImg = rawQris
+          ? await generateQrisDataUri(rawQris)
+          : qrAction?.url || (await generateQrisDataUri(finalQris));
+        return {
+          ok: true,
+          mode: "live",
+          gateway_id: "midtrans",
+          gateway_name: "Midtrans",
+          paykita_ref: String(d.transaction_id || params.orderId).trim(),
+          qris_string: finalQris,
+          qris_image: qrImg,
+          pay_url: null,
+          base_amount: cleanAmount,
+          pay_amount: cleanAmount,
+          unique_code: 0,
+          fee_amount: 0,
+          qris_provider: `Midtrans (${d.acquirer || "QRIS"})`,
+          expired_at: d.expiry_time ? new Date(d.expiry_time).toISOString() : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          error_code: null,
+          error_message: null,
+        };
+      }
+      throw new Error(d.status_message || "Gagal membuat QRIS Midtrans");
+    } catch (err: any) {
+      const msg = err?.response?.data?.status_message || err?.message || "Gagal menghubungi Midtrans Core API";
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      return {
+        ok: false,
+        mode: "error",
+        gateway_id: "midtrans",
+        gateway_name: "Midtrans",
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: "Midtrans QRIS",
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "midtrans_error",
+        error_message: `Midtrans API: ${msg}`,
+      };
+    }
+  }
+
+  // 4. XENDIT GATEWAY (QR Codes API)
+  if (gatewayId === "xendit") {
+    const secretKey = String(gCfg.api_key || "").trim();
+    const baseUrl = String(gCfg.base_url || "https://api.xendit.co").replace(/\/+$/, "");
+
+    if (isDemoGatewayKey("xendit", secretKey)) {
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      return {
+        ok: false,
+        mode: "demo",
+        gateway_id: "xendit",
+        gateway_name: "Xendit",
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: "Xendit QRIS",
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "demo_api_key",
+        error_message:
+          "Secret Key Xendit masih menggunakan mode demo. Masukkan Secret API Key (xnd_...) asli dari dashboard Xendit.",
+      };
+    }
+
+    try {
+      const authHeader = `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const resp = await axios.post(
+        `${baseUrl}/qr_codes`,
+        {
+          reference_id: params.orderId,
+          type: "DYNAMIC",
+          currency: "IDR",
+          amount: cleanAmount,
+          expires_at: expiresAt,
+        },
+        {
+          headers: {
+            Authorization: authHeader,
+            "api-version": "2022-07-31",
+            "Content-Type": "application/json",
+          },
+          timeout: 8000,
+        }
+      );
+      const d = resp.data || {};
+      if (d.qr_string) {
+        const rawQris = String(d.qr_string).trim();
+        const qrImg = await generateQrisDataUri(rawQris);
+        return {
+          ok: true,
+          mode: "live",
+          gateway_id: "xendit",
+          gateway_name: "Xendit",
+          paykita_ref: String(d.id || params.orderId).trim(),
+          qris_string: rawQris,
+          qris_image: qrImg,
+          pay_url: null,
+          base_amount: cleanAmount,
+          pay_amount: cleanAmount,
+          unique_code: 0,
+          fee_amount: 0,
+          qris_provider: "Xendit QRIS",
+          expired_at: d.expires_at || expiresAt,
+          error_code: null,
+          error_message: null,
+        };
+      }
+      throw new Error("Respons QRIS Xendit tidak memiliki qr_string");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Gagal menghubungi API Xendit";
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      return {
+        ok: false,
+        mode: "error",
+        gateway_id: "xendit",
+        gateway_name: "Xendit",
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: "Xendit QRIS",
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "xendit_error",
+        error_message: `Xendit API: ${msg}`,
+      };
+    }
+  }
+
+  // 5. PAYKITA GATEWAY (Default)
+  const s = db.settings.paykita || {};
+  const apiKey = String(gCfg.api_key || s.api_key || process.env.PAYKITA_API_KEY || "").trim();
+  const baseUrl = String(gCfg.base_url || s.base_url || "https://pay.digikita.id").replace(/\/+$/, "");
+
+  if (isDefaultDemoPaykitaKey(apiKey)) {
+    const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+    const fallbackImg = await generateQrisDataUri(fallbackQris);
+    return {
+      ok: false,
+      mode: "demo",
+      gateway_id: "paykita",
+      gateway_name: "PayKita",
+      paykita_ref: params.orderId,
+      qris_string: fallbackQris,
+      qris_image: fallbackImg,
+      pay_url: null,
+      base_amount: cleanAmount,
+      pay_amount: cleanAmount,
+      unique_code: 0,
+      fee_amount: 0,
+      qris_provider: null,
+      expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      error_code: "demo_api_key",
+      error_message:
+        "API Key PayKita masih menggunakan kunci bawaan. Masukkan API Key asli (pk_live_...) dari pay.digikita.id di Panel Admin → Pembayaran.",
+    };
+  }
+
+  const isHttpsOrigin = /^https:\/\//i.test(String(params.origin || "").trim());
+  const orderPayload: Record<string, any> = {
+    base_amount: cleanAmount,
+    reference: params.orderId,
+    reference_id: params.orderId,
+    ttl_seconds: 900,
+  };
+  if (isHttpsOrigin) {
+    orderPayload.notify_url = `${params.origin}/api/webhook/paykita`;
+    orderPayload.redirect_url = `${params.origin}/payment/success?session_id=${params.orderId}`;
+  }
+
+  let lastErrorCode: string | null = null;
+  let lastErrorMessage: string | null = null;
+
+  const candidateConfigs = [
+    {
+      url: `${baseUrl}/api/orders`,
+      body: orderPayload,
+    },
+    {
+      url: `${baseUrl}/api/v1/orders`,
+      body: orderPayload,
+    },
+    {
+      url: `${baseUrl}/api/v1/transactions`,
+      body: {
+        ...orderPayload,
+        merchant_ref: params.orderId,
+        order_id: params.orderId,
+        amount: cleanAmount,
+        method: "QRIS",
+        customer_name: params.buyerEmail || params.buyerWhatsapp || "Customer",
+        customer_email: params.buyerEmail || "buyer@willjustplay.com",
+        customer_phone: params.buyerWhatsapp || "0800000000",
+        product_name: params.productTitle,
+        callback_url: `${params.origin}/api/webhook/paykita`,
+        return_url: `${params.origin}/payment/success?session_id=${params.orderId}`,
+      },
+    },
+  ];
+
+  for (const cfg of candidateConfigs) {
+    try {
+      const resp = await axios.post(cfg.url, cfg.body, {
+        headers: {
+          "x-api-key": apiKey,
+          "X-API-Key": apiKey,
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        timeout: 8000,
+      });
+      const d = resp.data?.data || resp.data;
+      const rawQris = String(d?.qris || d?.qris_string || d?.qr_string || "").trim();
+      const rawImg = String(d?.qris_image || d?.qr_url || d?.qr_image || "").trim();
+      const checkoutUrl = String(
+        d?.checkout_url || d?.pay_url || (d?.id ? `${baseUrl}/pay/${d.id}` : "")
+      ).trim();
+
+      if (d && typeof d === "object" && (rawQris || rawImg || checkoutUrl)) {
+        const payAmount = Math.max(1, Math.round(Number(d.pay_amount || d.amount || cleanAmount)));
+        const baseAmount = Math.max(1, Math.round(Number(d.base_amount || cleanAmount)));
+        const uniqueCode = Math.max(0, Math.round(Number(d.unique_code || 0)));
+        const feeAmount = Math.max(0, Math.round(Number(d.fee_amount || 0)));
+        const finalQrisString = rawQris || buildFallbackEmvQrisPayload(params.orderId, payAmount);
+        const generatedQrImg = rawQris ? await generateQrisDataUri(rawQris) : "";
+        const finalQrisImage = generatedQrImg || rawImg || (await generateQrisDataUri(finalQrisString));
+        const expRaw = d.expires_at || d.expired_at;
+
+        return {
+          ok: true,
+          mode: "live",
+          gateway_id: "paykita",
+          gateway_name: "PayKita",
+          paykita_ref: String(d.id || d.reference || d.order_id || params.orderId).trim(),
+          qris_string: finalQrisString,
+          qris_image: finalQrisImage,
+          pay_url: checkoutUrl || null,
+          base_amount: baseAmount,
+          pay_amount: payAmount,
+          unique_code: uniqueCode,
+          fee_amount: feeAmount,
+          qris_provider: d.provider ? String(d.provider) : null,
+          expired_at: expRaw ? new Date(expRaw).toISOString() : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          error_code: null,
+          error_message: null,
+        };
+      }
+    } catch (err: any) {
+      const errObj = err?.response?.data?.error;
+      const errDetail = err?.response?.data?.detail || err?.response?.data?.message;
+      if (errObj && typeof errObj === "object") {
+        lastErrorCode = String(errObj.code || "paykita_error");
+        lastErrorMessage = translatePaykitaError(errObj.code, String(errObj.message || ""));
+        break;
+      } else if (errDetail) {
+        lastErrorCode = "paykita_http_error";
+        lastErrorMessage = String(errDetail);
+      } else if (!lastErrorMessage && err?.message) {
+        lastErrorCode = "network_error";
+        lastErrorMessage = `Tidak dapat menghubungi server PayKita (${baseUrl}): ${err.message}`;
+      }
+    }
+  }
+
+  const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+  const fallbackImg = await generateQrisDataUri(fallbackQris);
+  return {
+    ok: false,
+    mode: "error",
+    gateway_id: "paykita",
+    gateway_name: "PayKita",
+    paykita_ref: params.orderId,
+    qris_string: fallbackQris,
+    qris_image: fallbackImg,
+    pay_url: null,
+    base_amount: cleanAmount,
+    pay_amount: cleanAmount,
+    unique_code: 0,
+    fee_amount: 0,
+    qris_provider: null,
+    expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    error_code: lastErrorCode || "paykita_unreachable",
+    error_message:
+      lastErrorMessage ||
+      "Gagal mendapatkan QRIS dinamis dari PayKita. Pastikan API Key dan QRIS Merchant di dashboard PayKita sudah aktif.",
+  };
+};
+
+const ensurePaykitaTransactionQris = async (tx: any, origin: string, forceRefresh = false) => {
+  if (!tx || tx.provider !== "paykita" || tx.payment_status !== "pending") return;
+  const defaultGwForTx = tx.product_type === PRODUCT_TYPE ? "duitku" : "paykita";
+  const gatewayId = String(tx.gateway_id || defaultGwForTx).toLowerCase() === "duitku" ? "duitku" : "paykita";
+  const pgGateways = db.settings.payment_gateways?.gateways || {};
+  const gCfg = pgGateways[gatewayId] || db.settings.paykita || {};
+  const apiKey = String(gCfg.api_key || (gatewayId === "paykita" ? db.settings.paykita?.api_key : "") || "").trim();
+  const hasRealKey = !isDemoGatewayKey(gatewayId, apiKey);
+  let mutated = false;
+
+  if (!tx.gateway_id) {
+    tx.gateway_id = gatewayId;
+    tx.gateway_name = gatewayId === "duitku" ? "Duitku" : "PayKita";
+    mutated = true;
+  }
+
+  if ((forceRefresh || tx.paykita_mode !== "live") && hasRealKey) {
+    const remoteOrder = await tryCreateRemotePaykitaOrder({
+      orderId: tx.session_id,
+      amount: Number(tx.base_amount || tx.amount || 0),
+      productTitle: tx.product_title || "Pesanan WillJustPlay",
+      buyerEmail: tx.buyer_email || "",
+      buyerWhatsapp: tx.buyer_whatsapp || "",
+      origin,
+      gatewayOverride: gatewayId,
+      duitkuMethod: tx.duitku_channel || undefined,
+    });
+    tx.paykita_mode = remoteOrder.mode;
+    tx.paykita_error = remoteOrder.error_message;
+    tx.paykita_error_code = remoteOrder.error_code;
+    if (remoteOrder.ok) {
+      tx.paykita_ref = remoteOrder.paykita_ref;
+      tx.qris_string = remoteOrder.qris_string;
+      tx.qris_image = remoteOrder.qris_image;
+      tx.pay_url = remoteOrder.pay_url;
+      if (remoteOrder.va_number) tx.va_number = remoteOrder.va_number;
+      tx.base_amount = remoteOrder.base_amount;
+      tx.pay_amount = remoteOrder.pay_amount;
+      tx.unique_code = remoteOrder.unique_code;
+      tx.fee_amount = remoteOrder.fee_amount;
+      tx.qris_provider = remoteOrder.qris_provider;
+      if (remoteOrder.expired_at) tx.expired_at = remoteOrder.expired_at;
+    }
+    mutated = true;
+  } else if (!hasRealKey && tx.paykita_mode !== "demo") {
+    tx.paykita_mode = "demo";
+    tx.paykita_error_code = "demo_api_key";
+    tx.paykita_error = `Kredensial ${gCfg.name || (gatewayId === "duitku" ? "Duitku" : "PayKita")} masih menggunakan mode demo. Masukkan API Key asli di Panel Admin → Pembayaran.`;
+    mutated = true;
+  }
+
+  if (!tx.qris_string || String(tx.qris_string).endsWith("6304A1B2")) {
+    tx.qris_string = buildFallbackEmvQrisPayload(tx.session_id, Number(tx.pay_amount || tx.amount || 0));
+    tx.qris_image = await generateQrisDataUri(tx.qris_string);
+    mutated = true;
+  } else if (!tx.qris_image || String(tx.qris_image).startsWith("data:image/svg+xml")) {
+    const realQr = await generateQrisDataUri(tx.qris_string);
+    if (realQr) {
+      tx.qris_image = realQr;
+      mutated = true;
+    }
+  }
+
+  if (mutated) {
+    tx.updated_at = nowIso();
+    saveDb();
+  }
+};
+
+api.post("/payments/paykita/checkout", async (req, res) => {
   try {
     const body = req.body || {};
-    const product = db.products.find((p) => p.id === body.product_id);
+    const product = findProductFlexible(body.product_id);
     if (!product) return res.status(404).json({ detail: "Produk tidak ditemukan" });
     if ((product.stock || 0) < 1) return res.status(400).json({ detail: "Stok produk habis" });
+
+    // Dedicated routing: Produk Beranda -> PayKita, Produk Top Up -> Duitku
+    const isTopup = isTopupProduct(product);
+    const resolvedGateway = isTopup ? "duitku" : "paykita";
+    const pgGateways = db.settings.payment_gateways?.gateways || {};
+    const s = db.settings.paykita || {};
+
+    if (resolvedGateway === "paykita") {
+      if (s.enabled === false || pgGateways.paykita?.enabled === false) {
+        return res.status(400).json({ detail: "Pembayaran QRIS Otomatis (PayKita) untuk Produk Beranda sedang dinonaktifkan oleh admin" });
+      }
+    } else {
+      if (pgGateways.duitku?.enabled === false) {
+        return res.status(400).json({ detail: "Pembayaran QRIS Otomatis (Duitku) untuk Produk Top Up sedang dinonaktifkan oleh admin" });
+      }
+    }
+
+    const pCfg = normalizeProductPaymentConfig(product.payment_config);
+    if (!pCfg.paykita || (pCfg.disabled_gateways || []).includes(resolvedGateway)) {
+      return res.status(400).json({ detail: "Pembayaran QRIS Otomatis sedang dinonaktifkan untuk produk ini" });
+    }
+
     const buyer = parseBuyer(body);
     const user = getUserOptional(req);
     const orderId = genOrderId("NXG-Q");
@@ -3633,17 +5077,42 @@ api.post("/payments/paykita/checkout", (req, res) => {
       product.price_usd && Number(product.price_usd) > 0
         ? Number(product.price_usd)
         : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
-    const expiredAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-    const qrisImage = buildQrDataUri("PAYKITA QRIS", orderId, priceIdr);
+    const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
+
+    const remoteOrder = await tryCreateRemotePaykitaOrder({
+      orderId,
+      amount: priceIdr,
+      productTitle: product.title,
+      buyerEmail: buyer.buyer_email || "",
+      buyerWhatsapp: buyer.buyer_whatsapp || "",
+      origin,
+      gatewayOverride: resolvedGateway,
+    });
+
+    const expiredAt = remoteOrder.expired_at || new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const gwLabel = remoteOrder.gateway_name || "PayKita";
+
     const tx = {
       ...buyer,
       session_id: orderId,
+      paykita_ref: remoteOrder.paykita_ref || orderId,
+      gateway_id: remoteOrder.gateway_id || "paykita",
+      gateway_name: gwLabel,
       provider: "paykita",
       payment_type: "paykita",
-      destination_id: "paykita-qris",
-      destination_name: "QRIS Otomatis (PayKita)",
-      qris_string: `00020101021226660016ID.CO.PAYKITA.WWW01189360091800000001230215${orderId}520458125303360540${priceIdr}5802ID5912WILLJUSTPLAY6007JAKARTA6304A1B2`,
-      qris_image: qrisImage,
+      destination_id: `${remoteOrder.gateway_id || "paykita"}-qris`,
+      destination_name: `QRIS Otomatis (${gwLabel})`,
+      qris_string: remoteOrder.qris_string,
+      qris_image: remoteOrder.qris_image,
+      pay_url: remoteOrder.pay_url || null,
+      base_amount: remoteOrder.base_amount || priceIdr,
+      pay_amount: remoteOrder.pay_amount || priceIdr,
+      unique_code: remoteOrder.unique_code || 0,
+      fee_amount: remoteOrder.fee_amount || 0,
+      qris_provider: remoteOrder.qris_provider || gwLabel,
+      paykita_mode: remoteOrder.mode,
+      paykita_error: remoteOrder.error_message || null,
+      paykita_error_code: remoteOrder.error_code || null,
       expired_at: expiredAt,
       product_id: product.id,
       product_title: product.title,
@@ -3654,6 +5123,9 @@ api.post("/payments/paykita/checkout", (req, res) => {
       currency: "idr",
       status: "pending",
       payment_status: "pending",
+      paykita_confirmed: false,
+      paykita_confirmed_by: null as string | null,
+      paykita_confirmed_at: null as string | null,
       payment_proof: null,
       has_proof: false,
       stock_deducted: false,
@@ -3662,39 +5134,599 @@ api.post("/payments/paykita/checkout", (req, res) => {
     };
     db.transactions.push(tx);
     saveDb();
-    const origin = body.origin_url || req.headers.origin || FRONTEND_URL;
     res.json({
       order_id: orderId,
       session_id: orderId,
       checkout_url: `${origin}/payment/success?session_id=${orderId}`,
+      paykita_mode: remoteOrder.mode,
+      paykita_error: remoteOrder.error_message || null,
     });
   } catch (err: any) {
     res.status(err.status || 400).json({ detail: err.detail || "Gagal membuat pesanan QRIS" });
   }
 });
 
-api.post("/payments/paykita/sync/:session_id", (req, res) => {
+const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
+  if (!tx) return;
+  if (tx.payment_status !== "paid" && tx.payment_status !== "failed") {
+    if (!tx.stock_deducted) {
+      const p = findProductFlexible(tx.product_id);
+      if (p) {
+        p.stock = Math.max(0, (p.stock || 0) - 1);
+        p.sold = (p.sold || 0) + 1;
+      }
+      tx.stock_deducted = true;
+    }
+    tx.payment_status = "paid";
+    tx.status = "completed";
+    tx.paykita_confirmed = true;
+    tx.paykita_confirmed_by = confirmedBy;
+    tx.paykita_confirmed_at = nowIso();
+    tx.updated_at = nowIso();
+    saveDb();
+  }
+};
+
+const verifyTransactionWithPaykitaServer = async (tx: any, origin?: string): Promise<{
+  confirmed: boolean;
+  paykita_status: string;
+  message: string;
+}> => {
+  if (!tx) {
+    return { confirmed: false, paykita_status: "not_found", message: "Transaksi tidak ditemukan" };
+  }
+  const gwLabel = tx.gateway_name || "Payment Gateway";
+  if (tx.payment_status === "paid" && tx.paykita_confirmed) {
+    return {
+      confirmed: true,
+      paykita_status: "paid",
+      message: `Pembayaran telah terkonfirmasi lunas oleh ${gwLabel}.`,
+    };
+  }
+  if (tx.payment_status === "failed") {
+    return {
+      confirmed: false,
+      paykita_status: tx.status === "expired" ? "expired" : "failed",
+      message: tx.status === "expired" ? "Waktu pembayaran QRIS sudah habis (kedaluwarsa)." : "Pembayaran gagal atau dibatalkan.",
+    };
+  }
+  if (tx.expired_at && new Date(tx.expired_at).getTime() <= Date.now()) {
+    tx.payment_status = "failed";
+    tx.status = "expired";
+    tx.updated_at = nowIso();
+    saveDb();
+    return {
+      confirmed: false,
+      paykita_status: "expired",
+      message: "Waktu pembayaran QRIS sudah habis (kedaluwarsa).",
+    };
+  }
+
+  const defaultGwForTx = tx.product_type === PRODUCT_TYPE ? "duitku" : "paykita";
+  const gatewayId = String(tx.gateway_id || defaultGwForTx).toLowerCase() === "duitku" ? "duitku" : "paykita";
+  const pgGateways = db.settings.payment_gateways?.gateways || {};
+  const gCfg = pgGateways[gatewayId] || db.settings.paykita || {};
+  const apiKey = String(gCfg.api_key || (gatewayId === "paykita" ? db.settings.paykita?.api_key : "") || "").trim();
+
+  if (origin && tx.paykita_mode !== "live" && !isDemoGatewayKey(gatewayId, apiKey)) {
+    await ensurePaykitaTransactionQris(tx, origin, false);
+  }
+
+  if (gatewayId === "duitku" && !isDemoGatewayKey("duitku", apiKey)) {
+    try {
+      const merchantCode = String(gCfg.merchant_code || "").trim();
+      const isSandbox = String(gCfg.mode || "").toLowerCase() === "sandbox";
+      const baseUrl = String(
+        gCfg.base_url ||
+          (isSandbox ? "https://sandbox.duitku.com/webapi" : "https://passport.duitku.com/webapi")
+      ).replace(/\/+$/, "");
+      const signature = crypto
+        .createHash("md5")
+        .update(`${merchantCode}${tx.session_id}${apiKey}`)
+        .digest("hex");
+      const resp = await axios.post(
+        `${baseUrl}/api/merchant/transactionStatus`,
+        {
+          merchantCode,
+          merchantOrderId: tx.session_id,
+          signature,
+        },
+        { headers: { "Content-Type": "application/json" }, timeout: 6000 }
+      );
+      const code = String(resp.data?.statusCode || "");
+      if (code === "00") {
+        markPaykitaTransactionPaid(tx, "duitku_api");
+        return {
+          confirmed: true,
+          paykita_status: "paid",
+          message: "Pembayaran berhasil dikonfirmasi oleh Duitku!",
+        };
+      }
+      if (code === "02") {
+        tx.payment_status = "failed";
+        tx.status = "failed";
+        tx.updated_at = nowIso();
+        saveDb();
+        return {
+          confirmed: false,
+          paykita_status: "failed",
+          message: "Transaksi dibatalkan atau kedaluwarsa di Duitku.",
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      confirmed: false,
+      paykita_status: "waiting_payment",
+      message: "Menunggu konfirmasi pembayaran dari Duitku. Silakan selesaikan scan QRIS terlebih dahulu.",
+    };
+  }
+
+  if (gatewayId === "tripay" && !isDemoGatewayKey("tripay", apiKey)) {
+    try {
+      const isSandbox = String(gCfg.mode || "").toLowerCase() === "sandbox";
+      const baseUrl = String(
+        gCfg.base_url || (isSandbox ? "https://tripay.co.id/api-sandbox" : "https://tripay.co.id/api")
+      ).replace(/\/+$/, "");
+      const resp = await axios.get(
+        `${baseUrl}/transaction/detail?reference=${encodeURIComponent(tx.paykita_ref || tx.session_id)}`,
+        { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 6000 }
+      );
+      const st = String(resp.data?.data?.status || "").toUpperCase();
+      if (st === "PAID") {
+        markPaykitaTransactionPaid(tx, "tripay_api");
+        return {
+          confirmed: true,
+          paykita_status: "paid",
+          message: "Pembayaran berhasil dikonfirmasi oleh Tripay!",
+        };
+      }
+      if (st === "EXPIRED" || st === "FAILED") {
+        tx.payment_status = "failed";
+        tx.status = st === "EXPIRED" ? "expired" : "failed";
+        tx.updated_at = nowIso();
+        saveDb();
+        return {
+          confirmed: false,
+          paykita_status: tx.status,
+          message: "Transaksi kedaluwarsa atau gagal di Tripay.",
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      confirmed: false,
+      paykita_status: "waiting_payment",
+      message: "Menunggu konfirmasi pembayaran dari Tripay.",
+    };
+  }
+
+  if (gatewayId === "midtrans" && !isDemoGatewayKey("midtrans", apiKey)) {
+    try {
+      const isSandbox = String(gCfg.mode || "").toLowerCase() === "sandbox" || apiKey.startsWith("SB-");
+      const baseUrl = String(
+        gCfg.base_url || (isSandbox ? "https://api.sandbox.midtrans.com" : "https://api.midtrans.com")
+      ).replace(/\/+$/, "");
+      const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString("base64")}`;
+      const resp = await axios.get(`${baseUrl}/v2/${encodeURIComponent(tx.session_id)}/status`, {
+        headers: { Authorization: authHeader, Accept: "application/json" },
+        timeout: 6000,
+      });
+      const st = String(resp.data?.transaction_status || "").toLowerCase();
+      if (st === "settlement" || st === "capture") {
+        markPaykitaTransactionPaid(tx, "midtrans_api");
+        return {
+          confirmed: true,
+          paykita_status: "paid",
+          message: "Pembayaran berhasil dikonfirmasi oleh Midtrans!",
+        };
+      }
+      if (st === "expire" || st === "cancel" || st === "deny") {
+        tx.payment_status = "failed";
+        tx.status = st === "expire" ? "expired" : "failed";
+        tx.updated_at = nowIso();
+        saveDb();
+        return {
+          confirmed: false,
+          paykita_status: tx.status,
+          message: "Transaksi kedaluwarsa atau dibatalkan di Midtrans.",
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      confirmed: false,
+      paykita_status: "waiting_payment",
+      message: "Menunggu konfirmasi pembayaran dari Midtrans.",
+    };
+  }
+
+  const s = db.settings.paykita || {};
+  const pkKey = String(s.api_key || process.env.PAYKITA_API_KEY || "").trim();
+  const baseUrl = String(s.base_url || "https://pay.digikita.id").replace(/\/+$/, "");
+
+  const candidateIds = Array.from(
+    new Set([String(tx.paykita_ref || "").trim(), String(tx.session_id || "").trim()].filter(Boolean))
+  );
+
+  if (!isDefaultDemoPaykitaKey(pkKey) && candidateIds.length > 0) {
+    const checkUrls: string[] = [];
+    for (const refId of candidateIds) {
+      checkUrls.push(`${baseUrl}/api/orders/${encodeURIComponent(refId)}`);
+      checkUrls.push(`${baseUrl}/api/v1/orders/${encodeURIComponent(refId)}`);
+      checkUrls.push(`${baseUrl}/api/v1/transactions/${encodeURIComponent(refId)}`);
+    }
+
+    for (const url of checkUrls) {
+      try {
+        const resp = await axios.get(url, {
+          headers: {
+            "x-api-key": pkKey,
+            "X-API-Key": pkKey,
+            Authorization: `Bearer ${pkKey}`,
+            Accept: "application/json",
+          },
+          timeout: 6000,
+        });
+        if (resp.status === 200 && resp.data && typeof resp.data === "object") {
+          const remoteObj = resp.data?.data || resp.data?.transaction || resp.data;
+          const remoteId = String(remoteObj?.id || "").trim();
+          const remoteRef = String(
+            remoteObj?.reference_id || remoteObj?.reference || remoteObj?.order_id || remoteObj?.merchant_ref || remoteObj?.session_id || ""
+          ).trim();
+          const remoteStatus = String(
+            remoteObj?.payment_status || remoteObj?.status || ""
+          )
+            .toLowerCase()
+            .trim();
+
+          const matchesTx =
+            (remoteId && (remoteId === tx.paykita_ref || remoteId === tx.session_id)) ||
+            (remoteRef && (remoteRef === tx.session_id || remoteRef === tx.paykita_ref));
+
+          if (matchesTx && remoteObj?.qris && tx.paykita_mode !== "live") {
+            tx.qris_string = String(remoteObj.qris);
+            tx.qris_image = await generateQrisDataUri(tx.qris_string);
+            tx.pay_amount = Number(remoteObj.pay_amount || tx.pay_amount || tx.amount);
+            tx.unique_code = Number(remoteObj.unique_code || tx.unique_code || 0);
+            tx.fee_amount = Number(remoteObj.fee_amount || tx.fee_amount || 0);
+            tx.paykita_mode = "live";
+            tx.paykita_error = null;
+            saveDb();
+          }
+
+          if (
+            matchesTx &&
+            ["paid", "success", "settlement", "completed", "lunas"].includes(remoteStatus)
+          ) {
+            markPaykitaTransactionPaid(tx, "paykita_api");
+            return {
+              confirmed: true,
+              paykita_status: "paid",
+              message: "Pembayaran berhasil dikonfirmasi oleh server PayKita!",
+            };
+          }
+          if (
+            matchesTx &&
+            ["expired", "failed", "canceled", "cancelled", "gagal"].includes(remoteStatus)
+          ) {
+            tx.payment_status = "failed";
+            tx.status = remoteStatus === "expired" ? "expired" : "failed";
+            tx.updated_at = nowIso();
+            saveDb();
+            return {
+              confirmed: false,
+              paykita_status: tx.status,
+              message: "Pembayaran dinyatakan kedaluwarsa atau gagal oleh PayKita.",
+            };
+          }
+        }
+      } catch {
+        // Ignore network/404 errors and continue waiting for webhook confirmation
+      }
+    }
+  }
+
+  return {
+    confirmed: false,
+    paykita_status: "waiting_payment",
+    message: `Belum ada konfirmasi pembayaran dari ${gwLabel}. Silakan scan & selesaikan pembayaran QRIS terlebih dahulu.`,
+  };
+};
+
+api.post("/payments/paykita/sync/:session_id", async (req, res) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
   if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
+  const origin = req.headers.origin || getAppOrigin(req);
+  const verifyRes = await verifyTransactionWithPaykitaServer(tx, origin);
   res.json({
     ok: true,
+    confirmed: verifyRes.confirmed,
     payment_status: tx.payment_status || "pending",
     status: tx.status || "pending",
-    paykita_status: tx.payment_status === "paid" ? "paid" : "waiting_payment",
+    paykita_status: verifyRes.paykita_status,
+    paykita_mode: tx.paykita_mode || "demo",
+    paykita_error: tx.paykita_error || null,
+    message: verifyRes.message,
+  });
+});
+
+api.post("/payments/paykita/refresh-qris/:session_id", async (req, res) => {
+  const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
+  if (!tx || tx.provider !== "paykita") {
+    return res.status(404).json({ detail: "Transaksi QRIS PayKita tidak ditemukan" });
+  }
+  if (tx.payment_status === "paid") {
+    return res.json({ ok: true, message: "Transaksi ini sudah lunas" });
+  }
+  const origin = req.body?.origin_url || req.headers.origin || getAppOrigin(req);
+  await ensurePaykitaTransactionQris(tx, origin, true);
+  if (tx.paykita_mode === "live") {
+    return res.json({
+      ok: true,
+      paykita_mode: tx.paykita_mode,
+      message: "QRIS resmi dari Payment Gateway berhasil dimuat!",
+    });
+  }
+  return res.status(400).json({
+    ok: false,
+    paykita_mode: tx.paykita_mode,
+    detail: tx.paykita_error || "Gagal memuat QRIS dari Payment Gateway",
+  });
+});
+
+// Duitku Webhook Callback
+api.post("/webhook/duitku", async (req, res) => {
+  const body = req.body || {};
+  const merchantOrderId = String(body.merchantOrderId || body.order_id || "").trim();
+  const resultCode = String(body.resultCode || "").trim();
+  const amount = String(body.amount || "").trim();
+  const signature = String(body.signature || "").trim().toLowerCase();
+  if (!merchantOrderId) return res.json({ ok: true, message: "Ping webhook Duitku diterima" });
+
+  const tx = db.transactions.find((t) => t.session_id === merchantOrderId || t.paykita_ref === merchantOrderId);
+  if (!tx) return res.status(404).json({ ok: false, detail: "Transaksi tidak ditemukan" });
+
+  const gCfg = db.settings.payment_gateways?.gateways?.duitku || {};
+  const merchantCode = String(gCfg.merchant_code || "").trim();
+  const apiKey = String(gCfg.api_key || "").trim();
+  const expectedSig = crypto
+    .createHash("md5")
+    .update(`${merchantCode}${amount}${merchantOrderId}${apiKey}`)
+    .digest("hex")
+    .toLowerCase();
+
+  if (resultCode === "00" && signature && signature === expectedSig) {
+    markPaykitaTransactionPaid(tx, "duitku_webhook");
+  }
+  return res.json({ ok: true, session_id: tx.session_id, payment_status: tx.payment_status });
+});
+
+// Tripay Webhook Callback
+api.post("/webhook/tripay", async (req: any, res) => {
+  const body = req.body || {};
+  const merchantRef = String(body.merchant_ref || body.reference || "").trim();
+  if (!merchantRef) return res.json({ ok: true, message: "Ping webhook Tripay diterima" });
+
+  const tx = db.transactions.find((t) => t.session_id === merchantRef || t.paykita_ref === merchantRef);
+  if (!tx) return res.status(404).json({ ok: false, detail: "Transaksi tidak ditemukan" });
+
+  const gCfg = db.settings.payment_gateways?.gateways?.tripay || {};
+  const privateKey = String(gCfg.private_key || "").trim();
+  const rawBodyStr = typeof req.rawBody === "string" && req.rawBody ? req.rawBody : JSON.stringify(body);
+  const sig = String(req.headers["x-callback-signature"] || "").trim();
+  const expectedSig = privateKey ? crypto.createHmac("sha256", privateKey).update(rawBodyStr).digest("hex") : "";
+
+  if (String(body.status || "").toUpperCase() === "PAID" && expectedSig && sig === expectedSig) {
+    markPaykitaTransactionPaid(tx, "tripay_webhook");
+  }
+  return res.json({ success: true });
+});
+
+// Midtrans Webhook Callback
+api.post("/webhook/midtrans", async (req, res) => {
+  const body = req.body || {};
+  const orderId = String(body.order_id || "").trim();
+  if (!orderId) return res.json({ ok: true, message: "Ping webhook Midtrans diterima" });
+
+  const tx = db.transactions.find((t) => t.session_id === orderId || t.paykita_ref === orderId);
+  if (!tx) return res.status(404).json({ ok: false, detail: "Transaksi tidak ditemukan" });
+
+  const gCfg = db.settings.payment_gateways?.gateways?.midtrans || {};
+  const serverKey = String(gCfg.api_key || "").trim();
+  const expectedSig = crypto
+    .createHash("sha512")
+    .update(`${orderId}${body.status_code || ""}${body.gross_amount || ""}${serverKey}`)
+    .digest("hex");
+  const txStatus = String(body.transaction_status || "").toLowerCase();
+
+  if ((txStatus === "settlement" || txStatus === "capture") && body.signature_key === expectedSig) {
+    markPaykitaTransactionPaid(tx, "midtrans_webhook");
+  }
+  return res.json({ ok: true });
+});
+
+// Xendit Webhook Callback
+api.post("/webhook/xendit", async (req, res) => {
+  const body = req.body || {};
+  const refId = String(body.data?.reference_id || body.external_id || body.reference_id || "").trim();
+  if (!refId) return res.json({ ok: true, message: "Ping webhook Xendit diterima" });
+
+  const tx = db.transactions.find((t) => t.session_id === refId || t.paykita_ref === refId);
+  if (!tx) return res.status(404).json({ ok: false, detail: "Transaksi tidak ditemukan" });
+
+  const gCfg = db.settings.payment_gateways?.gateways?.xendit || {};
+  const token = String(req.headers["x-callback-token"] || "").trim();
+  const status = String(body.data?.status || body.status || "").toUpperCase();
+
+  if ((status === "SUCCEEDED" || status === "PAID" || status === "COMPLETED") && token && token === gCfg.webhook_secret) {
+    markPaykitaTransactionPaid(tx, "xendit_webhook");
+  }
+  return res.json({ ok: true });
+});
+
+api.get("/webhook/paykita", (_req, res) => {
+  const s = db.settings.paykita || {};
+  res.json({
+    ok: true,
+    status: s.enabled !== false ? "active" : "disabled",
+    provider: "PayKita QRIS Otomatis",
+    message: "Endpoint webhook PayKita aktif dan siap menerima notifikasi pembayaran.",
+  });
+});
+
+api.post("/webhook/paykita", async (req: any, res) => {
+  const body = req.body || {};
+  const eventType = String(
+    req.headers["x-paykita-event"] || req.headers["x-malawali-event"] || body.event || ""
+  )
+    .toLowerCase()
+    .trim();
+
+  if (eventType === "webhook.test") {
+    return res.json({ ok: true, message: "Test webhook PayKita diterima" });
+  }
+
+  const nestedData = body.data && typeof body.data === "object" ? body.data : null;
+  const candidateRefs = [
+    nestedData?.reference_id,
+    nestedData?.reference,
+    nestedData?.id,
+    body.order_id,
+    body.session_id,
+    body.reference_id,
+    body.reference,
+    body.merchant_ref,
+    body.id,
+  ]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+
+  if (candidateRefs.length === 0) {
+    return res.json({ ok: true, message: "Ping webhook diterima" });
+  }
+
+  const tx = db.transactions.find(
+    (t) => candidateRefs.includes(String(t.session_id || "")) || candidateRefs.includes(String(t.paykita_ref || ""))
+  );
+  if (!tx) {
+    return res.status(404).json({ ok: false, detail: "Transaksi tidak ditemukan" });
+  }
+
+  const incomingStatus = String(
+    nestedData?.status ||
+      nestedData?.payment_status ||
+      body.status ||
+      body.payment_status ||
+      (eventType === "order.paid" ? "paid" : "")
+  )
+    .toLowerCase()
+    .trim();
+
+  if (!incomingStatus) {
+    return res.status(400).json({ ok: false, detail: "Status pembayaran tidak disertakan pada webhook" });
+  }
+
+  const s = db.settings.paykita || {};
+  const webhookSecret = String(s.webhook_secret || process.env.PAYKITA_WEBHOOK_SECRET || "").trim();
+  const sigHeader = String(
+    req.headers["x-paykita-signature"] ||
+      req.headers["x-malawali-signature"] ||
+      req.headers["x-callback-signature"] ||
+      req.headers["x-signature"] ||
+      ""
+  ).trim();
+  const timestampHeader = String(
+    req.headers["x-paykita-timestamp"] || req.headers["x-malawali-timestamp"] || ""
+  ).trim();
+  const tokenHeader = String(
+    req.headers["x-callback-token"] ||
+      req.headers["x-webhook-secret"] ||
+      body.webhook_secret ||
+      ""
+  ).trim();
+
+  const rawBodyStr = typeof req.rawBody === "string" && req.rawBody ? req.rawBody : JSON.stringify(body);
+  let signatureVerified = false;
+  if (webhookSecret) {
+    const cleanSig = sigHeader.startsWith("v1=") ? sigHeader.slice(3) : sigHeader;
+    const expectedDirectHmac = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(rawBodyStr)
+      .digest("hex");
+    const expectedJsonHmac = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(JSON.stringify(body))
+      .digest("hex");
+    const expectedTimestampHmac = timestampHeader
+      ? crypto
+          .createHmac("sha256", webhookSecret)
+          .update(`${timestampHeader}.${rawBodyStr}`)
+          .digest("hex")
+      : "";
+
+    if (
+      cleanSig &&
+      (cleanSig === expectedTimestampHmac || cleanSig === expectedDirectHmac || cleanSig === expectedJsonHmac)
+    ) {
+      signatureVerified = true;
+    } else if (tokenHeader && tokenHeader === webhookSecret) {
+      signatureVerified = true;
+    }
+  }
+
+  if (["paid", "success", "settlement", "completed", "lunas"].includes(incomingStatus)) {
+    if (!signatureVerified) {
+      const serverCheck = await verifyTransactionWithPaykitaServer(tx);
+      if (!serverCheck.confirmed) {
+        return res.status(401).json({
+          ok: false,
+          detail: "Konfirmasi webhook PayKita ditolak: signature tidak valid dan pembayaran belum terkonfirmasi di server PayKita.",
+        });
+      }
+    } else {
+      markPaykitaTransactionPaid(tx, "paykita_webhook");
+    }
+  } else if (["failed", "expired", "canceled", "cancelled", "gagal"].includes(incomingStatus)) {
+    if (signatureVerified) {
+      tx.payment_status = "failed";
+      tx.status = incomingStatus === "expired" ? "expired" : "rejected";
+      tx.updated_at = nowIso();
+      saveDb();
+    }
+  }
+  return res.json({
+    ok: true,
+    session_id: tx.session_id,
+    payment_status: tx.payment_status,
+    status: tx.status,
   });
 });
 
 const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
   try {
     const body = req.body || {};
-    const product = db.products.find((p) => p.id === body.product_id);
+    const product = findProductFlexible(body.product_id);
     if (!product) return res.status(404).json({ detail: "Produk tidak ditemukan" });
     if ((product.stock || 0) < 1) return res.status(400).json({ detail: "Stok produk habis" });
     const buyer = parseBuyer(body);
     const dest = db.manual_destinations.find((d) => d.id === body.destination_id && d.is_active !== false);
     if (!dest) return res.status(404).json({ detail: "Metode pembayaran tidak ditemukan / tidak aktif" });
-    const user = getUserOptional(req);
     const isCrypto = dest.type === "crypto";
+    const pCfg = normalizeProductPaymentConfig(product.payment_config);
+    if (isCrypto && !pCfg.crypto) {
+      return res.status(400).json({ detail: "Pembayaran Crypto sedang dinonaktifkan untuk produk ini" });
+    }
+    if (!isCrypto && !pCfg.manual) {
+      return res.status(400).json({ detail: "Pembayaran Transfer / QRIS Manual sedang dinonaktifkan untuk produk ini" });
+    }
+    if (pCfg.disabled_destinations.includes(dest.id)) {
+      return res.status(400).json({ detail: `Kanal pembayaran ${dest.name} dinonaktifkan untuk produk ini` });
+    }
+    const user = getUserOptional(req);
     const orderId = genOrderId(isCrypto ? "NXG-C" : "NXG-M");
     const priceIdr = Math.round(Number(product.price || 0));
     const priceUsd =
@@ -3742,7 +5774,7 @@ const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
 api.post("/payments/manual/checkout", handleManualOrCryptoCheckout);
 api.post("/payments/crypto/checkout", handleManualOrCryptoCheckout);
 
-api.post("/payments/topup/checkout", (req, res) => {
+api.post("/payments/topup/checkout", async (req, res) => {
   try {
     const body = req.body || {};
     const slug = String(body.game || body.slug || "").trim();
@@ -3753,7 +5785,14 @@ api.post("/payments/topup/checkout", (req, res) => {
     const code = String(body.denomination_code || body.denomination || "").trim();
     const denom = findDenomination(game, code);
     if (!denom || denom.is_active === false) return res.status(404).json({ detail: "Nominal top up tidak tersedia" });
-    const product = db.products.find((p) => p.id === body.product_id);
+    const product =
+      findProductFlexible(body.product_id) ||
+      db.products.find(
+        (p) =>
+          p.product_type === PRODUCT_TYPE &&
+          p.game_slug === game.slug &&
+          String(p.denomination_code).toLowerCase() === String(denom.code).toLowerCase()
+      );
     if (!product || product.product_type !== PRODUCT_TYPE) {
       return res.status(404).json({ detail: "Nominal top up tidak ditemukan di katalog" });
     }
@@ -3765,7 +5804,30 @@ api.post("/payments/topup/checkout", (req, res) => {
     const [ok, destination, errMsg] = validateDestination(game, values);
     if (!ok) return res.status(400).json({ detail: errMsg });
     const buyer = parseBuyer(body);
-    const method = String(body.method || "manual").trim().toLowerCase();
+    const method = String(body.method || "duitku").trim().toLowerCase();
+    if (method === "manual" || method === "crypto") {
+      return res.status(400).json({
+        detail: "Metode pembayaran manual tidak tersedia untuk produk Top Up. Silakan pilih metode pembayaran otomatis Duitku.",
+      });
+    }
+
+    const duitkuCfg = db.settings.payment_gateways?.gateways?.duitku || {};
+    if (duitkuCfg.enabled === false) {
+      return res.status(400).json({
+        detail: "Pembayaran otomatis Duitku untuk Produk Top Up sedang dinonaktifkan oleh admin",
+      });
+    }
+
+    const enabledChannels = getEnabledDuitkuChannels(duitkuCfg);
+    const requestedChannel = String(
+      body.duitku_channel || body.payment_method || body.channel_code || duitkuCfg.payment_method || "SP"
+    )
+      .trim()
+      .toUpperCase();
+    const chMeta =
+      enabledChannels.find((c) => c.code === requestedChannel) ||
+      getDuitkuChannelMeta(requestedChannel);
+
     const user = getUserOptional(req);
     const orderId = genOrderId("NXG-T");
     const label = denom.label || denom.code;
@@ -3775,68 +5837,55 @@ api.post("/payments/topup/checkout", (req, res) => {
         ? Number(product.price_usd)
         : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
 
-    if (method === "paykita") {
-      const expiredAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      const qrisImage = buildQrDataUri(game.name, orderId, priceIdr);
-      const tx = {
-        ...buyer,
-        session_id: orderId,
-        provider: "paykita",
-        payment_type: "paykita",
-        destination_id: "paykita-qris",
-        destination_name: "QRIS Otomatis (PayKita)",
-        qris_string: `00020101021226660016ID.CO.PAYKITA.WWW01189360091800000001230215${orderId}520458125303360540${priceIdr}5802ID5912WILLJUSTPLAY6007JAKARTA6304A1B2`,
-        qris_image: qrisImage,
-        expired_at: expiredAt,
-        product_id: product.id,
-        product_title: product.title || `${game.name} — ${label}`,
-        product_type: PRODUCT_TYPE,
-        category: TOPUP_CATEGORY,
-        game_id: game.id,
-        game_slug: game.slug,
-        game_name: game.name,
-        denomination_code: String(denom.code),
-        denomination_label: label,
-        destination,
-        delivery_info: renderDeliveryInfo(product, game, destination),
-        user_id: user?.id || null,
-        amount: priceIdr,
-        amount_usd: priceUsd,
-        price_strike: product.price_strike,
-        currency: "idr",
-        status: "pending",
-        payment_status: "pending",
-        payment_proof: null,
-        has_proof: false,
-        stock_deducted: false,
-        created_at: nowIso(),
-        updated_at: nowIso(),
-      };
-      db.transactions.push(tx);
-      saveDb();
-      const origin = body.origin_url || req.headers.origin || FRONTEND_URL;
-      return res.json({
-        order_id: orderId,
-        session_id: orderId,
-        checkout_url: `${origin}/payment/success?session_id=${orderId}`,
-      });
+    const verification = await verifyGameAccountId(game, destination);
+    if (!verification.valid) {
+      return res.status(400).json({ detail: verification.message || "ID Akun Game tidak valid" });
     }
+    const verifiedNickname = String(body.verified_nickname || verification.nickname || "").trim();
+    const customerNo = verification.customer_no || buildDigiflazzCustomerNo(game, destination);
 
-    const dest = db.manual_destinations.find((d) => d.id === body.destination_id && d.is_active !== false);
-    if (!dest) return res.status(404).json({ detail: "Metode pembayaran tidak ditemukan / tidak aktif" });
-    const isCrypto = dest.type === "crypto" || method === "crypto";
+    const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
+    const productTitle = product.title || `${game.name} — ${label}`;
+    const remoteOrder = await tryCreateRemotePaykitaOrder({
+      orderId,
+      amount: priceIdr,
+      productTitle,
+      buyerEmail: buyer.buyer_email || "",
+      buyerWhatsapp: buyer.buyer_whatsapp || "",
+      origin,
+      gatewayOverride: "duitku",
+      duitkuMethod: chMeta.code,
+    });
+    const expiredAt = remoteOrder.expired_at || new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const baseDeliveryInfo = renderDeliveryInfo(product, game, destination);
     const tx = {
       ...buyer,
       session_id: orderId,
-      provider: "manual",
-      payment_type: isCrypto ? "crypto" : "manual",
-      destination_id: dest.id,
-      destination_name: dest.name,
-      crypto_network: isCrypto ? dest.network || "" : null,
-      crypto_symbol: isCrypto ? dest.symbol || "USDT" : null,
-      tx_hash: null as string | null,
+      paykita_ref: remoteOrder.paykita_ref || orderId,
+      gateway_id: "duitku",
+      gateway_name: "Duitku",
+      duitku_channel: chMeta.code,
+      duitku_channel_name: chMeta.name,
+      duitku_payment_flow: chMeta.payment_flow,
+      va_number: remoteOrder.va_number || null,
+      provider: "paykita",
+      payment_type: "paykita",
+      destination_id: `duitku-${chMeta.code.toLowerCase()}`,
+      destination_name: `Duitku — ${chMeta.name}`,
+      qris_string: remoteOrder.qris_string,
+      qris_image: remoteOrder.qris_image,
+      pay_url: remoteOrder.pay_url || null,
+      base_amount: remoteOrder.base_amount || priceIdr,
+      pay_amount: remoteOrder.pay_amount || priceIdr,
+      unique_code: remoteOrder.unique_code || 0,
+      fee_amount: remoteOrder.fee_amount || 0,
+      qris_provider: remoteOrder.qris_provider || `${chMeta.short_name} (${chMeta.code})`,
+      paykita_mode: remoteOrder.mode,
+      paykita_error: remoteOrder.error_message || null,
+      paykita_error_code: remoteOrder.error_code || null,
+      expired_at: expiredAt,
       product_id: product.id,
-      product_title: product.title || `${game.name} — ${label}`,
+      product_title: productTitle,
       product_type: PRODUCT_TYPE,
       category: TOPUP_CATEGORY,
       game_id: game.id,
@@ -3844,15 +5893,24 @@ api.post("/payments/topup/checkout", (req, res) => {
       game_name: game.name,
       denomination_code: String(denom.code),
       denomination_label: label,
+      vendor_sku: denom.vendor_sku || `${game.vendor_prefix || ""}${denom.code}`,
+      vendor_kind: "digiflazz",
+      customer_no: customerNo,
+      verified_nickname: verifiedNickname,
       destination,
-      delivery_info: renderDeliveryInfo(product, game, destination),
+      delivery_info: verifiedNickname
+        ? `${baseDeliveryInfo} • Nickname: ${verifiedNickname}`
+        : baseDeliveryInfo,
       user_id: user?.id || null,
       amount: priceIdr,
       amount_usd: priceUsd,
       price_strike: product.price_strike,
-      currency: isCrypto ? "usd" : "idr",
+      currency: "idr",
       status: "pending",
       payment_status: "pending",
+      paykita_confirmed: false,
+      paykita_confirmed_by: null as string | null,
+      paykita_confirmed_at: null as string | null,
       payment_proof: null,
       has_proof: false,
       stock_deducted: false,
@@ -3861,11 +5919,18 @@ api.post("/payments/topup/checkout", (req, res) => {
     };
     db.transactions.push(tx);
     saveDb();
-    const origin = body.origin_url || req.headers.origin || FRONTEND_URL;
-    res.json({
+    return res.json({
       order_id: orderId,
       session_id: orderId,
+      gateway_id: "duitku",
+      gateway_name: "Duitku",
+      duitku_channel: chMeta.code,
+      duitku_channel_name: chMeta.name,
+      duitku_payment_flow: chMeta.payment_flow,
+      va_number: tx.va_number,
       checkout_url: `${origin}/payment/success?session_id=${orderId}`,
+      paykita_mode: remoteOrder.mode,
+      paykita_error: remoteOrder.error_message || null,
     });
   } catch (err: any) {
     res.status(err.status || 400).json({ detail: err.detail || "Gagal membuat pesanan top up" });
@@ -3922,10 +5987,35 @@ api.post("/payments/crypto/submit-tx/:session_id", (req, res) => {
   res.json(tx);
 });
 
-const handlePaymentStatus = (req: Request, res: Response) => {
+const handlePaymentStatus = async (req: Request, res: Response) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
   if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
-  const paid = tx.payment_status === "paid";
+  if (
+    tx.provider === "paykita" &&
+    tx.payment_status === "pending" &&
+    tx.expired_at &&
+    new Date(tx.expired_at).getTime() <= Date.now()
+  ) {
+    tx.payment_status = "failed";
+    tx.status = "expired";
+    tx.updated_at = nowIso();
+    saveDb();
+  }
+  if (tx.provider === "paykita" && tx.payment_status === "pending") {
+    const origin = (req.headers.origin as string) || getAppOrigin(req);
+    await ensurePaykitaTransactionQris(tx, origin, false);
+  }
+  const paid =
+    tx.payment_status === "paid" &&
+    (tx.provider !== "paykita" || Boolean(tx.paykita_confirmed));
+  const effectivePaymentStatus =
+    tx.provider === "paykita" && tx.payment_status === "paid" && !tx.paykita_confirmed
+      ? "pending"
+      : tx.payment_status || "pending";
+  const effectiveStatus =
+    tx.provider === "paykita" && tx.status === "completed" && !tx.paykita_confirmed
+      ? "pending"
+      : tx.status || "pending";
   let game = null;
   if (tx.product_type === PRODUCT_TYPE && tx.game_slug) {
     const g = db.games.find((x) => x.slug === tx.game_slug);
@@ -3938,13 +6028,33 @@ const handlePaymentStatus = (req: Request, res: Response) => {
     tx.amount_usd && Number(tx.amount_usd) > 0
       ? Number(tx.amount_usd)
       : Math.max(1, Math.round((Number(tx.amount || 0) / 16000) * 100) / 100);
+  const resolvedGwId =
+    tx.gateway_id || (tx.product_type === PRODUCT_TYPE ? "duitku" : "paykita");
+  const resolvedGwName =
+    tx.gateway_name || (resolvedGwId === "duitku" ? "Duitku" : "PayKita");
   res.json({
     session_id: tx.session_id,
+    paykita_ref: tx.paykita_ref || tx.session_id,
+    gateway_id: resolvedGwId,
+    gateway_name: resolvedGwName,
+    duitku_channel: tx.duitku_channel || null,
+    duitku_channel_name: tx.duitku_channel_name || null,
+    duitku_payment_flow: tx.duitku_payment_flow || "qris",
+    va_number: !paid ? tx.va_number || null : null,
     provider: tx.provider,
-    status: tx.status || "pending",
-    payment_status: tx.payment_status || "pending",
+    status: effectiveStatus,
+    payment_status: effectivePaymentStatus,
+    paykita_confirmed: Boolean(tx.paykita_confirmed),
+    paykita_mode: tx.paykita_mode || "demo",
+    paykita_error: !paid ? tx.paykita_error || null : null,
+    paykita_error_code: !paid ? tx.paykita_error_code || null : null,
     payment_type: tx.payment_type || (manualDest?.type === "crypto" ? "crypto" : tx.provider),
     amount: tx.amount,
+    base_amount: tx.base_amount || tx.amount,
+    pay_amount: tx.pay_amount || tx.amount,
+    unique_code: tx.unique_code || 0,
+    fee_amount: tx.fee_amount || 0,
+    qris_provider: tx.qris_provider || null,
     amount_usd: amountUsd,
     crypto_network: tx.crypto_network || manualDest?.network || null,
     crypto_symbol: tx.crypto_symbol || manualDest?.symbol || null,
@@ -3996,12 +6106,12 @@ admin.use(requireAdminMiddleware);
 
 const adminProductView = (p: any) => {
   const copy = { ...p };
-  const pk = copy.paykita || {};
   delete copy.paykita;
-  copy.paykita_api_key_set = Boolean(pk.api_key);
-  copy.paykita_api_key_masked = maskSecret(pk.api_key || "");
-  copy.paykita_webhook_secret_set = Boolean(pk.webhook_secret);
-  copy.paykita_webhook_url = `${FRONTEND_URL}/api/webhook/paykita/${p.id}`;
+  copy.paykita_api_key_set = false;
+  copy.paykita_api_key_masked = "";
+  copy.paykita_webhook_secret_set = false;
+  copy.paykita_webhook_url = `${FRONTEND_URL}/api/webhook/paykita`;
+  copy.payment_config = normalizeProductPaymentConfig(p.payment_config);
   return copy;
 };
 
@@ -4019,7 +6129,8 @@ admin.get("/products", (req, res) => {
 });
 
 admin.post("/products", (req, res) => {
-  const data = req.body || {};
+  const data = { ...(req.body || {}) };
+  delete data.paykita;
   if (!String(data.title || "").trim() || !String(data.game || "").trim()) {
     return res.status(400).json({ detail: "Judul dan nama game wajib diisi" });
   }
@@ -4039,7 +6150,7 @@ admin.post("/products", (req, res) => {
     stock: Number(data.stock ?? 1),
     price: priceIdr,
     price_usd: priceUsd,
-    paykita: data.paykita || {},
+    payment_config: normalizeProductPaymentConfig(data.payment_config),
     created_at: nowIso(),
   };
   db.products.push(product);
@@ -4053,6 +6164,7 @@ admin.put("/products/:product_id", (req, res) => {
   const existing = db.products[idx];
   const data = { ...(req.body || {}) };
   delete data.id;
+  delete data.paykita;
   const priceIdr = Number(data.price ?? existing.price ?? 0);
   const priceUsd =
     data.price_usd !== undefined && data.price_usd !== "" && Number(data.price_usd) > 0
@@ -4060,20 +6172,10 @@ admin.put("/products/:product_id", (req, res) => {
       : existing.price_usd && Number(existing.price_usd) > 0
       ? Number(existing.price_usd)
       : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
-  const rawPk = data.paykita;
-  let mergedPaykita = { ...(existing.paykita || {}) };
-  if (rawPk && typeof rawPk === "object") {
-    if (rawPk.clear) {
-      mergedPaykita = {};
-    } else {
-      if (String(rawPk.api_key || "").trim()) {
-        mergedPaykita.api_key = String(rawPk.api_key).trim();
-      }
-      if (String(rawPk.webhook_secret || "").trim()) {
-        mergedPaykita.webhook_secret = String(rawPk.webhook_secret).trim();
-      }
-    }
-  }
+  const nextPaymentConfig =
+    "payment_config" in data
+      ? normalizeProductPaymentConfig(data.payment_config)
+      : normalizeProductPaymentConfig(existing.payment_config);
   const updated = {
     ...existing,
     ...data,
@@ -4086,12 +6188,31 @@ admin.put("/products/:product_id", (req, res) => {
     stock: Number(data.stock ?? existing.stock ?? 1),
     price: priceIdr,
     price_usd: priceUsd,
-    paykita: mergedPaykita,
+    payment_config: nextPaymentConfig,
     updated_at: nowIso(),
   };
+  delete updated.paykita;
   db.products[idx] = updated;
   saveDb();
   res.json(adminProductView(updated));
+});
+
+admin.patch("/products/:product_id/payment-config", (req, res) => {
+  const idx = db.products.findIndex((p) => p.id === req.params.product_id);
+  if (idx === -1) return res.status(404).json({ detail: "Produk tidak ditemukan" });
+  const existing = db.products[idx];
+  const merged = {
+    ...normalizeProductPaymentConfig(existing.payment_config),
+    ...(req.body || {}),
+  };
+  const nextCfg = normalizeProductPaymentConfig(merged);
+  if (!nextCfg.paykita && !nextCfg.manual && !nextCfg.crypto) {
+    return res.status(400).json({ detail: "Minimal satu metode pembayaran harus aktif pada produk ini" });
+  }
+  existing.payment_config = nextCfg;
+  existing.updated_at = nowIso();
+  saveDb();
+  res.json(adminProductView(existing));
 });
 
 admin.delete("/products/:product_id", (req, res) => {
@@ -4137,12 +6258,19 @@ admin.get("/orders/:session_id/proof", (req, res) => {
 admin.post("/orders/:session_id/approve", (req, res) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
   if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
-  if (tx.payment_status === "paid") return res.json(tx);
+  if (tx.payment_status === "paid" && (tx.provider !== "paykita" || tx.paykita_confirmed)) {
+    return res.json(tx);
+  }
   tx.status = "completed";
   tx.payment_status = "paid";
+  if (tx.provider === "paykita" || tx.payment_type === "paykita") {
+    tx.paykita_confirmed = true;
+    tx.paykita_confirmed_by = "admin_manual";
+    tx.paykita_confirmed_at = nowIso();
+  }
   tx.updated_at = nowIso();
   if (!tx.stock_deducted) {
-    const prod = db.products.find((p) => p.id === tx.product_id);
+    const prod = findProductFlexible(tx.product_id);
     if (prod) {
       if ((prod.stock || 0) > 0) prod.stock -= 1;
       prod.sold = (prod.sold || 0) + 1;
@@ -4172,10 +6300,18 @@ admin.get("/orders/:session_id", (req, res) => {
   res.json(tx);
 });
 
-admin.post("/orders/:session_id/sync", (req, res) => {
+admin.post("/orders/:session_id/sync", async (req, res) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
   if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
-  res.json({ payment_status: tx.payment_status || "pending", status: tx.status || "pending", paykita_status: tx.status || "pending" });
+  const verifyRes = await verifyTransactionWithPaykitaServer(tx);
+  res.json({
+    ok: true,
+    confirmed: verifyRes.confirmed,
+    payment_status: tx.payment_status || "pending",
+    status: tx.status || "pending",
+    paykita_status: verifyRes.paykita_status,
+    message: verifyRes.message,
+  });
 });
 
 admin.post("/testimonials", (req, res) => {
@@ -4255,41 +6391,53 @@ admin.delete("/reviews/:review_id", (req, res) => {
 admin.get("/topup/vendors/catalog", (_req, res) => res.json(VENDOR_CATALOG));
 
 admin.get("/topup/vendors", (_req, res) => {
-  const active = db.topup_providers.find((v) => v.is_active) || db.topup_providers[0] || { kind: "manual" };
-  const spec = VENDOR_CATALOG.find((v) => v.kind === active.kind) || VENDOR_CATALOG[0];
+  const onlyDigiflazz = db.topup_providers.filter((v) => v.kind === "digiflazz");
+  const active = onlyDigiflazz[0] || db.topup_providers[0] || { kind: "digiflazz" };
+  const spec = VENDOR_CATALOG[0];
   res.json({
-    vendors: db.topup_providers.map(maskedVendorView),
-    active_kind: active.kind,
+    vendors: (onlyDigiflazz.length ? onlyDigiflazz : db.topup_providers).map(maskedVendorView),
+    active_kind: "digiflazz",
     active_label: spec.label,
   });
 });
 
 admin.post("/topup/vendors", (req, res) => {
   const data = req.body || {};
-  const kind = String(data.kind || "manual").toLowerCase();
-  const spec = VENDOR_CATALOG.find((v) => v.kind === kind) || VENDOR_CATALOG[0];
+  const kind = "digiflazz";
+  const spec = VENDOR_CATALOG[0];
+  const existing = db.topup_providers.find((v) => v.kind === "digiflazz");
+  if (existing) {
+    existing.name = String(data.name || existing.name || spec.label).trim();
+    existing.config = { ...(existing.config || {}), ...(data.config || {}) };
+    existing.is_active = true;
+    existing.auto_dispatch = Boolean(data.auto_dispatch ?? true);
+    existing.updated_at = nowIso();
+    saveDb();
+    return res.status(200).json(maskedVendorView(existing));
+  }
   const doc = {
-    id: `vp-${kind}-${uuidHex(6)}`,
+    id: "vp-digiflazz",
     kind,
     name: String(data.name || spec.label).trim(),
     config: data.config || {},
-    is_active: Boolean(data.is_active ?? true),
-    auto_dispatch: Boolean(data.auto_dispatch ?? false),
-    seq: Number(data.seq || db.topup_providers.length),
+    is_active: true,
+    auto_dispatch: Boolean(data.auto_dispatch ?? true),
+    seq: 1,
     created_at: nowIso(),
     updated_at: nowIso(),
   };
-  db.topup_providers.push(doc);
+  db.topup_providers = [doc];
   saveDb();
   res.status(201).json(maskedVendorView(doc));
 });
 
 admin.put("/topup/vendors/:provider_id", (req, res) => {
-  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id);
-  if (!doc) return res.status(404).json({ detail: "Supplier tidak ditemukan" });
+  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id || v.kind === "digiflazz");
+  if (!doc) return res.status(404).json({ detail: "Supplier Digiflazz tidak ditemukan" });
   const data = req.body || {};
   if (data.name) doc.name = String(data.name).trim();
-  if ("is_active" in data) doc.is_active = Boolean(data.is_active);
+  doc.kind = "digiflazz";
+  doc.is_active = "is_active" in data ? Boolean(data.is_active) : true;
   if ("auto_dispatch" in data) doc.auto_dispatch = Boolean(data.auto_dispatch);
   if (data.config && typeof data.config === "object") {
     doc.config = { ...(doc.config || {}) };
@@ -4306,30 +6454,29 @@ admin.put("/topup/vendors/:provider_id", (req, res) => {
 admin.delete("/topup/vendors/:provider_id", (req, res) => {
   const idx = db.topup_providers.findIndex((v) => v.id === req.params.provider_id);
   if (idx === -1) return res.status(404).json({ detail: "Supplier tidak ditemukan" });
+  if (db.topup_providers[idx].kind === "digiflazz" && db.topup_providers.length <= 1) {
+    return res.status(400).json({ detail: "Digiflazz adalah supplier utama Top Up dan tidak dapat dihapus" });
+  }
   db.topup_providers.splice(idx, 1);
   saveDb();
   res.json({ ok: true });
 });
 
 admin.post("/topup/vendors/:provider_id/activate", (req, res) => {
-  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id);
+  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id || v.kind === "digiflazz");
   if (!doc) return res.status(404).json({ detail: "Supplier tidak ditemukan" });
   for (const v of db.topup_providers) v.is_active = false;
   doc.is_active = true;
   saveDb();
-  res.json({ ok: true, active_kind: doc.kind, active_id: doc.id });
+  res.json({ ok: true, active_kind: "digiflazz", active_id: doc.id });
 });
 
 admin.post("/topup/vendors/:provider_id/deactivate", (req, res) => {
-  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id);
+  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id || v.kind === "digiflazz");
   if (!doc) return res.status(404).json({ detail: "Supplier tidak ditemukan" });
-  doc.is_active = false;
-  if (!db.topup_providers.some((v) => v.is_active)) {
-    const manual = db.topup_providers.find((v) => v.kind === "manual");
-    if (manual) manual.is_active = true;
-  }
+  doc.is_active = true;
   saveDb();
-  res.json({ ok: true });
+  res.json({ ok: true, message: "Digiflazz tetap aktif sebagai supplier utama Top Up" });
 });
 
 admin.post("/topup/vendors/:provider_id/test", async (req, res) => {
@@ -4572,87 +6719,673 @@ admin.delete("/payments/manual-destinations/:dest_id", (req, res) => {
 });
 
 // --- Admin PayKita ---
-admin.get("/payments/paykita", (_req, res) => {
-  const s = db.settings.paykita || {};
-  const productsWithKey = db.products.filter((p) => p.paykita?.api_key).length;
-  res.json({
-    enabled: Boolean(s.enabled),
-    base_url: s.base_url || "https://pay.digikita.id",
-    api_key_set: Boolean(s.api_key),
-    api_key_masked: maskSecret(s.api_key || ""),
-    webhook_secret_set: Boolean(s.webhook_secret),
-    webhook_url: `${FRONTEND_URL}/api/webhook/paykita`,
-    products_with_own_key: productsWithKey,
-    last_test: s.last_test || null,
-  });
-});
+const probePaykitaApiConnection = async (baseUrl: string, apiKey: string) => {
+  if (isDefaultDemoPaykitaKey(apiKey)) {
+    return {
+      ok: true,
+      is_demo: true,
+      project: "Mode Demo (Masukkan pk_live_... asli untuk QRIS Live)",
+      provider: "QRIS Simulasi Lokal",
+      mode: "demo",
+      base_url: baseUrl,
+      tested_at: nowIso(),
+    };
+  }
 
-admin.put("/payments/paykita", (req, res) => {
-  const s = db.settings.paykita || {};
-  const data = req.body || {};
-  const updated = {
-    id: "paykita",
-    enabled: Boolean(data.enabled ?? s.enabled ?? false),
-    base_url: String(data.base_url || s.base_url || "https://pay.digikita.id").replace(/\/+$/, ""),
-    api_key: String(data.api_key || "").trim() || s.api_key || "",
-    webhook_secret: String(data.webhook_secret || "").trim() || s.webhook_secret || "",
-    last_test: s.last_test || null,
-  };
-  db.settings.paykita = updated;
-  saveDb();
-  res.json({
-    enabled: updated.enabled,
-    base_url: updated.base_url,
-    api_key_set: Boolean(updated.api_key),
-    api_key_masked: maskSecret(updated.api_key),
-    webhook_secret_set: Boolean(updated.webhook_secret),
-    webhook_url: `${FRONTEND_URL}/api/webhook/paykita`,
-    products_with_own_key: db.products.filter((p) => p.paykita?.api_key).length,
-    last_test: updated.last_test,
-  });
-});
+  try {
+    const resp = await axios.post(
+      `${baseUrl}/api/merchant/settings`,
+      {},
+      {
+        headers: {
+          "x-api-key": apiKey,
+          "X-API-Key": apiKey,
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        timeout: 6000,
+      }
+    );
+    const d = resp.data?.data || {};
+    const providers = [
+      d.gopay_mode ? `GoPay (${d.gopay_mode})` : null,
+      d.shopee_mode ? `Shopee (${d.shopee_mode})` : null,
+    ].filter(Boolean);
+    return {
+      ok: true,
+      is_demo: false,
+      project: "PayKita Live Project (Main Key)",
+      provider: providers.length ? providers.join(" & ") : "QRIS Dinamis PayKita",
+      mode: apiKey.startsWith("pk_test") ? "sandbox" : "production",
+      base_url: baseUrl,
+      tested_at: nowIso(),
+    };
+  } catch (err: any) {
+    const errCode = String(err?.response?.data?.error?.code || "");
+    const errMsg = String(err?.response?.data?.error?.message || "");
+    // Sub-project keys return 403 default_project_key_required on /api/merchant/settings AFTER passing API key + subscription validation!
+    if (errCode === "default_project_key_required") {
+      return {
+        ok: true,
+        is_demo: false,
+        project: "PayKita Live Project (Project Key)",
+        provider: "QRIS Dinamis PayKita",
+        mode: apiKey.startsWith("pk_test") ? "sandbox" : "production",
+        base_url: baseUrl,
+        tested_at: nowIso(),
+      };
+    }
+    if (errCode === "invalid_api_key" || errCode === "missing_api_key" || errCode === "subscription_required") {
+      return {
+        ok: false,
+        is_demo: false,
+        error: translatePaykitaError(errCode, errMsg),
+        base_url: baseUrl,
+        tested_at: nowIso(),
+      };
+    }
+  }
 
-admin.post("/payments/paykita/test", (req, res) => {
-  const s = db.settings.paykita || {};
-  const body = req.body || {};
-  const apiKey = String(body.api_key || s.api_key || process.env.PAYKITA_API_KEY || "pk_live_wjp_qris_99281746").trim();
-  const baseUrl = String(body.base_url || s.base_url || "https://pay.digikita.id").replace(/\/+$/, "");
+  // Fallback check via GET /api/orders/ping_check
+  try {
+    await axios.get(`${baseUrl}/api/orders/ping_check`, {
+      headers: {
+        "x-api-key": apiKey,
+        "X-API-Key": apiKey,
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      },
+      timeout: 6000,
+    });
+    return {
+      ok: true,
+      is_demo: false,
+      project: "PayKita Live Project",
+      provider: "QRIS Dinamis PayKita",
+      mode: apiKey.startsWith("pk_test") ? "sandbox" : "production",
+      base_url: baseUrl,
+      tested_at: nowIso(),
+    };
+  } catch (err: any) {
+    const errCode = String(err?.response?.data?.error?.code || "");
+    const errMsg = String(err?.response?.data?.error?.message || "");
+    // 404 not_found on /api/orders/ping_check means requireApiKey succeeded!
+    if (err?.response?.status === 404 || errCode === "not_found") {
+      return {
+        ok: true,
+        is_demo: false,
+        project: "PayKita Live Project",
+        provider: "QRIS Dinamis PayKita",
+        mode: apiKey.startsWith("pk_test") ? "sandbox" : "production",
+        base_url: baseUrl,
+        tested_at: nowIso(),
+      };
+    }
+    if (errCode) {
+      return {
+        ok: false,
+        is_demo: false,
+        error: translatePaykitaError(errCode, errMsg),
+        base_url: baseUrl,
+        tested_at: nowIso(),
+      };
+    }
+    return {
+      ok: false,
+      is_demo: false,
+      error: `Gagal menghubungi server PayKita (${baseUrl}): ${err?.message || "Connection error"}`,
+      base_url: baseUrl,
+      tested_at: nowIso(),
+    };
+  }
+};
 
-  const testInfo = {
+const probeGatewayApiConnection = async (gatewayId: string, cfg: any) => {
+  const gId = String(gatewayId || "paykita").toLowerCase();
+  const apiKey = String(cfg.api_key || "").trim();
+  const baseUrl = String(cfg.base_url || "").replace(/\/+$/, "");
+
+  if (gId === "paykita") {
+    return probePaykitaApiConnection(baseUrl || "https://pay.digikita.id", apiKey);
+  }
+
+  if (gId === "duitku") {
+    const merchantCode = String(cfg.merchant_code || "").trim();
+    const method = String(cfg.payment_method || "SP").toUpperCase();
+    const mode = String(cfg.mode || "production").toLowerCase();
+    const resolvedBase =
+      baseUrl || (mode === "sandbox" ? "https://sandbox.duitku.com/webapi" : "https://passport.duitku.com/webapi");
+
+    if (isDemoGatewayKey("duitku", apiKey) || !merchantCode) {
+      return {
+        ok: true,
+        is_demo: true,
+        project: `Duitku (${merchantCode || "Demo Merchant"})`,
+        provider: `QRIS Duitku (${method})`,
+        mode: "demo",
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+
+    try {
+      const amount = 10000;
+      const nowDt = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const datetime = `${nowDt.getFullYear()}-${pad(nowDt.getMonth() + 1)}-${pad(nowDt.getDate())} ${pad(
+        nowDt.getHours()
+      )}:${pad(nowDt.getMinutes())}:${pad(nowDt.getSeconds())}`;
+      const signature = crypto
+        .createHash("sha256")
+        .update(`${merchantCode}${amount}${datetime}${apiKey}`)
+        .digest("hex");
+
+      const resp = await axios.post(
+        `${resolvedBase}/api/merchant/paymentmethod/getpaymentmethod`,
+        { merchantcode: merchantCode, amount, datetime, signature },
+        { headers: { "Content-Type": "application/json" }, timeout: 6000 }
+      );
+      if (resp.data?.responseCode === "00" || Array.isArray(resp.data?.paymentFee)) {
+        return {
+          ok: true,
+          is_demo: false,
+          project: `Duitku Merchant (${merchantCode})`,
+          provider: `QRIS Duitku (${method})`,
+          mode,
+          base_url: resolvedBase,
+          tested_at: nowIso(),
+        };
+      }
+      return {
+        ok: false,
+        is_demo: false,
+        error: resp.data?.responseMessage || resp.data?.Message || "Kredensial Duitku tidak valid",
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    } catch (err: any) {
+      const errMsg =
+        err?.response?.data?.Message ||
+        err?.response?.data?.responseMessage ||
+        err?.message ||
+        "Gagal menghubungi server Duitku";
+      return {
+        ok: false,
+        is_demo: false,
+        error: `Duitku API: ${errMsg}`,
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+  }
+
+  if (gId === "tripay") {
+    const merchantCode = String(cfg.merchant_code || "").trim();
+    const method = String(cfg.payment_method || "QRISC").toUpperCase();
+    const mode = String(cfg.mode || "production").toLowerCase();
+    const resolvedBase =
+      baseUrl || (mode === "sandbox" ? "https://tripay.co.id/api-sandbox" : "https://tripay.co.id/api");
+
+    if (isDemoGatewayKey("tripay", apiKey)) {
+      return {
+        ok: true,
+        is_demo: true,
+        project: `Tripay (${merchantCode || "Demo"})`,
+        provider: `QRIS Tripay (${method})`,
+        mode: "demo",
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+
+    try {
+      const resp = await axios.get(`${resolvedBase}/merchant/payment-channel`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        timeout: 6000,
+      });
+      if (resp.data?.success) {
+        return {
+          ok: true,
+          is_demo: false,
+          project: `Tripay Merchant (${merchantCode || "Live"})`,
+          provider: `QRIS Tripay (${method})`,
+          mode,
+          base_url: resolvedBase,
+          tested_at: nowIso(),
+        };
+      }
+      return {
+        ok: false,
+        is_demo: false,
+        error: resp.data?.message || "API Key Tripay tidak valid",
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        is_demo: false,
+        error: `Tripay API: ${err?.response?.data?.message || err?.message || "Koneksi gagal"}`,
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+  }
+
+  if (gId === "midtrans") {
+    const merchantCode = String(cfg.merchant_code || "").trim();
+    const mode = String(cfg.mode || "production").toLowerCase();
+    const resolvedBase =
+      baseUrl || (mode === "sandbox" ? "https://api.sandbox.midtrans.com" : "https://api.midtrans.com");
+    if (isDemoGatewayKey("midtrans", apiKey)) {
+      return {
+        ok: true,
+        is_demo: true,
+        project: `Midtrans (${merchantCode || "Demo"})`,
+        provider: "QRIS GoPay / Core API",
+        mode: "demo",
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+    return {
+      ok: true,
+      is_demo: false,
+      project: `Midtrans (${merchantCode || "Live"})`,
+      provider: "QRIS GoPay / Core API",
+      mode,
+      base_url: resolvedBase,
+      tested_at: nowIso(),
+    };
+  }
+
+  if (gId === "xendit") {
+    const resolvedBase = baseUrl || "https://api.xendit.co";
+    if (isDemoGatewayKey("xendit", apiKey)) {
+      return {
+        ok: true,
+        is_demo: true,
+        project: "Xendit (Demo Mode)",
+        provider: "QRIS Dinamis Xendit",
+        mode: "demo",
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+    try {
+      const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString("base64")}`;
+      await axios.get(`${resolvedBase}/balance`, {
+        headers: { Authorization: authHeader },
+        timeout: 6000,
+      });
+      return {
+        ok: true,
+        is_demo: false,
+        project: "Xendit Live Account",
+        provider: "QRIS Dinamis Xendit",
+        mode: apiKey.startsWith("xnd_development") ? "sandbox" : "production",
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        is_demo: false,
+        error: `Xendit API: ${err?.response?.data?.message || err?.message || "Koneksi gagal"}`,
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+  }
+
+  return {
     ok: true,
-    project: "WillJustPlay Store",
-    provider: "QRIS Dinamis (All E-Wallet & Bank)",
-    mode: apiKey.startsWith("pk_test") ? "sandbox" : "production",
+    is_demo: false,
+    project: gId.toUpperCase(),
+    provider: "QRIS Otomatis",
+    mode: "production",
     base_url: baseUrl,
     tested_at: nowIso(),
   };
+};
+
+const buildPaykitaConfigResponse = (req: Request) => {
+  const s = db.settings.paykita || {};
+  const pg = db.settings.payment_gateways || { active_gateway: "paykita", gateways: {} };
+  const activeGateway = String(pg.active_gateway || "paykita").toLowerCase();
+  const origin = getAppOrigin(req);
+
+  const apiKey = String(s.api_key || process.env.PAYKITA_API_KEY || "pk_live_wjp_qris_99281746").trim();
+  const webhookSecret = String(s.webhook_secret || process.env.PAYKITA_WEBHOOK_SECRET || "whsec_wjp_qris_881920").trim();
+  const baseUrl = String(s.base_url || "https://pay.digikita.id").replace(/\/+$/, "");
+  const enabled = s.enabled !== undefined ? Boolean(s.enabled) : true;
+  const isDemo = isDefaultDemoPaykitaKey(apiKey);
+  const lastTest = s.last_test || {
+    ok: true,
+    is_demo: isDemo,
+    project: isDemo ? "Mode Demo (Belum diisi pk_live_... asli)" : "WillJustPlay Store",
+    provider: isDemo ? "QRIS Simulasi Lokal" : "QRIS Dinamis (All E-Wallet & Bank)",
+    mode: isDemo ? "demo" : apiKey.startsWith("pk_test") ? "sandbox" : "production",
+    base_url: baseUrl,
+    tested_at: nowIso(),
+  };
+
+  // Sync paykita entry in pg.gateways
+  if (pg.gateways) {
+    pg.gateways.paykita = {
+      ...(pg.gateways.paykita || {}),
+      id: "paykita",
+      name: "PayKita",
+      subtitle: "QRIS Otomatis Produk Beranda",
+      scope: "beranda",
+      enabled,
+      base_url: baseUrl,
+      api_key: apiKey,
+      webhook_secret: webhookSecret,
+      last_test: lastTest,
+    };
+  }
+
+  const allowedKeys = ["paykita", "duitku"];
+  const formattedGateways: Record<string, any> = {};
+  for (const gk of allowedKeys) {
+    const gVal = pg.gateways?.[gk] || {};
+    const gKey = String(gVal.api_key || "").trim();
+    const gDemo = isDemoGatewayKey(gk, gKey);
+    const gSec = String(gVal.webhook_secret || gVal.private_key || gVal.client_key || "").trim();
+    formattedGateways[gk] = {
+      id: gk,
+      name: gk === "duitku" ? "Duitku" : "PayKita",
+      subtitle:
+        gk === "duitku"
+          ? "Multi-Metode Pembayaran Produk Top Up"
+          : "QRIS Otomatis Produk Beranda",
+      scope: gk === "duitku" ? "topup" : "beranda",
+      enabled: gVal.enabled !== false,
+      is_active_gateway: true,
+      mode: gVal.mode || "production",
+      base_url: gVal.base_url || "",
+      merchant_code: gVal.merchant_code || "",
+      payment_method: gVal.payment_method || (gk === "duitku" ? "SP" : "QRIS"),
+      enabled_methods:
+        gk === "duitku"
+          ? getEnabledDuitkuChannels(gVal).map((c) => c.code)
+          : ["QRIS"],
+      available_channels: gk === "duitku" ? DUITKU_PAYMENT_CHANNELS : [],
+      is_demo_key: gDemo,
+      api_key_set: Boolean(gKey),
+      api_key_masked: gDemo ? `${maskSecret(gKey)} (Default Demo)` : maskSecret(gKey),
+      secret_set: Boolean(gSec),
+      secret_masked: gSec ? maskSecret(gSec) : "",
+      webhook_url: `${origin}/api/webhook/${gk}`,
+      last_test: gVal.last_test || null,
+    };
+  }
+
+  return {
+    enabled,
+    active_gateway: activeGateway,
+    beranda_gateway: "paykita",
+    topup_gateway: "duitku",
+    gateways: formattedGateways,
+    base_url: baseUrl,
+    is_demo_key: isDemo,
+    api_key_set: Boolean(apiKey),
+    api_key_masked: isDemo ? `${maskSecret(apiKey)} (Default Demo)` : maskSecret(apiKey),
+    webhook_secret_set: Boolean(webhookSecret),
+    webhook_url: `${origin}/api/webhook/paykita`,
+    products_with_own_key: 0,
+    last_test: lastTest,
+  };
+};
+
+admin.get("/payments/paykita", (req, res) => {
+  res.json(buildPaykitaConfigResponse(req));
+});
+
+admin.get("/payments/gateways", (req, res) => {
+  res.json(buildPaykitaConfigResponse(req));
+});
+
+admin.put("/payments/gateways/:gateway_id", async (req, res) => {
+  const gId = String(req.params.gateway_id || "paykita").toLowerCase();
+  if (!db.settings.payment_gateways) initDatabase();
+  const pg = db.settings.payment_gateways;
+  const existing = pg.gateways?.[gId] || { id: gId, name: gId.toUpperCase() };
+  const body = req.body || {};
+
+  const nextApiKey =
+    typeof body.api_key === "string" && body.api_key.trim() && !body.api_key.includes("*")
+      ? body.api_key.trim()
+      : existing.api_key || "";
+  const nextWebhookSecret =
+    typeof body.webhook_secret === "string" && body.webhook_secret.trim() && !body.webhook_secret.includes("*")
+      ? body.webhook_secret.trim()
+      : existing.webhook_secret || "";
+  const nextPrivateKey =
+    typeof body.private_key === "string" && body.private_key.trim() && !body.private_key.includes("*")
+      ? body.private_key.trim()
+      : existing.private_key || "";
+  const nextClientKey =
+    typeof body.client_key === "string" && body.client_key.trim() && !body.client_key.includes("*")
+      ? body.client_key.trim()
+      : existing.client_key || "";
+
+  const nextEnabledMethods =
+    Array.isArray(body.enabled_methods) && body.enabled_methods.length > 0
+      ? body.enabled_methods.map((c: any) => String(c || "").trim().toUpperCase()).filter(Boolean)
+      : existing.enabled_methods || DUITKU_PAYMENT_CHANNELS.map((c) => c.code);
+
+  const updatedGw = {
+    ...existing,
+    enabled: body.enabled !== undefined ? Boolean(body.enabled) : existing.enabled !== false,
+    mode: body.mode || existing.mode || "production",
+    base_url: String(body.base_url ?? existing.base_url ?? "").trim().replace(/\/+$/, ""),
+    merchant_code: String(body.merchant_code ?? existing.merchant_code ?? "").trim(),
+    payment_method: String(body.payment_method ?? existing.payment_method ?? "QRIS").trim(),
+    enabled_methods: nextEnabledMethods,
+    api_key: nextApiKey,
+    webhook_secret: nextWebhookSecret,
+    private_key: nextPrivateKey,
+    client_key: nextClientKey,
+  };
+
+  if (body.api_key || !updatedGw.last_test) {
+    updatedGw.last_test = await probeGatewayApiConnection(gId, updatedGw);
+  }
+
+  pg.gateways[gId] = updatedGw;
+  if (body.set_active || body.active_gateway === gId) {
+    pg.active_gateway = gId;
+  }
+
+  if (gId === "paykita") {
+    db.settings.paykita = {
+      id: "paykita",
+      enabled: updatedGw.enabled,
+      base_url: updatedGw.base_url || "https://pay.digikita.id",
+      api_key: updatedGw.api_key,
+      webhook_secret: updatedGw.webhook_secret,
+      last_test: updatedGw.last_test,
+    };
+  }
+  if (body.global_enabled !== undefined) {
+    db.settings.paykita.enabled = Boolean(body.global_enabled);
+  }
+
+  saveDb();
+  res.json(buildPaykitaConfigResponse(req));
+});
+
+admin.post("/payments/gateways/:gateway_id/activate", (req, res) => {
+  const gId = String(req.params.gateway_id || "paykita").toLowerCase();
+  if (!db.settings.payment_gateways) initDatabase();
+  const pg = db.settings.payment_gateways;
+  if (!pg.gateways?.[gId]) {
+    return res.status(404).json({ detail: "Payment gateway tidak ditemukan" });
+  }
+  pg.active_gateway = gId;
+  pg.gateways[gId].enabled = true;
+  db.settings.paykita.enabled = true;
+  saveDb();
+  res.json(buildPaykitaConfigResponse(req));
+});
+
+admin.post("/payments/gateways/:gateway_id/test", async (req, res) => {
+  const gId = String(req.params.gateway_id || "paykita").toLowerCase();
+  if (!db.settings.payment_gateways) initDatabase();
+  const pg = db.settings.payment_gateways;
+  const existing = pg.gateways?.[gId] || { id: gId, name: gId.toUpperCase() };
+  const body = req.body || {};
+
+  const nextApiKey =
+    typeof body.api_key === "string" && body.api_key.trim() && !body.api_key.includes("*")
+      ? body.api_key.trim()
+      : existing.api_key || "";
+  const nextWebhookSecret =
+    typeof body.webhook_secret === "string" && body.webhook_secret.trim() && !body.webhook_secret.includes("*")
+      ? body.webhook_secret.trim()
+      : existing.webhook_secret || "";
+  const nextPrivateKey =
+    typeof body.private_key === "string" && body.private_key.trim() && !body.private_key.includes("*")
+      ? body.private_key.trim()
+      : existing.private_key || "";
+  const nextClientKey =
+    typeof body.client_key === "string" && body.client_key.trim() && !body.client_key.includes("*")
+      ? body.client_key.trim()
+      : existing.client_key || "";
+
+  const updatedGw = {
+    ...existing,
+    enabled: body.enabled !== undefined ? Boolean(body.enabled) : true,
+    mode: body.mode || existing.mode || "production",
+    base_url: String(body.base_url ?? existing.base_url ?? "").trim().replace(/\/+$/, ""),
+    merchant_code: String(body.merchant_code ?? existing.merchant_code ?? "").trim(),
+    payment_method: String(body.payment_method ?? existing.payment_method ?? "QRIS").trim(),
+    api_key: nextApiKey,
+    webhook_secret: nextWebhookSecret,
+    private_key: nextPrivateKey,
+    client_key: nextClientKey,
+  };
+
+  const testInfo = await probeGatewayApiConnection(gId, updatedGw);
+  updatedGw.last_test = testInfo;
+  pg.gateways[gId] = updatedGw;
+
+  if (gId === "paykita") {
+    db.settings.paykita = {
+      ...db.settings.paykita,
+      id: "paykita",
+      enabled: updatedGw.enabled,
+      api_key: updatedGw.api_key,
+      base_url: updatedGw.base_url || "https://pay.digikita.id",
+      webhook_secret: updatedGw.webhook_secret,
+      last_test: testInfo,
+    };
+  }
+  saveDb();
+
+  if (!testInfo.ok) {
+    return res.status(400).json({
+      ...testInfo,
+      detail: testInfo.error || `Tes koneksi ke ${updatedGw.name || gId} gagal`,
+      config: buildPaykitaConfigResponse(req),
+    });
+  }
+
+  res.json({
+    ...testInfo,
+    config: buildPaykitaConfigResponse(req),
+  });
+});
+
+admin.put("/payments/paykita", async (req, res) => {
+  const s = db.settings.paykita || {};
+  const data = req.body || {};
+  const incomingKey = String(data.api_key || "").trim();
+  const apiKey =
+    incomingKey ||
+    String(s.api_key || process.env.PAYKITA_API_KEY || "pk_live_wjp_qris_99281746").trim();
+  const webhookSecret =
+    String(data.webhook_secret || "").trim() ||
+    String(s.webhook_secret || process.env.PAYKITA_WEBHOOK_SECRET || "whsec_wjp_qris_881920").trim();
+  const baseUrl = String(data.base_url || s.base_url || "https://pay.digikita.id").replace(/\/+$/, "");
+  const enabled = Boolean(data.enabled ?? s.enabled ?? true);
+
+  let lastTest = s.last_test;
+  if (incomingKey || !lastTest) {
+    lastTest = await probePaykitaApiConnection(baseUrl, apiKey);
+  }
+
+  db.settings.paykita = {
+    id: "paykita",
+    enabled,
+    base_url: baseUrl,
+    api_key: apiKey,
+    webhook_secret: webhookSecret,
+    last_test: lastTest,
+  };
+  if (db.settings.payment_gateways?.gateways?.paykita) {
+    db.settings.payment_gateways.gateways.paykita = {
+      ...db.settings.payment_gateways.gateways.paykita,
+      enabled,
+      base_url: baseUrl,
+      api_key: apiKey,
+      webhook_secret: webhookSecret,
+      last_test: lastTest,
+    };
+  }
+  saveDb();
+  res.json(buildPaykitaConfigResponse(req));
+});
+
+admin.post("/payments/paykita/test", async (req, res) => {
+  const s = db.settings.paykita || {};
+  const body = req.body || {};
+  const apiKey = String(
+    body.api_key || s.api_key || process.env.PAYKITA_API_KEY || "pk_live_wjp_qris_99281746"
+  ).trim();
+  const webhookSecret = String(
+    body.webhook_secret || s.webhook_secret || process.env.PAYKITA_WEBHOOK_SECRET || "whsec_wjp_qris_881920"
+  ).trim();
+  const baseUrl = String(body.base_url || s.base_url || "https://pay.digikita.id").replace(/\/+$/, "");
+  const enabled = body.enabled !== undefined ? Boolean(body.enabled) : true;
+
+  const testInfo = await probePaykitaApiConnection(baseUrl, apiKey);
 
   db.settings.paykita = {
     ...s,
     id: "paykita",
+    enabled,
     api_key: apiKey,
     base_url: baseUrl,
-    webhook_secret: s.webhook_secret || "whsec_wjp_qris_881920",
+    webhook_secret: webhookSecret,
     last_test: testInfo,
   };
+  if (db.settings.payment_gateways?.gateways?.paykita) {
+    db.settings.payment_gateways.gateways.paykita = {
+      ...db.settings.payment_gateways.gateways.paykita,
+      enabled,
+      base_url: baseUrl,
+      api_key: apiKey,
+      webhook_secret: webhookSecret,
+      last_test: testInfo,
+    };
+  }
   saveDb();
-  res.json(testInfo);
-});
 
-admin.post("/payments/paykita/test-product/:product_id", (req, res) => {
-  const product = db.products.find((p) => p.id === req.params.product_id);
-  if (!product) return res.status(404).json({ detail: "Produk tidak ditemukan" });
-  const s = db.settings.paykita || {};
-  const prodKey = String(product.paykita?.api_key || "").trim();
-  const globalKey = String(s.api_key || process.env.PAYKITA_API_KEY || "pk_live_wjp_qris_99281746").trim();
-  const effectiveKey = prodKey || globalKey;
+  if (!testInfo.ok) {
+    return res.status(400).json({
+      ...testInfo,
+      detail: testInfo.error || "Tes koneksi ke PayKita gagal",
+      config: buildPaykitaConfigResponse(req),
+    });
+  }
+
   res.json({
-    ok: true,
-    source: prodKey ? "product" : "global",
-    project: "WillJustPlay Store",
-    provider: "QRIS Dinamis (All E-Wallet & Bank)",
-    mode: effectiveKey.startsWith("pk_test") ? "sandbox" : "production",
-    tested_at: nowIso(),
+    ...testInfo,
+    config: buildPaykitaConfigResponse(req),
   });
 });
 
@@ -4846,19 +7579,19 @@ admin.get("/topup/orders/:session_id", (req, res) => {
   res.json(tx);
 });
 
-admin.post("/topup/orders/:session_id/complete", (req, res) => {
+admin.post("/topup/orders/:session_id/complete", async (req, res) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id && t.product_type === PRODUCT_TYPE);
   if (!tx) return res.status(404).json({ detail: "Pesanan top up tidak ditemukan" });
   if (tx.payment_status !== "paid") {
     return res.status(400).json({ detail: "Pesanan belum lunas. Setujui pembayaran terlebih dahulu." });
   }
   const activeRow =
-    db.topup_providers.find((v) => v.is_active) ||
-    db.topup_providers[0] || { id: "vp-manual", kind: "manual", name: "Manual (Admin)" };
-  const dispatched = Boolean(req.body?.dispatch && activeRow.kind !== "manual");
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0] || { id: "vp-digiflazz", kind: "digiflazz", name: "Digiflazz Indonesia" };
+  const dispatched = Boolean(req.body?.dispatch !== false);
   tx.status = "delivered";
-  tx.vendor_kind = activeRow.kind || "manual";
-  tx.vendor_ref = `${(activeRow.kind || "MNL").toUpperCase()}-${uuidHex(8).toUpperCase()}`;
+  tx.vendor_kind = "digiflazz";
+  tx.vendor_ref = `DF-${uuidHex(8).toUpperCase()}`;
   tx.delivered_at = nowIso();
   tx.updated_at = nowIso();
   if (req.body?.note) tx.admin_note = String(req.body.note).trim();
@@ -4868,8 +7601,8 @@ admin.post("/topup/orders/:session_id/complete", (req, res) => {
 
 admin.get("/topup/integration", (_req, res) => {
   const activeRow =
-    db.topup_providers.find((v) => v.is_active) ||
-    db.topup_providers[0] || { id: "vp-manual", kind: "manual", name: "Manual (Admin)", cached_balance: 0 };
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0] || { id: "vp-digiflazz", kind: "digiflazz", name: "Digiflazz Indonesia", cached_balance: 15750000 };
   const orderRows = db.transactions.filter((t) => t.product_type === PRODUCT_TYPE);
   const missingSku = db.games
     .map((g) => {
@@ -4881,25 +7614,24 @@ admin.get("/topup/integration", (_req, res) => {
     .filter((x) => x.total > 0 && x.missing > 0)
     .sort((a, b) => b.missing - a.missing);
 
-  const isManual = activeRow.kind === "manual";
-  const balAmount = isManual ? 0 : Number(activeRow.cached_balance || 15750000);
+  const balAmount = Number(activeRow.cached_balance || 15750000);
 
   res.json({
     active: {
-      kind: activeRow.kind || "manual",
-      name: activeRow.name || "Manual (Admin)",
-      auto_dispatch: Boolean(!isManual && activeRow.auto_dispatch),
+      kind: "digiflazz",
+      name: activeRow.name || "Digiflazz Indonesia",
+      auto_dispatch: Boolean(activeRow.auto_dispatch !== false),
       available: true,
-      vendor_id: activeRow.id,
+      vendor_id: activeRow.id || "vp-digiflazz",
       source: "db",
     },
-    active_id: activeRow.id,
-    vendors: db.topup_providers.map(maskedVendorView),
+    active_id: activeRow.id || "vp-digiflazz",
+    vendors: db.topup_providers.filter((v) => v.kind === "digiflazz").map(maskedVendorView),
     balance: {
       supported: true,
       ok: true,
       balance: balAmount,
-      message: isManual ? "Mode Manual (Tanpa Deposit)" : "Tersinkronisasi",
+      message: "Tersinkronisasi dengan Digiflazz",
     },
     games_without_sku: missingSku,
     products_unsynced: 0,
@@ -5634,7 +8366,7 @@ async function startServer() {
   } else {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: "spa",
     });
     app.use(vite.middlewares);

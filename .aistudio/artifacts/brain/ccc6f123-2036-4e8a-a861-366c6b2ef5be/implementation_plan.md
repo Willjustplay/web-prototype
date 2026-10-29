@@ -1,51 +1,52 @@
-# Rencana Implementasi: Sistem Verifikasi Email, Reset Password, & Manajemen Pengguna Admin
+# Rencana Desain Ulang Checkout Produk Beranda (Clean, Dinamis & Simpel)
 
-## 1. Ringkasan Eksekutif
-Mengaktifkan alur autentikasi berbasis verifikasi tautan email wajib sebelum pengguna dapat masuk ke aplikasi **TanyaHukum**, melengkapi alur lupa dan reset kata sandi berbasis token aman (SHA-256), menyediakan pengiriman email melalui **Resend API** dengan fallback pratinjau tautan instan saat mode pengembangan (ketika `RESEND_API_KEY` belum diatur), mendukung penyimpanan persisten lokal (JSON/file) sekaligus koneksi **MongoDB** jika `MONGODB_URI` dikonfigurasi, serta menambahkan tab **Manajemen User** dan **Audit Log** langsung di halaman Panel Admin (`/admin`).
-
----
-
-## 2. Arsitektur & Penyimpanan Data (`server.ts` & Modul Database)
-- **Dual-Mode Persistence (Penyimpanan Lokal + MongoDB Opsional)**:
-  - Menyediakan lapisan abstraksi penyimpanan untuk `users`, `sessions`, `auth_tokens`, `audit_logs`, dan `rule_overrides`.
-  - Secara otomatis menyimpan perubahan ke file JSON lokal di server agar data pengguna, status verifikasi, token, dan log audit tetap bertahan meskipun server dimuat ulang, serta otomatis terhubung ke **MongoDB** apabila `MONGODB_URI` tersedia di environment.
-- **Koleksi / Tabel Data**:
-  - `users`: Menyimpan `id`, `name`, `email`, `password_hash`, `role` (`user` | `admin`), `is_verified` (`boolean`), `verified_at`, `created_at`, `updated_at`, dan `last_login_at`. Akun demo yang sudah ada (`admin@tanyahukum.id`, `budi@email.com`) tetap berstatus terverifikasi (`is_verified: true`).
-  - `auth_tokens`: Menyimpan `id`, `user_id`, `email`, `type` (`verify_email` | `reset_password`), `token_hash` (SHA-256 dari raw token 32-byte), `expires_at`, `used_at`, dan `created_at`.
-  - `audit_logs`: Menyimpan `id`, `actor_user_id`, `actor_email`, `action` (mis. `AUTH_REGISTER`, `AUTH_VERIFY_EMAIL`, `AUTH_LOGIN`, `AUTH_PASSWORD_RESET`, `ADMIN_USER_VERIFY`, `ADMIN_USER_ROLE`, `ADMIN_USER_DELETE`), `target_type`, `target_id`, `metadata`, `ip`, dan `created_at`.
+## 1. Tujuan & Gambaran Umum
+Merapikan dan menyederhanakan alur pembelian **Produk Beranda** secara menyeluruh — mulai dari **Modal Detail & Checkout Cepat (`src/components/ProductModal.jsx`)** hingga **Halaman Instruksi & Konfirmasi Pembayaran (`src/pages/PaymentSuccess.jsx`)** — agar terasa jauh lebih bersih (*clean*), responsif/dinamis, minim langkah, dan sangat mudah dipahami oleh pembeli.
 
 ---
 
-## 3. Alur Autentikasi, Verifikasi Email & Reset Password
-- **Registrasi (`POST /api/auth/register`)**:
-  - Pengguna baru dibuat dengan `is_verified: false` (tidak langsung login).
-  - Menghasilkan token verifikasi 32-byte acak, menyimpan hash SHA-256 ke `auth_tokens` (berlaku 24 jam), dan mengirim email verifikasi berisi tautan `/verify-email?token=...`.
-  - Mengembalikan respons `{ message, email_verification_sent: true, dev_preview_url? }` sehingga `AuthModal` otomatis menampilkan layar instruksi cek email dan pratinjau tautan langsung jika berada di mode pengembangan tanpa `RESEND_API_KEY`.
-- **Verifikasi Email (`GET /api/auth/verify-email` & `POST /api/auth/resend-verification`)**:
-  - Memvalidasi hash token, memastikan belum kedaluwarsa dan belum terpakai, lalu mengubah `user.is_verified = true` serta `verified_at = now`.
-  - Mendukung pengiriman ulang tautan verifikasi dengan pembatasan jeda (cooldown) dan pencatatan di `audit_logs`.
-- **Login Wajib Verifikasi (`POST /api/auth/login`)**:
-  - Memeriksa kecocokan email dan kata sandi.
-  - Jika `user.is_verified === false`, mengembalikan HTTP `403` dengan `{ detail: "Email belum diverifikasi. Silakan cek kotak masuk email Anda.", code: "EMAIL_NOT_VERIFIED", email }` agar `AuthModal` langsung membuka panel kirim ulang verifikasi.
-- **Lupa & Reset Kata Sandi (`POST /api/auth/forgot-password` & `POST /api/auth/reset-password`)**:
-  - `forgot-password`: Membuat token reset password (berlaku 1 jam), mengirim tautan `/reset-password?token=...` via Resend API (atau menyertakan `dev_preview_url` di mode dev), dan mencatat log audit.
-  - `reset-password`: Memvalidasi token, memperbarui `password_hash`, menandai token telah digunakan, mencabut seluruh sesi lama pengguna tersebut demi keamanan, dan menandai email sebagai terverifikasi jika sebelumnya belum.
+## 2. Pengalaman Pengguna & Perombakan Antarmuka (UX & UI)
+
+### A. Modal Detail & Checkout Produk Beranda (`src/components/ProductModal.jsx`)
+1. **Tata Letak Satu Tampilan Ringkas (*Contiguous Purchase Module*)**:
+   - **Kolom Kiri (Media & Spesifikasi Inti)**: Galeri foto produk berasio proporsional dengan navigasi *swipe* & *thumbnail* yang bersih, diikuti baris informasi spesifikasi inti (Rank/Tier, Stok, Garansi) dengan pemisah garis tipis (*hairline divider*) tanpa tumpukan kotak di dalam kotak (*no cards-within-cards*).
+   - **Kolom Kanan (Info Produk & Checkout Langsung)**:
+     - Header produk yang bersih menampilkan kategori, status ketersediaan, judul produk, dan harga utama (`IDR` & ekuivalen `USD` untuk opsi Crypto) dalam format *tabular numerals* yang tegas.
+     - Deskripsi produk ringkas yang dapat dibuka/tutup (*collapsible*) dengan transisi halus tanpa memakan ruang vertikal berlebih.
+2. **Input Kontak Pembeli Pintar (1 Kolom Utama + Auto-Fill)**:
+   - Mengganti dua kolom input yang padat menjadi **satu input kontak pintar** (*No. WhatsApp atau Email Aktif*) yang otomatis terisi (*auto-filled*) jika pengguna sudah login (`user.email`).
+   - Dilengkapi tombol opsional *"+ Tambah WhatsApp / Email cadangan"* jika pembeli ingin menyertakan keduanya, atau deteksi otomatis apakah input berupa nomor WhatsApp (`08...` / `+62...`) atau alamat email, sehingga pembeli cukup mengetik satu kontak saja untuk langsung lanjut bayar.
+3. **Pemilih Metode Pembayaran yang Jelas & Dinamis**:
+   - Menyajikan pilihan metode pembayaran produk beranda (**QRIS Otomatis PayKita**, **Transfer / QRIS Manual**, dan **Crypto USD**) menggunakan kontrol tab/kartu bersih yang langsung menampilkan ringkasan instruksi singkat:
+     - **QRIS Otomatis (PayKita)**: Menampilkan indikator proses instan satu klik tanpa perlu memilih sub-rekening.
+     - **Transfer / QRIS Manual**: Menampilkan daftar tujuan bank/e-wallet/QRIS dalam bentuk kartu pilihan bersih yang mudah diklik.
+     - **Crypto (USDT/Coin)**: Menampilkan nominal USD otomatis beserta pilihan jaringan (*network*) yang rapi.
+4. **Ringkasan Total & Tombol CTA Utama (*Sticky Action Bar*)**:
+   - Baris tombol aksi utama yang selalu mudah dijangkau di bagian bawah modal, menampilkan nominal yang harus dibayar secara dinamis sesuai metode yang dipilih serta tombol tanya CS via WhatsApp yang proporsional.
+
+### B. Halaman Instruksi & Status Pembayaran (`src/pages/PaymentSuccess.jsx`)
+1. **Hierarki Informasi Pembayaran yang Bersih & Fokus**:
+   - Menghilangkan elemen dekoratif yang ramai dan menyatukan kartu pembayaran ke dalam satu kontainer fokus dengan *progress step* yang jelas: **1. Selesaikan Pembayaran → 2. Verifikasi → 3. Pesanan Selesai**.
+   - Ringkasan pesanan ringkas di bagian atas (Nama Produk, ID Sesi dengan tombol salin cepat, dan batas waktu pembayaran *live countdown*).
+2. **Tampilan Dinamis Berdasarkan Metode Pembayaran**:
+   - **Mode QRIS Otomatis (PayKita)**:
+     - Bingkai kode QRIS bersih di tengah halaman dengan tombol **"Unduh / Perbesar QRIS"** dan tombol **"Salin Nominal Total Bayar"**.
+     - Rincian harga (Harga Produk + Kode Unik/Biaya Layanan jika ada) ditampilkan secara transparan dengan garis pemisah tipis.
+     - Tombol **"Cek Status Pembayaran"** yang berdampingan dengan deteksi otomatis (*auto-polling* setiap 3 detik) tanpa perlu muat ulang halaman.
+   - **Mode Transfer Manual / Crypto**:
+     - Kartu nomor rekening / alamat wallet dengan tombol **Salin** satu klik dan tampilan QR (jika tersedia).
+     - Area **Upload Bukti Transfer** (atau input TXID untuk Crypto) dengan pratinjau file dan umpan balik instan saat bukti berhasil dikirim.
+3. **Tampilan Pengiriman Akun / Produk (*Delivery Box*)**:
+   - Saat pembayaran terkonfirmasi lunas, menampilkan informasi akun/akses di dalam panel khusus yang mudah disalin atau dibuka langsung, disertai tombol ulasan dan bantuan WhatsApp CS.
 
 ---
 
-## 4. Layanan Email Resend + Pratinjau Mode Pengembangan
-- **Integrasi Resend (`RESEND_API_KEY` & `EMAIL_FROM`)**:
-  - Jika `RESEND_API_KEY` tersedia, server mengirim email HTML berdesain editorial TanyaHukum melalui API Resend (`https://api.resend.com/emails`).
-  - Jika `RESEND_API_KEY` belum dikonfigurasi, sistem tetap berjalan lancar tanpa error 503: mencetak tautan verifikasi/reset di log server dan menyertakan `dev_preview_url` pada respons API agar pengguna/penguji dapat langsung mengklik tombol pratinjau tautan dari dalam dialog autentikasi.
+## 3. File yang Akan Dimodifikasi
+- `src/components/ProductModal.jsx`: Perombakan tata letak modal produk beranda, penyederhanaan input kontak pembeli (1 input pintar + auto-fill), perapian kartu pemilihan metode pembayaran (PayKita, Manual, Crypto), serta tetap mempertahankan seluruh atribut `data-testid` dan kompatibilitas API backend.
+- `src/pages/PaymentSuccess.jsx`: Penyederhanaan tampilan halaman pembayaran dan status transaksi agar lebih bersih, terstruktur dengan *step indicator* yang jelas, serta mempermudah penyalinan nomor rekening/nominal dan *upload* bukti bayar.
 
 ---
 
-## 5. Pembaruan Antarmuka Pengguna & Panel Admin (`src/pages/Admin.jsx` & `src/components/AuthModal.jsx`)
-- **Dialog Autentikasi (`AuthModal.jsx`)**:
-  - Menampilkan pratinjau tautan verifikasi / reset password langsung di dalam modal apabila server mengembalikan `dev_preview_url` (ketika Resend belum dikonfigurasi), sehingga alur verifikasi dan reset password dapat diuji dari ujung ke ujung dengan satu klik.
-- **Tab Baru di Halaman Admin (`/admin`)**:
-  - **Tab Manajemen User**:
-    - Tabel daftar pengguna dilengkapi pencarian (`name`/`email`), filter status verifikasi (`Semua`, `Terverifikasi`, `Belum Verifikasi`), dan filter peran (`Semua`, `Admin`, `User`).
-    - Tombol aksi cepat bagi Admin: **Verifikasi Manual / Cabut Verifikasi**, **Kirim Ulang Email Verifikasi**, **Ubah Role (`user` ↔ `admin`)**, dan **Hapus Pengguna** (dengan proteksi agar admin tidak menghapus akunnya sendiri).
-  - **Tab Audit Log**:
-    - Menampilkan riwayat aktivitas sistem dan autentikasi secara kronologis (waktu, pelaku, jenis aksi, target, dan detail metadata) beserta filter pencarian aksi.
+## 4. Verifikasi
+- Memastikan seluruh alur checkout produk beranda (**PayKita QRIS Otomatis**, **Transfer Manual**, dan **Crypto**) berfungsi lancar dari modal produk hingga halaman pembayaran.
+- Menjalankan `compile_applet` untuk memastikan tidak ada *error* kompilasi atau *broken imports*.

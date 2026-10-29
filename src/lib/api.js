@@ -55,6 +55,54 @@ export const formatUSD = (itemOrUsd, fallbackIdr = 0) => {
 export const WA_NUMBER = "6285693161480";
 export const FB_URL = "https://www.facebook.com/share/1Ey74rNDVi/";
 export const FB_LOGO_URL = "https://www.facebook.com/share/1DNMWVGsG5/";
+export const STORE_LOGO_URL = "/assets/aistudio/photo_2026-10-28_01-45-50_fca1f215.jpg";
+
+export const PROFILE_AVATARS = [
+  { id: "av-1", name: "Rick", url: "/assets/aistudio/photo_2026-10-28_02-22-09_470c90d8.jpg" },
+  { id: "av-2", name: "Dante", url: "/assets/aistudio/photo_2026-10-28_02-22-13_652b92ce.jpg" },
+  { id: "av-3", name: "Vergil", url: "/assets/aistudio/photo_2026-10-28_02-22-16_52b6e712.jpg" },
+  { id: "av-4", name: "Aizen", url: "/assets/aistudio/photo_2026-10-28_02-22-18_efd389db.jpg" },
+  { id: "av-5", name: "Rukia", url: "/assets/aistudio/photo_2026-10-28_02-22-20_5831c2fa.jpg" },
+  { id: "av-6", name: "Renge", url: "/assets/aistudio/photo_2026-10-28_02-22-23_21c3bd49.jpg" },
+  { id: "av-7", name: "Maple", url: "/assets/aistudio/photo_2026-10-28_02-22-25_b7f0d619.jpg" },
+  { id: "av-8", name: "Gojo", url: "/assets/aistudio/photo_2026-10-28_02-22-29_87215399.jpg" },
+  { id: "av-9", name: "Saitama", url: "/assets/aistudio/photo_2026-10-28_02-22-31_d3fa61d6.jpg" },
+  { id: "av-10", name: "Chitoge", url: "/assets/aistudio/photo_2026-10-28_02-22-34_4bd8132c.jpg" },
+];
+
+export const getLocalUserAvatar = (user) => {
+  if (typeof localStorage === "undefined") return "";
+  const key = String(user?.id || user?.email || "").trim().toLowerCase();
+  if (key) {
+    const saved = localStorage.getItem(`wjp_avatar_${key}`);
+    if (saved && saved.trim()) return saved.trim();
+  }
+  const fallbackSaved = localStorage.getItem("wjp_avatar_active");
+  return fallbackSaved && fallbackSaved.trim() ? fallbackSaved.trim() : "";
+};
+
+export const saveLocalUserAvatar = (user, avatarUrl) => {
+  if (typeof localStorage === "undefined" || !avatarUrl) return;
+  const clean = String(avatarUrl).trim();
+  if (!clean) return;
+  const key = String(user?.id || user?.email || "").trim().toLowerCase();
+  if (key) {
+    localStorage.setItem(`wjp_avatar_${key}`, clean);
+  }
+  localStorage.setItem("wjp_avatar_active", clean);
+};
+
+export const resolveUserAvatar = (user) => {
+  if (user?.avatar && String(user.avatar).trim()) return String(user.avatar).trim();
+  const localAv = getLocalUserAvatar(user);
+  if (localAv) return localAv;
+  const seed = String(user?.email || user?.id || "wjp");
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return PROFILE_AVATARS[hash % PROFILE_AVATARS.length].url;
+};
 
 export const waLink = (text) =>
   `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
