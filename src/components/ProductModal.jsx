@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
-  ShieldCheck,
   Zap,
   MessageCircle,
   Loader2,
@@ -242,34 +241,7 @@ export const ProductModal = ({ product, onClose }) => {
     setBuyerContact(val);
   };
 
-  const applyEmailDomain = (domain) => {
-    const raw = buyerEmail.trim();
-    const localPart = raw.includes("@") ? raw.split("@")[0] : raw;
-    const nextEmail = `${localPart || "pembeli"}${domain}`;
-    handleEmailChange(nextEmail);
-  };
-
-  const activeDestObj = manualDestinations.find((d) => d.id === selectedDest);
-
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail.trim());
-  const isPaymentReady =
-    method === "paykita"
-      ? paykitaAvailable
-      : Boolean(selectedDest && activeDestObj);
-  const checkoutReadiness =
-    (isEmailValid ? 50 : buyerEmail.trim() ? 25 : 0) +
-    (isPaymentReady ? 50 : 0);
-
-  const activePaymentLabel =
-    method === "paykita"
-      ? "QRIS Instan (PayKita)"
-      : method === "crypto"
-      ? activeDestObj
-        ? `${activeDestObj.symbol || "USDT"} · ${activeDestObj.network || activeDestObj.name}`
-        : "Crypto Wallet"
-      : activeDestObj
-      ? `${activeDestObj.name}`
-      : "Transfer / QRIS";
 
   const resolveBuyerPayload = () => {
     const finalEmail = buyerEmail.trim().toLowerCase();
@@ -496,7 +468,7 @@ export const ProductModal = ({ product, onClose }) => {
                   </div>
                   <div className="px-2">
                     <p className="text-[10px] font-mono text-slate-400">
-                      Stok Tersedia
+                      Stok
                     </p>
                     <p
                       className="text-xs font-mono font-semibold tabular-nums text-slate-100 mt-0.5"
@@ -520,7 +492,7 @@ export const ProductModal = ({ product, onClose }) => {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Dynamic Contiguous Purchase & Instant Checkout Module */}
+            {/* RIGHT COLUMN: Clean & Focused Checkout Module */}
             <div className="md:col-span-6 min-w-0 w-full p-4 sm:p-6 flex flex-col justify-between gap-4">
               {/* Top Product Summary */}
               <div className="min-w-0 space-y-2.5">
@@ -549,7 +521,7 @@ export const ProductModal = ({ product, onClose }) => {
                   <div className="flex items-center gap-1 text-lime shrink-0 font-mono text-xs tabular-nums">
                     <Star size={12} fill="currentColor" />
                     <span className="font-semibold">{product.rating}</span>
-                    <span className="text-slate-500">· {product.sold} terjual</span>
+                    <span className="text-slate-500">· {product.sold}</span>
                   </div>
                 </div>
 
@@ -577,25 +549,23 @@ export const ProductModal = ({ product, onClose }) => {
                   </div>
                 </div>
 
-                {/* Clean Expandable Description */}
+                {/* Compact Expandable Description */}
                 <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 line-clamp-1 pr-2">
-                      {!showDescription
-                        ? product.description || "Lihat rincian lengkap spesifikasi akun & produk ini."
-                        : "Rincian Produk"}
+                  <button
+                    type="button"
+                    onClick={() => setShowDescription((prev) => !prev)}
+                    data-testid="toggle-product-description"
+                    aria-label={
+                      showDescription
+                        ? "Sembunyikan deskripsi produk"
+                        : "Tampilkan deskripsi produk"
+                    }
+                    className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-neon transition-colors py-0.5"
+                  >
+                    <span className="truncate pr-2">
+                      {showDescription ? "Deskripsi Produk" : product.description || "Deskripsi Produk"}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowDescription((prev) => !prev)}
-                      data-testid="toggle-product-description"
-                      aria-label={
-                        showDescription
-                          ? "Sembunyikan deskripsi produk"
-                          : "Tampilkan deskripsi produk"
-                      }
-                      className="inline-flex items-center gap-1 text-xs font-mono text-neon hover:text-lime transition-colors whitespace-nowrap shrink-0"
-                    >
+                    <span className="inline-flex items-center gap-1 font-mono text-neon shrink-0">
                       <span>{showDescription ? "Tutup" : "Detail"}</span>
                       <ChevronDown
                         size={13}
@@ -603,8 +573,8 @@ export const ProductModal = ({ product, onClose }) => {
                           showDescription ? "rotate-180" : ""
                         }`}
                       />
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                   <AnimatePresence initial={false}>
                     {showDescription && (
                       <motion.p
@@ -612,80 +582,27 @@ export const ProductModal = ({ product, onClose }) => {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.18 }}
+                        transition={{ duration: 0.16 }}
                         className="overflow-y-auto max-h-28 text-xs leading-relaxed text-slate-300 mt-2 pt-2 border-t border-line/50 pr-1 whitespace-pre-line"
                         data-testid="modal-product-description"
                       >
-                        {product.description ||
-                          "Tidak ada rincian deskripsi tambahan untuk produk ini."}
+                        {product.description || "Tidak ada deskripsi tambahan."}
                       </motion.p>
                     )}
                   </AnimatePresence>
                 </div>
               </div>
 
-              {/* DYNAMIC INTERACTIVE CHECKOUT MODULE */}
-              <div className="space-y-3.5 pt-1">
-                {/* Live Checkout Progress & Readiness Bar */}
-                <div className="bg-void/60 border border-line/80 p-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2 text-[11px] font-mono">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={`inline-flex items-center gap-1 font-semibold ${
-                          isEmailValid ? "text-lime" : "text-neon"
-                        }`}
-                      >
-                        {isEmailValid ? (
-                          <CheckCircle2 size={12} className="shrink-0" />
-                        ) : (
-                          <span>01.</span>
-                        )}
-                        <span>Data Penerima</span>
-                      </span>
-                      <span className="text-slate-600" aria-hidden="true">
-                        /
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 font-semibold truncate ${
-                          isPaymentReady ? "text-slate-100" : "text-slate-400"
-                        }`}
-                      >
-                        <span>02.</span>
-                        <span className="truncate">{activePaymentLabel}</span>
-                      </span>
-                    </div>
-                    <span
-                      className={`tabular-nums font-semibold shrink-0 ${
-                        checkoutReadiness === 100 ? "text-lime" : "text-neon"
-                      }`}
-                    >
-                      {checkoutReadiness === 100 ? "Siap Checkout" : `${checkoutReadiness}%`}
-                    </span>
-                  </div>
-                  <div className="h-1 w-full bg-void overflow-hidden">
-                    <motion.div
-                      initial={false}
-                      animate={{ scaleX: checkoutReadiness / 100 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                      style={{ transformOrigin: "left" }}
-                      className={`h-full w-full ${
-                        checkoutReadiness === 100 ? "bg-lime" : "bg-neon"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Step 1: Mandatory Buyer Email Input + Quick Domain Autocomplete + Optional WhatsApp */}
+              {/* CLEAN & TIDY CHECKOUT FORM */}
+              <div className="space-y-4">
+                {/* Buyer Email + Optional WhatsApp */}
                 <div className="space-y-2" data-testid="buyer-contact-fields">
                   <div className="flex items-center justify-between gap-2">
                     <label
                       htmlFor="primary-buyer-email"
-                      className="text-xs font-semibold text-slate-100 flex items-center gap-1.5"
+                      className="text-xs font-medium text-slate-200"
                     >
-                      <span>01. Email Penerima Akses Akun</span>
-                      <span className="text-[10px] font-mono text-neon">
-                        · Wajib
-                      </span>
+                      Email Penerima
                     </label>
                     <button
                       type="button"
@@ -698,11 +615,7 @@ export const ProductModal = ({ product, onClose }) => {
                           showExtraContact ? "rotate-45 text-neon" : ""
                         }`}
                       />
-                      <span>
-                        {showExtraContact
-                          ? "Tutup WhatsApp"
-                          : "No. WhatsApp (Opsional)"}
-                      </span>
+                      <span>{showExtraContact ? "Tutup WhatsApp" : "WhatsApp"}</span>
                     </button>
                   </div>
 
@@ -719,63 +632,21 @@ export const ProductModal = ({ product, onClose }) => {
                       required
                       value={buyerEmail}
                       onChange={(e) => handleEmailChange(e.target.value)}
-                      placeholder="Ketik email aktif (contoh: kamu@gmail.com)..."
+                      placeholder="nama@gmail.com"
                       data-testid="buyer-email-input"
                       className={`w-full bg-void/90 border ${
                         isEmailValid
                           ? "border-lime/70 focus:border-lime"
                           : "border-line focus:border-neon"
-                      } outline-none text-xs font-mono pl-9 pr-28 py-2.5 text-slate-100 placeholder:text-slate-500 transition-colors`}
+                      } outline-none text-xs font-mono pl-9 pr-9 py-2.5 text-slate-100 placeholder:text-slate-500 transition-colors`}
                     />
-                    {buyerEmail.trim() && (
-                      <span
-                        className={`absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-mono ${
-                          isEmailValid ? "text-lime" : "text-amber-300"
-                        }`}
-                      >
-                        {isEmailValid ? (
-                          <>
-                            <Check size={11} />
-                            {user?.email && buyerEmail.trim() === user.email
-                              ? "Akun Aktif"
-                              : "Email Valid"}
-                          </>
-                        ) : (
-                          "Lengkapi Domain"
-                        )}
-                      </span>
+                    {isEmailValid && (
+                      <Check
+                        size={14}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-lime"
+                      />
                     )}
                   </div>
-
-                  {/* Dynamic Email Quick-Complete Strip */}
-                  {!isEmailValid && (
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-                      <span className="text-[10px] font-mono text-slate-500 shrink-0">
-                        Isi Cepat:
-                      </span>
-                      {user?.email && buyerEmail !== user.email && (
-                        <button
-                          type="button"
-                          onClick={() => handleEmailChange(user.email)}
-                          className="text-[10px] font-mono text-lime hover:text-neon bg-void/80 border border-lime/40 px-2 py-0.5 transition-colors whitespace-nowrap shrink-0"
-                        >
-                          {user.email}
-                        </button>
-                      )}
-                      {["@gmail.com", "@icloud.com", "@yahoo.com", "@outlook.com"].map(
-                        (dom) => (
-                          <button
-                            key={dom}
-                            type="button"
-                            onClick={() => applyEmailDomain(dom)}
-                            className="text-[10px] font-mono text-slate-300 hover:text-neon hover:border-neon/60 bg-void/70 border border-line/70 px-2 py-0.5 transition-colors whitespace-nowrap shrink-0"
-                          >
-                            {dom}
-                          </button>
-                        )
-                      )}
-                    </div>
-                  )}
 
                   <AnimatePresence initial={false}>
                     {showExtraContact ? (
@@ -796,7 +667,7 @@ export const ProductModal = ({ product, onClose }) => {
                             type="tel"
                             value={buyerWa}
                             onChange={(e) => setBuyerWa(e.target.value)}
-                            placeholder="No. WhatsApp cadangan (08xxxxxxxxxx) — opsional"
+                            placeholder="No. WhatsApp (opsional)"
                             data-testid="buyer-whatsapp-input"
                             className="w-full bg-void/90 border border-line focus:border-neon outline-none text-xs font-mono pl-8 pr-2.5 py-2 text-slate-100 placeholder:text-slate-500 transition-colors"
                           />
@@ -815,28 +686,13 @@ export const ProductModal = ({ product, onClose }) => {
                       />
                     )}
                   </AnimatePresence>
-
-                  <p className="text-[11px] font-mono text-slate-400 leading-relaxed">
-                    Format pengiriman{" "}
-                    <span className="text-neon">[Tipe Akun] [Email] [Password]</span>{" "}
-                    &amp; invoice terverifikasi dikirim otomatis ke email ini.
-                  </p>
                 </div>
 
-                {/* Step 2: Dynamic Payment Method & Channel Selector */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-100">
-                      02. Pilih Metode Pembayaran
-                    </span>
-                    <span className="text-[11px] font-mono text-neon tabular-nums">
-                      {method === "paykita"
-                        ? "Konfirmasi Otomatis 24/7"
-                        : method === "crypto"
-                        ? `Estimasi ${formatUSD(product)} USD`
-                        : `${activeChannelList.length} Kanal Tersedia`}
-                    </span>
-                  </div>
+                {/* Payment Method & Channel Selector */}
+                <div className="space-y-2">
+                  <span className="block text-xs font-medium text-slate-200">
+                    Metode Pembayaran
+                  </span>
 
                   {availableTabCount > 0 ? (
                     <div
@@ -856,7 +712,7 @@ export const ProductModal = ({ product, onClose }) => {
                           data-testid="method-paykita"
                           className={`flex items-center justify-center gap-1.5 text-xs font-medium py-2 px-2.5 transition-all duration-150 whitespace-nowrap shrink-0 ${
                             method === "paykita"
-                              ? "bg-neon text-void font-semibold shadow-sm"
+                              ? "bg-neon text-void font-semibold"
                               : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
                           }`}
                         >
@@ -871,7 +727,7 @@ export const ProductModal = ({ product, onClose }) => {
                           data-testid="method-manual"
                           className={`flex items-center justify-center gap-1.5 text-xs font-medium py-2 px-2.5 transition-all duration-150 whitespace-nowrap shrink-0 ${
                             method === "manual"
-                              ? "bg-neon text-void font-semibold shadow-sm"
+                              ? "bg-neon text-void font-semibold"
                               : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
                           }`}
                         >
@@ -886,7 +742,7 @@ export const ProductModal = ({ product, onClose }) => {
                           data-testid="method-crypto"
                           className={`flex items-center justify-center gap-1.5 text-xs font-medium py-2 px-2.5 transition-all duration-150 whitespace-nowrap shrink-0 ${
                             method === "crypto"
-                              ? "bg-lime text-void font-semibold shadow-sm"
+                              ? "bg-lime text-void font-semibold"
                               : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
                           }`}
                         >
@@ -897,121 +753,88 @@ export const ProductModal = ({ product, onClose }) => {
                     </div>
                   ) : (
                     <div className="p-3 bg-coral/10 border border-coral/30 text-xs text-coral">
-                      Metode pembayaran sedang tidak aktif. Silakan pesan langsung melalui WhatsApp.
+                      Metode pembayaran sedang tidak aktif.
                     </div>
                   )}
 
-                  {/* Animated Dynamic Sub-Panel per Method */}
+                  {/* Compact Sub-Panel per Method */}
                   <AnimatePresence mode="wait" initial={false}>
                     {method === "paykita" ? (
                       <motion.div
                         key="panel-paykita"
-                        initial={{ opacity: 0, y: 4 }}
+                        initial={{ opacity: 0, y: 3 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="bg-void/60 border border-neon/40 p-3 space-y-2"
+                        exit={{ opacity: 0, y: -3 }}
+                        transition={{ duration: 0.14 }}
+                        className="flex items-center justify-between gap-3 bg-void/60 border border-line/80 px-3.5 py-2.5"
                         data-testid="paykita-info-box"
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <QrCode size={18} className="text-neon shrink-0" />
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-slate-100 truncate">
-                                QRIS Semua E-Wallet &amp; M-Banking (PayKita)
-                              </p>
-                              <p className="text-[11px] text-slate-400 truncate">
-                                Scan kode QR di layar berikutnya · Verifikasi otomatis detik itu juga
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-[11px] font-mono font-semibold text-lime shrink-0">
-                            Instan
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <QrCode size={16} className="text-neon shrink-0" />
+                          <span className="text-xs text-slate-200 truncate">
+                            QRIS Semua E-Wallet &amp; M-Banking
                           </span>
                         </div>
-                        <div className="pt-2 border-t border-line/60 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-slate-400">
-                          <span>DANA · OVO · GoPay · ShopeePay · BCA · Mandiri · BRI</span>
-                          <span className="text-slate-300 tabular-nums">
-                            Total: {formatIDR(product.price)}
-                          </span>
-                        </div>
+                        <span className="text-[11px] font-mono text-lime shrink-0">
+                          Otomatis
+                        </span>
                       </motion.div>
                     ) : method === "crypto" ? (
                       <motion.div
                         key="panel-crypto"
-                        initial={{ opacity: 0, y: 4 }}
+                        initial={{ opacity: 0, y: 3 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
+                        exit={{ opacity: 0, y: -3 }}
+                        transition={{ duration: 0.14 }}
                         data-testid="crypto-payment-panel"
-                        className="space-y-2"
                       >
                         {cryptoDestinations.length > 0 ? (
-                          <>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {cryptoDestinations.map((d) => {
-                                const isSelected = d.id === selectedDest;
-                                return (
-                                  <button
-                                    key={d.id}
-                                    type="button"
-                                    onClick={() => setSelectedDest(d.id)}
-                                    data-testid={`crypto-dest-${d.id}`}
-                                    className={`flex items-center justify-between gap-2 px-3 py-2 border text-left transition-all duration-150 ${
-                                      isSelected
-                                        ? "border-lime bg-lime/10 text-slate-100"
-                                        : "border-line bg-void/60 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {cryptoDestinations.map((d) => {
+                              const isSelected = d.id === selectedDest;
+                              return (
+                                <button
+                                  key={d.id}
+                                  type="button"
+                                  onClick={() => setSelectedDest(d.id)}
+                                  data-testid={`crypto-dest-${d.id}`}
+                                  className={`flex items-center justify-between gap-2 px-3 py-2 border text-left transition-all duration-150 ${
+                                    isSelected
+                                      ? "border-lime bg-lime/10 text-slate-100"
+                                      : "border-line bg-void/60 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold truncate">
+                                      {d.symbol || "USDT"} · {d.name}
+                                    </p>
+                                    <p className="text-[10px] font-mono text-slate-400 truncate">
+                                      {d.network || d.account_number}
+                                    </p>
+                                  </div>
+                                  <CheckCircle2
+                                    size={14}
+                                    className={`shrink-0 transition-opacity ${
+                                      isSelected ? "text-lime opacity-100" : "opacity-0"
                                     }`}
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-semibold truncate">
-                                        {d.symbol || "USDT"} · {d.name}
-                                      </p>
-                                      <p className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
-                                        {d.network ? `Jaringan ${d.network}` : d.account_number}
-                                      </p>
-                                    </div>
-                                    <CheckCircle2
-                                      size={14}
-                                      className={`shrink-0 transition-opacity ${
-                                        isSelected ? "text-lime opacity-100" : "opacity-0"
-                                      }`}
-                                    />
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            {activeDestObj && (
-                              <div className="flex items-center justify-between gap-2 bg-void/50 border border-line/70 px-3 py-2 text-[11px] font-mono">
-                                <span className="text-slate-400 truncate">
-                                  Koin:{" "}
-                                  <span className="text-lime font-semibold">
-                                    {activeDestObj.symbol || "USDT"}
-                                  </span>
-                                  {activeDestObj.network
-                                    ? ` · Network ${activeDestObj.network}`
-                                    : ""}
-                                </span>
-                                <span className="text-slate-200 tabular-nums shrink-0">
-                                  {formatUSD(product)} USD
-                                </span>
-                              </div>
-                            )}
-                          </>
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
                         ) : (
                           <p className="text-xs text-coral py-1">
-                            Belum ada wallet crypto aktif. Silakan gunakan metode QRIS atau Transfer.
+                            Wallet crypto belum tersedia.
                           </p>
                         )}
                       </motion.div>
                     ) : (
                       <motion.div
                         key="panel-manual"
-                        initial={{ opacity: 0, y: 4 }}
+                        initial={{ opacity: 0, y: 3 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="space-y-2"
+                        exit={{ opacity: 0, y: -3 }}
+                        transition={{ duration: 0.14 }}
                       >
                         {activeChannelList.length > 0 ? (
                           <>
@@ -1033,10 +856,10 @@ export const ProductModal = ({ product, onClose }) => {
                                       <p className="text-xs font-semibold truncate">
                                         {d.name}
                                       </p>
-                                      <p className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                                      <p className="text-[10px] font-mono text-slate-400 truncate">
                                         {d.account_number && d.account_number !== "-"
                                           ? d.account_number
-                                          : d.type?.toUpperCase() || "QRIS / TRANSFER"}
+                                          : d.type?.toUpperCase() || "QRIS"}
                                       </p>
                                     </div>
                                     <CheckCircle2
@@ -1049,23 +872,6 @@ export const ProductModal = ({ product, onClose }) => {
                                 );
                               })}
                             </div>
-
-                            {activeDestObj && (
-                              <div className="flex flex-wrap items-center justify-between gap-2 bg-void/50 border border-line/70 px-3 py-2 text-[11px] font-mono">
-                                <span className="text-slate-400 truncate">
-                                  Tujuan:{" "}
-                                  <span className="text-neon font-semibold">
-                                    {activeDestObj.name}
-                                  </span>
-                                  {activeDestObj.account_name
-                                    ? ` · a/n ${activeDestObj.account_name}`
-                                    : ""}
-                                </span>
-                                <span className="text-slate-300 shrink-0">
-                                  Proses 1–5 Menit
-                                </span>
-                              </div>
-                            )}
 
                             <select
                               value={selectedDest}
@@ -1083,7 +889,7 @@ export const ProductModal = ({ product, onClose }) => {
                           </>
                         ) : (
                           <p className="text-xs text-coral py-1">
-                            Tidak ada tujuan transfer manual yang tersedia saat ini.
+                            Tujuan transfer belum tersedia.
                           </p>
                         )}
                       </motion.div>
@@ -1091,32 +897,8 @@ export const ProductModal = ({ product, onClose }) => {
                   </AnimatePresence>
                 </div>
 
-                {/* Live Dynamic Order Summary & Primary Action Bar */}
-                <div className="sticky bottom-0 z-20 -mx-4 px-4 py-3 bg-panel/95 backdrop-blur border-t border-line sm:static sm:mx-0 sm:px-0 sm:py-0 sm:pt-1 sm:bg-transparent sm:border-t-0 space-y-2.5">
-                  {/* Live Order Breakdown Strip */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-y border-line/70 py-2 text-xs">
-                    <div className="flex items-center gap-1.5 min-w-0 font-mono text-[11px]">
-                      <span className="text-slate-400 shrink-0">Kirim ke:</span>
-                      <span
-                        className={`truncate ${
-                          isEmailValid
-                            ? "text-lime font-semibold"
-                            : "text-slate-400"
-                        }`}
-                      >
-                        {buyerEmail.trim() || "Masukkan email di atas"}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-1.5 shrink-0 font-mono tabular-nums">
-                      <span className="text-[11px] text-slate-400">Total:</span>
-                      <span className="text-sm font-bold text-neon">
-                        {method === "crypto"
-                          ? `${formatUSD(product)} USD`
-                          : formatIDR(product.price)}
-                      </span>
-                    </div>
-                  </div>
-
+                {/* Primary Action Bar */}
+                <div className="sticky bottom-0 z-20 -mx-4 px-4 py-3 bg-panel/95 backdrop-blur border-t border-line sm:static sm:mx-0 sm:px-0 sm:py-0 sm:pt-1 sm:bg-transparent sm:border-t-0">
                   <div className="flex items-stretch gap-2">
                     <button
                       onClick={handleBuy}
@@ -1143,9 +925,9 @@ export const ProductModal = ({ product, onClose }) => {
                         {product.stock < 1
                           ? "Stok Habis"
                           : loading
-                          ? "Memproses Pesanan..."
+                          ? "Memproses..."
                           : method === "crypto"
-                          ? `Lanjut Bayar · ${formatUSD(product)} USD (${activeDestObj?.symbol || "USDT"})`
+                          ? `Beli · ${formatUSD(product)} USD`
                           : `Beli Sekarang · ${formatIDR(product.price)}`}
                       </span>
                     </button>
@@ -1166,17 +948,6 @@ export const ProductModal = ({ product, onClose }) => {
                       <span>Tanya CS</span>
                     </a>
                   </div>
-
-                  <p className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 text-center">
-                    <ShieldCheck size={13} className="text-lime shrink-0" />
-                    <span>
-                      {method === "paykita"
-                        ? "Pembayaran terenkripsi PayKita · Akun dikirim otomatis setelah scan QRIS."
-                        : method === "crypto"
-                        ? "Salin alamat wallet atau scan QR pada langkah berikutnya."
-                        : "Garansi 100% aman · Instruksi rekening & upload bukti tampil di langkah berikutnya."}
-                    </span>
-                  </p>
                 </div>
               </div>
             </div>
