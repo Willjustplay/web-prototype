@@ -1,14 +1,15 @@
 import { motion } from "framer-motion";
 import { Check, Gamepad2, Zap, CreditCard } from "lucide-react";
-
-const STEPS = [
-  { id: "game", label: "Pilih Game", icon: Gamepad2 },
-  { id: "account", label: "Tujuan & Nominal", icon: Zap },
-  { id: "payment", label: "Checkout", icon: CreditCard },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 /** Horizontal progress indicator for the 3-step top up wizard. */
 export const TopupStepper = ({ current, onGoTo, reachable, summaries = {} }) => {
+  const { t } = useLanguage();
+  const STEPS = [
+    { id: "game", label: t("Pilih Game", "Select Game"), icon: Gamepad2 },
+    { id: "account", label: t("Tujuan & Nominal", "Account & Amount"), icon: Zap },
+    { id: "payment", label: "Checkout", icon: CreditCard },
+  ];
   const normalizedCurrent = current === "denomination" ? "account" : current;
   const index = STEPS.findIndex((s) => s.id === normalizedCurrent);
 
@@ -16,7 +17,7 @@ export const TopupStepper = ({ current, onGoTo, reachable, summaries = {} }) => 
     <ol
       data-testid="topup-stepper"
       className="grid grid-cols-3 gap-2 sm:gap-3 mb-6 sm:mb-8"
-      aria-label="Langkah top up"
+      aria-label={t("Langkah top up", "Top up steps")}
     >
       {STEPS.map((step, i) => {
         const done = i < index;

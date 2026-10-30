@@ -10,6 +10,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { api, imgSrc } from "@/lib/api";
+import { useLanguage } from "@/context/LanguageContext";
 
 const Stars = ({ n }) => (
   <span className="flex gap-0.5 text-lime">
@@ -25,6 +26,7 @@ const Stars = ({ n }) => (
 );
 
 export const Testimonials = () => {
+  const { t, translateDesc } = useLanguage();
   const [items, setItems] = useState([]);
   const [zoom, setZoom] = useState(null);
   const [activeGame, setActiveGame] = useState("all");
@@ -72,13 +74,16 @@ export const Testimonials = () => {
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8 sm:mb-10">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-neon font-mono mb-2.5">
-              03. Bukti Sosial &amp; Reputasi
+              {t("03. Bukti Sosial & Reputasi", "03. Social Proof & Reputation")}
             </p>
             <h2
               className="font-display font-bold uppercase tracking-tight text-2xl sm:text-3xl lg:text-4xl text-slate-100"
               data-testid="testimonials-title"
             >
-              Kata Mereka. <span className="text-stroke">Bukan Kata Kami.</span>
+              {t("Kata Mereka. ", "Their Words. ")}
+              <span className="text-stroke">
+                {t("Bukan Kata Kami.", "Not Just Ours.")}
+              </span>
             </h2>
           </div>
 
@@ -91,7 +96,9 @@ export const Testimonials = () => {
               <span className="text-slate-600">·</span>
               <p className="text-xs font-mono text-slate-300 flex items-center gap-1.5 tabular-nums">
                 <MessageSquare size={13} className="text-neon" />
-                <span>{items.length} ulasan terverifikasi</span>
+                <span>
+                  {items.length} {t("ulasan terverifikasi", "verified reviews")}
+                </span>
               </p>
             </div>
           </div>
@@ -110,7 +117,7 @@ export const Testimonials = () => {
                     : "bg-panel/80 text-slate-400 border border-line hover:text-slate-100 hover:border-neon/40"
                 }`}
               >
-                Semua Game ({items.length})
+                {t(`Semua Game (${items.length})`, `All Games (${items.length})`)}
               </button>
               {games.map((g) => {
                 const isSelected = activeGame === g;
@@ -142,7 +149,7 @@ export const Testimonials = () => {
                 }`}
               >
                 <ImageIcon size={13} />
-                <span>Dengan Bukti Foto</span>
+                <span>{t("Dengan Bukti Foto", "With Photo Proof")}</span>
               </button>
             )}
           </div>
@@ -151,26 +158,26 @@ export const Testimonials = () => {
         {/* Testimonials Grid */}
         <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto sm:overflow-visible snap-x snap-mandatory pb-3 sm:pb-0 no-scrollbar">
           <AnimatePresence mode="popLayout">
-            {filteredItems.map((t, i) => {
-              const initials = String(t.name || "M")
+            {filteredItems.map((item, i) => {
+              const initials = String(item.name || "M")
                 .trim()
                 .slice(0, 2)
                 .toUpperCase();
               return (
                 <motion.article
-                  key={t.id}
+                  key={item.id}
                   layout
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.96 }}
                   transition={{ duration: 0.3, delay: (i % 4) * 0.05 }}
                   whileHover={{ y: -4 }}
-                  data-testid={`testimonial-card-${t.id}`}
+                  data-testid={`testimonial-card-${item.id}`}
                   className="w-[82vw] max-w-[310px] sm:w-auto sm:max-w-none shrink-0 snap-center group relative rounded-2xl bg-panel/90 border border-line hover:border-neon/50 p-5 sm:p-6 flex flex-col justify-between transition-all duration-200 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-4">
-                      <Stars n={t.rating} />
+                      <Stars n={item.rating} />
                       <Quote
                         size={18}
                         className="text-neon/30 group-hover:text-neon transition-colors duration-200"
@@ -178,25 +185,25 @@ export const Testimonials = () => {
                     </div>
 
                     <p className="text-xs sm:text-sm leading-relaxed text-slate-200">
-                      &ldquo;{t.text}&rdquo;
+                      &ldquo;{translateDesc(item.text)}&rdquo;
                     </p>
 
-                    {t.image && (
+                    {item.image && (
                       <button
                         type="button"
-                        onClick={() => setZoom(t)}
-                        data-testid={`testimonial-image-${t.id}`}
+                        onClick={() => setZoom(item)}
+                        data-testid={`testimonial-image-${item.id}`}
                         className="mt-4 w-full relative block overflow-hidden rounded-xl border border-line hover:border-neon/60 transition-colors group/img cursor-pointer"
                       >
                         <img
-                          src={imgSrc(t.image)}
-                          alt={`Bukti chat ${t.name}`}
+                          src={imgSrc(item.image)}
+                          alt={t(`Bukti chat ${item.name}`, `Chat proof ${item.name}`)}
                           referrerPolicy="no-referrer"
                           className="w-full h-40 object-cover object-top group-hover/img:scale-105 transition-transform duration-500"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-void/85 via-transparent to-transparent flex items-end justify-between p-2.5">
                           <span className="text-[10px] font-mono text-neon font-semibold">
-                            Bukti Transaksi
+                            {t("Bukti Transaksi", "Transaction Proof")}
                           </span>
                           <span className="w-6 h-6 rounded-lg bg-void/80 border border-line text-slate-200 grid place-items-center">
                             <ZoomIn size={12} />
@@ -213,13 +220,17 @@ export const Testimonials = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <p className="font-display font-bold text-xs text-slate-100 truncate">
-                          {t.name}
+                          {item.name}
                         </p>
-                        <ShieldCheck size={12} className="text-lime shrink-0" title="Pembeli Terverifikasi" />
+                        <ShieldCheck
+                          size={12}
+                          className="text-lime shrink-0"
+                          title={t("Pembeli Terverifikasi", "Verified Buyer")}
+                        />
                       </div>
                       <p className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
-                        {t.game}
-                        {t.product ? ` · ${t.product}` : ""}
+                        {item.game}
+                        {item.product ? ` · ${item.product}` : ""}
                       </p>
                     </div>
                   </div>
@@ -254,7 +265,7 @@ export const Testimonials = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.92, opacity: 0 }}
               src={imgSrc(zoom.image)}
-              alt="Bukti chat"
+              alt={t("Bukti chat", "Chat proof")}
               referrerPolicy="no-referrer"
               className="max-h-[88vh] max-w-full rounded-xl border border-line shadow-2xl"
             />
@@ -264,4 +275,3 @@ export const Testimonials = () => {
     </section>
   );
 };
-

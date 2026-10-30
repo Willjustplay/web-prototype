@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi format pengiriman data akun terstruktur [Tipe Akun] [Email] [Password], pengiriman otomatis akses data akun & invoice Top Up ke email pembeli saat lunas, serta kewajiban input email sebelum pembelian.",
-  "updatedAt":  "2026-10-29T12:17:45.457845495Z",
+  "summary":  "Rencana implementasi lengkap untuk memperbaiki dan menyempurnakan sistem terjemahan Bahasa Inggris (EN) di seluruh halaman utama, modal checkout, top-up, dan akun dengan tetap mempertahankan judul produk asli.",
+  "updatedAt":  "2026-10-30T01:55:10.779604728Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

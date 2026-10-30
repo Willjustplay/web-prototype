@@ -1,89 +1,126 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   MousePointerClick,
   CreditCard,
   ShieldCheck,
   Zap,
   Gamepad2,
-  ArrowRight,
   CheckCircle2,
   Clock,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-
-const FLOW_MODES = {
-  store: {
-    label: "Beli Akun & Joki",
-    icon: Gamepad2,
-    steps: [
-      {
-        num: "01",
-        icon: MousePointerClick,
-        badge: "~1 Menit",
-        title: "Pilih Akun / Jasa",
-        desc: "Cari akun game impianmu di katalog atau pilih paket jasa joki rank sesuai kebutuhan & budget.",
-        highlights: ["Spesifikasi akun transparan", "Harga IDR & USD jelas"],
-      },
-      {
-        num: "02",
-        icon: CreditCard,
-        badge: "QRIS / Transfer",
-        title: "Bayar & Konfirmasi",
-        desc: "Selesaikan pembayaran via QRIS otomatis, e-wallet, atau transfer bank dengan sistem verifikasi cepat.",
-        highlights: ["QRIS otomatis 24/7", "Bukti transfer terenkripsi"],
-      },
-      {
-        num: "03",
-        icon: ShieldCheck,
-        badge: "5–15 Menit",
-        title: "Terima & Garansi",
-        desc: "Data akses akun atau progres joki langsung dikirim ke dashboard Akun Saya. Dilengkapi garansi penuh.",
-        highlights: ["Akses instan di brankas akun", "Garansi 100% uang kembali"],
-      },
-    ],
-  },
-  topup: {
-    label: "Top-Up Game Instan",
-    icon: Zap,
-    steps: [
-      {
-        num: "01",
-        icon: Gamepad2,
-        badge: "Detik Itu Juga",
-        title: "Masukkan ID & Pilih Nominal",
-        desc: "Pilih game favoritmu, masukkan User ID / Zone ID, lalu pilih nominal diamond atau voucher yang diinginkan.",
-        highlights: ["Tanpa perlu login akun game", "Harga langsung dari pusat"],
-      },
-      {
-        num: "02",
-        icon: CreditCard,
-        badge: "Otomatis 24/7",
-        title: "Scan QRIS / E-Wallet",
-        desc: "Bayar praktis menggunakan QRIS atau metode pembayaran instan tanpa harus antre konfirmasi manual.",
-        highlights: ["Verifikasi pembayaran real-time", "Bebas biaya tersembunyi"],
-      },
-      {
-        num: "03",
-        icon: Zap,
-        badge: "1–5 Menit",
-        title: "Diamond Langsung Masuk",
-        desc: "Sistem memproses pesanan secara otomatis dan item langsung dikirim ke akun game kamu dengan status real-time.",
-        highlights: ["Lacak status di halaman invoice", "Dukungan CS responsif"],
-      },
-    ],
-  },
-};
+import { useLanguage } from "@/context/LanguageContext";
 
 export const HowItWorks = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const isAdmin = user?.role === "admin";
   const [flowMode, setFlowMode] = useState("store");
   const [activeStep, setActiveStep] = useState(0);
 
-  const currentFlow = FLOW_MODES[flowMode];
+  const flowModes = {
+    store: {
+      label: t("Beli Akun & Joki", "Buy Accounts & Boost"),
+      icon: Gamepad2,
+      steps: [
+        {
+          num: "01",
+          icon: MousePointerClick,
+          badge: t("~1 Menit", "~1 Minute"),
+          title: t("Pilih Akun / Jasa", "Choose Account / Boost"),
+          desc: t(
+            "Cari akun game impianmu di katalog atau pilih paket jasa joki rank sesuai kebutuhan & budget.",
+            "Browse your dream game account in our catalog or pick a rank boosting package that fits your needs & budget."
+          ),
+          highlights: [
+            t("Spesifikasi akun transparan", "Transparent account specs"),
+            t("Harga IDR & USD jelas", "Clear IDR & USD pricing"),
+          ],
+        },
+        {
+          num: "02",
+          icon: CreditCard,
+          badge: t("QRIS / Transfer", "QRIS / Transfer"),
+          title: t("Bayar & Konfirmasi", "Pay & Confirm"),
+          desc: t(
+            "Selesaikan pembayaran via QRIS otomatis, e-wallet, atau transfer bank dengan sistem verifikasi cepat.",
+            "Complete payment via automated QRIS, e-wallet, or bank transfer with fast verification."
+          ),
+          highlights: [
+            t("QRIS otomatis 24/7", "24/7 automated QRIS"),
+            t("Bukti transfer terenkripsi", "Encrypted transfer receipt"),
+          ],
+        },
+        {
+          num: "03",
+          icon: ShieldCheck,
+          badge: t("5–15 Menit", "5–15 Minutes"),
+          title: t("Terima & Garansi", "Receive & Warranty"),
+          desc: t(
+            "Data akses akun atau progres joki langsung dikirim ke dashboard Akun Saya. Dilengkapi garansi penuh.",
+            "Account credentials or boosting progress are delivered directly to your My Account dashboard with full warranty."
+          ),
+          highlights: [
+            t("Akses instan di brankas akun", "Instant access in account vault"),
+            t("Garansi 100% uang kembali", "100% money-back guarantee"),
+          ],
+        },
+      ],
+    },
+    topup: {
+      label: t("Top-Up Game Instan", "Instant Game Top-Up"),
+      icon: Zap,
+      steps: [
+        {
+          num: "01",
+          icon: Gamepad2,
+          badge: t("Detik Itu Juga", "Right Away"),
+          title: t("Masukkan ID & Pilih Nominal", "Enter ID & Select Amount"),
+          desc: t(
+            "Pilih game favoritmu, masukkan User ID / Zone ID, lalu pilih nominal diamond atau voucher yang diinginkan.",
+            "Pick your favorite game, enter your User ID / Zone ID, and choose your desired diamond or voucher package."
+          ),
+          highlights: [
+            t("Tanpa perlu login akun game", "No game login required"),
+            t("Harga langsung dari pusat", "Direct official pricing"),
+          ],
+        },
+        {
+          num: "02",
+          icon: CreditCard,
+          badge: t("Otomatis 24/7", "24/7 Automatic"),
+          title: t("Scan QRIS / E-Wallet", "Scan QRIS / E-Wallet"),
+          desc: t(
+            "Bayar praktis menggunakan QRIS atau metode pembayaran instan tanpa harus antre konfirmasi manual.",
+            "Pay conveniently via QRIS or instant payment methods without waiting for manual confirmation."
+          ),
+          highlights: [
+            t("Verifikasi pembayaran real-time", "Real-time payment verification"),
+            t("Bebas biaya tersembunyi", "Zero hidden fees"),
+          ],
+        },
+        {
+          num: "03",
+          icon: Zap,
+          badge: t("1–5 Menit", "1–5 Minutes"),
+          title: t("Diamond Langsung Masuk", "Instant Diamond Delivery"),
+          desc: t(
+            "Sistem memproses pesanan secara otomatis dan item langsung dikirim ke akun game kamu dengan status real-time.",
+            "Our system processes orders automatically and delivers items straight to your game account with real-time status."
+          ),
+          highlights: [
+            t("Lacak status di halaman invoice", "Track status on invoice page"),
+            t("Dukungan CS responsif", "Responsive customer support"),
+          ],
+        },
+      ],
+    },
+  };
+
+  const currentFlow = flowModes[flowMode];
 
   return (
     <section
@@ -95,19 +132,20 @@ export const HowItWorks = () => {
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
         onClick={isAdmin ? () => navigate("/admin?mode=password") : undefined}
         data-testid="how-it-works-admin-trigger"
-        title={isAdmin ? "Masuk panel admin" : undefined}
+        title={isAdmin ? t("Masuk panel admin", "Open admin panel") : undefined}
       >
         {/* Header & Interactive Flow Switcher */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-12">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-neon font-mono mb-2.5">
-              02. Alur Transaksi Cepat
+              {t("02. Alur Transaksi Cepat", "02. Fast Transaction Flow")}
             </p>
             <h2
               className="font-display font-bold uppercase tracking-tight text-2xl sm:text-3xl lg:text-4xl text-slate-100"
               data-testid="how-it-works-title"
             >
-              Tiga Langkah. <span className="text-stroke">Nol Ribet.</span>
+              {t("Tiga Langkah. ", "Three Steps. ")}
+              <span className="text-stroke">{t("Nol Ribet.", "Zero Hassle.")}</span>
             </h2>
           </div>
 
@@ -116,7 +154,7 @@ export const HowItWorks = () => {
             onClick={(e) => e.stopPropagation()}
             className="inline-flex items-center gap-0.5 sm:gap-1 rounded-lg bg-panel/90 border border-line p-1 self-start md:self-auto shadow-sm"
           >
-            {Object.entries(FLOW_MODES).map(([key, cfg]) => {
+            {Object.entries(flowModes).map(([key, cfg]) => {
               const Icon = cfg.icon;
               const isSelected = flowMode === key;
               return (
@@ -224,4 +262,4 @@ export const HowItWorks = () => {
       </div>
     </section>
   );
-};
+};

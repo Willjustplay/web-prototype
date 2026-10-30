@@ -1,51 +1,61 @@
-# Rencana Implementasi: Format Pengiriman Akun Terstruktur, Pengiriman Email Otomatis (Akses Akun & Invoice Top Up), dan Wajib Email Saat Checkout
+# Rencana Perbaikan & Penyempurnaan Sistem Terjemahan Bahasa Inggris (EN)
 
-## 1. Tujuan & Gambaran Umum
-Menyempurnakan alur pembelian, pengiriman produk akun beranda, dan pengiriman invoice produk Top Up dengan empat pembaruan utama:
-1. **Format Pengiriman Data Akun Terstruktur (`[Tipe Akun] [Email] [Password]`)**: Menyediakan input terstruktur 3 kolom (Tipe Akun seperti Gmail/Moonton/Google/dll, Email/Username, dan Password) di Panel Admin yang tersinkronisasi dua arah dengan mode tempel teks langsung (`[tipe akun] [email] [password]`).
-2. **Tampilan Kartu Kredensial Akun Interaktif**: Menampilkan data akses akun di halaman sukses pembayaran (`PaymentSuccess`) dalam kartu terstruktur dengan tombol salin per bagian (*Tipe Akun*, *Email*, *Password*) sekaligus tombol salin format penuh (`[Tipe Akun] [Email] [Password]`).
-3. **Pengiriman Email Otomatis ke Pembeli Saat Lunas**:
-   - **Produk Beranda (Akun/Item)**: Mengirimkan email berisi **Data Akses Akun Terstruktur** (`[Tipe Akun] [Email] [Password]`) beserta rincian transaksi ke email pembeli begitu pembayaran terkonfirmasi lunas (baik via QRIS otomatis PayKita maupun persetujuan Admin).
-   - **Produk Top Up Game**: Mengirimkan email **Invoice Resmi Top Up Game** (berisi ID Pesanan, Game, Nominal Item, Tujuan User ID/Zone ID & Nickname, Metode Bayar Duitku, Total Bayar, dan Status Pengiriman Digiflazz) ke email pembeli segera setelah pembayaran Top Up terkonfirmasi lunas.
-4. **Wajib Memasukkan Email Sebelum Pembelian**: Mewajibkan pembeli mengisi alamat email yang valid (otomatis terisi jika sudah login) sebelum melanjutkan pembayaran baik pada produk Beranda (`ProductModal`) maupun produk Top Up (`Topup` & `TopupPaymentStep`), disertai validasi di sisi server (`server.ts`).
+Perbaikan menyeluruh pada sistem lokalisasi dua bahasa (`ID` / `EN`) di platform WillJustPlay agar seluruh antarmuka pengguna, bagian beranda, katalog, alur transaksi, testimoni, footer, modal checkout, halaman top-up, serta halaman akun diterjemahkan secara akurat dan instan ke Bahasa Inggris, sambil mempertahankan judul produk asli.
 
----
+### User Review & Critical Decisions
 
-## 2. Perubahan Antarmuka & Pengalaman Pengguna (Frontend)
+- **Cakupan Halaman Terjemahan (Dikonfirmasi):** Meliputi seluruh halaman utama (Navbar, Hero, Katalog, Cara Kerja, Testimoni, Footer), Modal Detail & Checkout Produk, Halaman Top-Up Game Instan, Halaman Akun & Riwayat Transaksi, serta Modal Autentikasi.
+- **Perlakuan Konten Produk & Ulasan (Dikonfirmasi):** Seluruh label antarmuka (UI), navigasi, lencana status, filter, tahapan cara kerja, serta deskripsi produk dan ulasan diterjemahkan ke Bahasa Inggris saat mode `EN` aktif, namun **judul produk (`product.title`) tetap dipertahankan sesuai aslinya** agar nama item/akun game tidak berubah menjadi rancu.
+- **Arsitektur Terjemahan Hibrida (Keputusan Teknis):** Menggabungkan penggunaan hook reaktif `useLanguage()` langsung di dalam komponen React (untuk teks yang berubah secara dinamis saat tab atau modal berganti) dengan kamus pola dinamis (`LanguageContext`) untuk menerjemahkan deskripsi produk serta teks berformat angka secara otomatis.
 
-### A. Wajib Email pada Checkout Produk Beranda (`src/components/ProductModal.jsx`)
-- Mengubah input kontak pada `ProductModal.jsx` agar memiliki **input Email Pembeli (Wajib `*`)** yang otomatis terisi dari email akun apabila user sudah login, serta input **WhatsApp (Opsional)** pendamping.
-- Menambahkan validasi format email (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`) sebelum tombol **Bayar Sekarang** memproses pesanan, dengan pesan petunjuk bahwa akses akun (`[Tipe Akun] [Email] [Password]`) dan bukti pembayaran akan dikirim langsung ke alamat email tersebut.
+### 1. Overview & Core Concept
 
-### B. Wajib Email pada Checkout Produk Top Up (`src/pages/Topup.jsx` & `src/components/topup/TopupPaymentStep.jsx`)
-- Menandai kolom **Alamat Email** sebagai **Wajib (`*`)** di `TopupPaymentStep.jsx` dengan keterangan bahwa invoice resmi Top Up akan dikirim otomatis ke email tersebut setelah lunas.
-- Memperbarui validasi `submit()` di `src/pages/Topup.jsx` agar mewajibkan email aktif yang valid sebelum membuat transaksi Duitku.
+Saat ini, beberapa bagian halaman masih menampilkan teks Bahasa Indonesia ketika pengguna beralih ke mode **EN** (seperti lencana `"Ready X+ Produk"` dan pilar kepercayaan di Hero, filter dan kartu produk di Katalog, seluruh tab dan langkah di bagian `"Cara Kerja"`, filter dan label di `"Testimoni"`, informasi di `"Footer"`, serta form pada `"Modal Checkout"`). Hal ini terjadi karena pembaruan salinan teks UI sebelumnya tidak lagi cocok dengan kamus pencocokan teks lama, serta perubahan state React (seperti pergantian tab atau pembukaan modal) merender ulang elemen DOM tanpa memicu terjemahan ulang yang konsisten.
 
-### C. Input Pengiriman Akun Terstruktur di Panel Admin (`src/pages/Admin.jsx`)
-- Pada modal **Tambah / Edit Produk Beranda**, bagian **Info Akun / Pengiriman Data (`delivery_info`)** dilengkapi builder interaktif:
-  - **Input Kolom Terstruktur**: Pilihan cepat / input `Tipe Akun` (Gmail, Moonton, Google Play, Facebook, Hoyoverse, Riot, VK, Lainnya), kolom `Email / Username`, kolom `Password`, serta `Catatan Tambahan (Opsional)`.
-  - **Sinkronisasi Otomatis & Mode Tempel Langsung**: Setiap perubahan pada ketiga kolom otomatis membentuk format standar `[Tipe Akun] [Email] [Password]`, dan jika Admin menempelkan teks berformat `[Gmail] [contoh@gmail.com] [pass123]` pada kotak teks langsung, ketiga kolom otomatis terisi.
+Solusi ini menyempurnakan mesin lokalisasi sehingga perpindahan antara **ID** dan **EN** bekerja secara instan, bebas kedipan (*flicker-free*), dan mencakup 100% elemen antarmuka beserta deskripsi konten.
 
-### D. Kartu Akses Akun Terstruktur & Status Email di Halaman Pembayaran (`src/pages/PaymentSuccess.jsx`)
-- Menambahkan parser cerdas yang membaca `delivery_info` berformat `[Tipe Akun] [Email] [Password]` (maupun format baris/teks).
-- Menampilkan **Kartu Kredensial Akun** yang memisahkan baris **Tipe Akun**, **Email / Username**, dan **Password** lengkap dengan tombol **Salin** di masing-masing baris serta tombol **Salin Semua Format (`[Tipe] [Email] [Password]`)**.
-- Menampilkan indikator bahwa salinan akses akun (untuk produk Beranda) atau invoice resmi (untuk produk Top Up) telah dikirimkan ke alamat email pembeli (`buyer_email`), disertai tombol **Kirim Ulang ke Email** bila pembeli ingin menerima ulang di inbox.
+### 2. User Experience & Visual Design
 
----
+- **Konsistensi Navigasi & Sakelar Bahasa:** Tombol `ID` / `EN` di bilah navigasi atas langsung memperbarui seluruh teks di layar secara reaktif tanpa perlu memuat ulang halaman (*reload*).
+- **Beranda (Hero, Katalog, Cara Kerja, Testimoni, Footer):**
+  - **Hero:** Lencana stok (`"Ready X+ Products"`), tombol aksi, kartu sorotan produk, serta 3 pilar jaminan keamanan tampil dalam Bahasa Inggris yang natural.
+  - **Katalog:** Pencarian, filter kategori (`"All"`, `"Game Accounts"`, `"Boosting"`, `"In Stock"`), pengurutan harga (`"Lowest Price"`, `"Highest Price"`), penghitung jumlah produk (`"X Products"`, `"X sold"`), dan deskripsi singkat kartu produk diterjemahkan sepenuhnya, sementara judul produk tetap asli.
+  - **Cara Kerja (How It Works):** Tombol pemilih alur (`"Buy Accounts & Boost"` dan `"Instant Game Top-Up"`), lencana estimasi waktu (`"~1 Minute"`, `"5–15 Minutes"`, `"Instant"`), judul langkah, deskripsi langkah, dan poin sorotan diterjemahkan secara langsung mengikuti tab yang aktif.
+  - **Testimoni & Bukti Sosial:** Filter game (`"All Games (X)"`, `"With Photo Proof"`), lencana `"Verified Buyer"`, `"Transaction Proof"`, serta teks ulasan pelanggan diterjemahkan dengan rapi.
+  - **Footer:** Deskripsi toko, daftar `"Service Guarantees"`, navigasi bawah, dan catatan hak cipta menggunakan Bahasa Inggris profesional.
+- **Modal Checkout, Halaman Top-Up, & Akun:**
+  - Seluruh label spesifikasi (`"Stock"`, `"X Units"`, `"Full Screen"`, `"Proportional"`), form pengiriman (`"Recipient Email"`, `"WhatsApp No. (optional)"`), metode pembayaran (`"Instant QRIS"`, `"Automatic"`), tombol beli (`"Buy Now"`), serta tahapan pengisian ID dan riwayat pesanan di halaman Top-Up dan Akun tampil sepenuhnya dalam Bahasa Inggris.
 
-## 3. Perubahan Backend & Pengiriman Email (`server.ts`)
+### 3. Key Product Decisions & Trade-Offs
 
-### A. Validasi Wajib Email Pembeli (`parseBuyer`)
-- Memperbarui fungsi `parseBuyer(body)` di `server.ts` agar memastikan `buyer_email` wajib diisi dan memiliki format email yang valid pada setiap pembuatan pesanan (`/api/payments/paykita/checkout`, `/api/payments/manual/checkout`, `/api/payments/crypto/checkout`, dan `/api/payments/topup/checkout`).
+- **Terjemahan Reaktif di Komponen vs Mutasi DOM Murni:**
+  - *Keputusan:* Menggunakan helper `t(idText, enText)` langsung pada komponen React utama sembari memperbarui kamus pola dinamis di `LanguageContext`.
+  - *Alasan:* Mengandalkan mutasi DOM (`MutationObserver`) saja rawan gagal ketika React atau animasi mengganti elemen saat pengguna berpindah tab (misalnya di bagian *Cara Kerja* atau *Modal Checkout*). Dengan mengikat terjemahan langsung ke state `lang`, setiap render ulang dijamin langsung menampilkan bahasa yang benar.
+- **Penerjemah Deskripsi Produk Cerdas Tanpa Mengubah Judul:**
+  - *Keputusan:* Menyediakan fungsi penerjemah deskripsi (`translateDescription`) yang menerjemahkan istilah umum deskripsi akun/joki dan kalimat penjelasan ke Bahasa Inggris, sementara atribut judul produk dikecualikan dari transformasi teks.
+  - *Alasan:* Pembeli internasional maupun pengguna berbahasa Inggris membutuhkan kejelasan spesifikasi dan deskripsi akun, tetapi tetap mengenali nama asli akun, skin, atau paket game tersebut.
 
-### B. Helper Parser & Formatter Pengiriman Akun
-- Menambahkan fungsi `parseStructuredDeliveryInfo(raw)` dan `formatStructuredDeliveryInfo(...)` di `server.ts` untuk mengekstrak `accountType`, `accountEmail`, `accountPassword`, dan `extraNotes` dari format `[tipe akun] [email] [password]` serta memperbarui data seed produk beranda agar menggunakan format standar `[Tipe Akun] [Email] [Password]`.
+### 4. Technical Architecture & Data Strategy
 
-### C. Pengiriman Email Akses Akun & Invoice Top Up Otomatis Saat Lunas
-- Membuat fungsi `sendOrderFulfillmentEmail(tx, req?)` menggunakan `renderBrandedEmailTemplate` dan `sendTransactionalEmail`:
-  1. **Untuk Produk Beranda (`product_type !== "topup"`)**: Mengirimkan email bertajuk **"📦 Akses Data Akun & Bukti Pembelian — {{product_title}}"** yang memuat blok kredensial `[Tipe Akun]`, `[Email / Username]`, `[Password]`, format lengkap `[tipe akun] [email] [password]`, serta detail invoice pesanan.
-  2. **Untuk Produk Top Up Game (`product_type === "topup"`)**: Mengirimkan email bertajuk **"🧾 Invoice Resmi Top Up {{game_name}} — {{denomination_label}}"** yang memuat Nomor Invoice (`session_id`), Nama Game & Item, Tujuan Akun (`customer_no` & `verified_nickname`), Metode Pembayaran (`destination_name`), Rincian Harga & Total Lunas, serta Waktu Lunas.
-- Memanggil `sendOrderFulfillmentEmail(tx)` secara otomatis dan idempoten (`tx.fulfillment_email_sent_at`) saat status transaksi berubah menjadi `paid` di:
-  - `markPaykitaTransactionPaid` (saat pembayaran QRIS PayKita atau Duitku terkonfirmasi lunas via cek status / webhook).
-  - `admin.post("/orders/:session_id/approve")` (saat Admin menyetujui pembayaran manual / crypto / pesanan).
-- Menambahkan endpoint `POST /api/payments/resend-order-email/:session_id` agar pembeli atau admin dapat mengirim ulang email akses akun / invoice kapan saja jika diperlukan.
+Sistem lokalisasi bekerja melalui dua lapisan yang saling melengkapi: lapisan komponen reaktif menggunakan konteks bahasa, dan lapisan pemformatan teks dinamis untuk konten dari database (deskripsi produk, jumlah terjual, dan ulasan).
+
+```
++-------------------------------------------------------------------+
+|                   LanguageContext (State: 'id' | 'en')            |
+|  - t(idText, enText): Helper reaktif langsung untuk komponen UI   |
+|  - translateDesc(text): Penerjemah deskripsi produk & ulasan      |
+|  - Dynamic Pattern Matcher: Menangani angka ("12 Produk", dll.)   |
++---------------------------------+---------------------------------+
+                                  |
+         +------------------------+------------------------+
+         |                                                 |
+         v                                                 v
++--------------------------------+       +----------------------------------+
+|   Komponen Beranda & Layout    |       |  Transaksi, Top-Up & Akun User   |
+|  - Navbar & Footer             |       |  - ProductModal (Checkout Area)  |
+|  - Hero & Trust Pillars        |       |  - Topup Page (Game & Nominal)   |
+|  - Catalog (Filter, Sort, Card)|       |  - Account Page (Vault & Order)  |
+|  - HowItWorks (Tab & Steps)    |       |  - AuthModal & Payment Status    |
+|  - Testimonials (Filter & Card)|       |  * Judul Produk Tetap Asli *     |
++--------------------------------+       +----------------------------------+
+```

@@ -11,6 +11,7 @@ import { TopupPaymentStep, DEFAULT_DUITKU_CHANNELS } from "@/components/topup/To
 import { TopupStepper } from "@/components/topup/TopupStepper";
 import { api, formatApiError, formatIDR, imgSrc } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useTopupGames, validateTopupDestination, localFieldError } from "@/hooks/useTopup";
 
 const slugifyId = (v) =>
@@ -18,6 +19,7 @@ const slugifyId = (v) =>
 
 export default function Topup() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { games, loading, error, reload } = useTopupGames();
 
   const [step, setStep] = useState("game");
@@ -198,16 +200,16 @@ export default function Topup() {
 
   const stepSummaries = useMemo(
     () => ({
-      game: game?.name || "Belum dipilih",
+      game: game?.name || t("Belum dipilih", "Not selected"),
       account:
         denomination && destinationLabel
           ? `${validation?.nickname ? `${validation.nickname} · ` : ""}${destinationLabel} · ${denomination.label}`
           : denomination
             ? denomination.label
-            : destinationLabel || "Isi ID & pilih paket",
-      payment: denomination ? formatIDR(denomination.price) : "Metode bayar",
+            : destinationLabel || t("Isi ID & pilih paket", "Enter ID & pick package"),
+      payment: denomination ? formatIDR(denomination.price) : t("Metode bayar", "Payment method"),
     }),
-    [game, destinationLabel, denomination, validation?.nickname]
+    [game, destinationLabel, denomination, validation?.nickname, t]
   );
 
   const isConfigureStep = step === "account" || step === "denomination";
@@ -224,7 +226,7 @@ export default function Topup() {
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-28 sm:pt-28 sm:pb-32">
         <div className="mb-6">
           <p className="text-[10px] font-mono uppercase tracking-[0.35em] text-neon mb-1.5">
-            Top Up Instan 24/7 &middot; Digiflazz Official
+            {t("Top Up Instan 24/7 · Digiflazz Official", "24/7 Instant Top Up · Digiflazz Official")}
           </p>
           <h1 className="font-display font-black text-2xl sm:text-3xl uppercase tracking-tight">
             Top Up <span className="text-stroke">Game</span>
@@ -295,7 +297,7 @@ export default function Topup() {
                     data-testid="topup-prev-game"
                     className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-void/80 text-slate-300 font-mono text-[11px] uppercase tracking-wider px-3.5 py-2 hover:text-neon hover:border-neon/60 transition-colors cursor-pointer"
                   >
-                    <ArrowLeft size={13} /> Ganti Game
+                    <ArrowLeft size={13} /> {t("Ganti Game", "Change Game")}
                   </button>
                 </div>
               )}
@@ -349,7 +351,10 @@ export default function Topup() {
                       </div>
                     ) : (
                       <p className="text-xs font-mono text-slate-400">
-                        Isi ID tujuan, verifikasi ID game, dan pilih paket nominal di atas untuk melanjutkan.
+                        {t(
+                          "Isi ID tujuan, verifikasi ID game, dan pilih paket nominal di atas untuk melanjutkan.",
+                          "Fill in target ID, verify your game ID, and choose a denomination package above to continue."
+                        )}
                       </p>
                     )}
                   </div>
@@ -361,7 +366,11 @@ export default function Topup() {
                     data-testid="topup-next-payment"
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-neon to-cyan-300 hover:from-lime hover:to-neon text-void font-display font-extrabold text-xs uppercase tracking-wider px-6 py-3.5 shadow-[0_0_22px_rgba(0,240,255,0.3)] transition-all disabled:opacity-60 cursor-pointer active:scale-95 shrink-0"
                   >
-                    <span>{checking ? "Memverifikasi ID..." : "Verifikasi & Lanjut Checkout"}</span>
+                    <span>
+                      {checking
+                        ? t("Memverifikasi ID...", "Verifying ID...")
+                        : t("Verifikasi & Lanjut Checkout", "Verify & Proceed to Checkout")}
+                    </span>
                     <ArrowRight size={14} />
                   </button>
                 </div>
@@ -376,7 +385,7 @@ export default function Topup() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25 }}
-              aria-label="Pembayaran"
+              aria-label={t("Pembayaran", "Payment")}
             >
               <TopupPaymentStep
                 game={game}
@@ -401,7 +410,7 @@ export default function Topup() {
                   data-testid="topup-prev-denomination"
                   className="inline-flex items-center gap-2 rounded-xl border border-line bg-panel/80 text-slate-300 font-mono text-xs uppercase tracking-wider px-5 py-3 hover:text-neon hover:border-neon/60 transition-colors cursor-pointer"
                 >
-                  <ArrowLeft size={14} /> Ubah Tujuan &amp; Nominal
+                  <ArrowLeft size={14} /> {t("Ubah Tujuan & Nominal", "Change ID & Amount")}
                 </button>
               </div>
             </motion.section>
@@ -415,7 +424,7 @@ export default function Topup() {
             data-testid="topup-reload-games"
             className="mt-8 inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400 hover:text-neon transition-colors cursor-pointer"
           >
-            <RefreshCw size={13} /> Muat ulang daftar game
+            <RefreshCw size={13} /> {t("Muat ulang daftar game", "Reload games list")}
           </button>
         )}
       </div>

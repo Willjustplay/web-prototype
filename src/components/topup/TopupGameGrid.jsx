@@ -2,18 +2,20 @@ import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Gamepad2, X, ArrowUpRight, Flame, SlidersHorizontal } from "lucide-react";
 import { formatIDR, imgSrc } from "@/lib/api";
-
-const FILTER_MODES = [
-  { id: "all", label: "Semua Game" },
-  { id: "featured", label: "Populer" },
-  { id: "cheapest", label: "Termurah" },
-  { id: "az", label: "A - Z" },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 /** Step 1 — pick the game to top up. */
 export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry }) => {
+  const { t } = useLanguage();
   const [q, setQ] = useState("");
   const [filterMode, setFilterMode] = useState("all");
+
+  const FILTER_MODES = [
+    { id: "all", label: t("Semua Game", "All Games") },
+    { id: "featured", label: t("Populer", "Popular") },
+    { id: "cheapest", label: t("Termurah", "Lowest Price") },
+    { id: "az", label: "A - Z" },
+  ];
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();

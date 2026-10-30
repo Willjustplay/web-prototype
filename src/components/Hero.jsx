@@ -26,12 +26,7 @@ import {
 } from "lucide-react";
 import { formatIDR, formatUSD, imgSrc, api } from "@/lib/api";
 import { socialIcon } from "@/lib/socials";
-
-const LINES = [
-  { text: "BELI AKUN GAME", cls: "text-slate-100" },
-  { text: "& JASA JOKI", cls: "text-neon" },
-  { text: "INSTANT.", cls: "text-stroke" },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -83,39 +78,58 @@ const FALLBACK_SPOTLIGHTS = [
   },
 ];
 
-const LIVE_FEED_EVENTS = [
-  {
-    tag: "TRANSAKSI LIVE",
-    text: "Akun Mythic Glory Full Skin baru saja terjual",
-    meta: "2 menit lalu • Terverifikasi",
-    tone: "text-lime border-lime/40 bg-lime/10",
-  },
-  {
-    tag: "TOP UP KILAT",
-    text: "Top Up 257 Diamonds MLBB sukses terkirim",
-    meta: "8 detik • Otomatis",
-    tone: "text-neon border-neon/40 bg-neon/10",
-  },
-  {
-    tag: "JOKI SELESAI",
-    text: "Order Joki Rank Legend → Mythic Honor tuntas",
-    meta: "11 menit lalu • Winrate 88%",
-    tone: "text-amber-300 border-amber-400/40 bg-amber-400/10",
-  },
-  {
-    tag: "STOK BARU",
-    text: "Akun Sultan Valorant & Genshin siap checkout",
-    meta: "Baru saja • Garansi 100%",
-    tone: "text-coral border-coral/40 bg-coral/10",
-  },
-];
-
 const compact = (n) =>
   n >= 1000
     ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "")}K+`
     : `${n}`;
 
 export const Hero = ({ featured, products = [], onSelect }) => {
+  const { t } = useLanguage();
+
+  const LINES = [
+    { text: t("BELI AKUN GAME", "BUY GAME ACCOUNTS"), cls: "text-slate-100" },
+    { text: t("& JASA JOKI", "& PRO BOOSTING"), cls: "text-neon" },
+    { text: t("INSTANT.", "INSTANTLY."), cls: "text-stroke" },
+  ];
+
+  const LIVE_FEED_EVENTS = [
+    {
+      tag: t("TRANSAKSI LIVE", "LIVE TRANSACTION"),
+      text: t(
+        "Akun Mythic Glory Full Skin baru saja terjual",
+        "Mythic Glory Full Skin Account just sold"
+      ),
+      meta: t("2 menit lalu • Terverifikasi", "2 mins ago • Verified"),
+      tone: "text-lime border-lime/40 bg-lime/10",
+    },
+    {
+      tag: t("TOP UP KILAT", "FLASH TOP UP"),
+      text: t(
+        "Top Up 257 Diamonds MLBB sukses terkirim",
+        "257 Diamonds MLBB Top Up delivered"
+      ),
+      meta: t("8 detik • Otomatis", "8 secs • Automatic"),
+      tone: "text-neon border-neon/40 bg-neon/10",
+    },
+    {
+      tag: t("JOKI SELESAI", "BOOST COMPLETED"),
+      text: t(
+        "Order Joki Rank Legend → Mythic Honor tuntas",
+        "Legend → Mythic Honor Boost completed"
+      ),
+      meta: t("11 menit lalu • Winrate 88%", "11 mins ago • 88% Winrate"),
+      tone: "text-amber-300 border-amber-400/40 bg-amber-400/10",
+    },
+    {
+      tag: t("STOK BARU", "NEW STOCK"),
+      text: t(
+        "Akun Sultan Valorant & Genshin siap checkout",
+        "Premium Valorant & Genshin Accounts ready"
+      ),
+      meta: t("Baru saja • Garansi 100%", "Just now • 100% Warranty"),
+      tone: "text-coral border-coral/40 bg-coral/10",
+    },
+  ];
   const safeProducts = useMemo(
     () =>
       (Array.isArray(products) ? products : []).filter(
@@ -298,24 +312,33 @@ export const Hero = ({ featured, products = [], onSelect }) => {
   const TRUST_PILLARS = [
     {
       icon: ShieldCheck,
-      label: "Anti-Hackback",
+      label: t("Anti-Hackback", "Anti-Hackback"),
       tone: "text-lime border-lime/35 bg-lime/10",
       activeTone: "border-lime bg-lime/15 text-lime shadow-[0_0_20px_rgba(163,230,53,0.2)]",
-      desc: "Setiap akun melewati verifikasi berlapis & garansi uang kembali penuh jika terjadi kendala keamanan.",
+      desc: t(
+        "Setiap akun melewati verifikasi berlapis & garansi uang kembali penuh jika terjadi kendala keamanan.",
+        "Every account passes multi-layer verification & a full money-back guarantee in case of any security issue."
+      ),
     },
     {
       icon: Timer,
-      label: "Kirim Instan",
+      label: t("Kirim Instan", "Instant Delivery"),
       tone: "text-neon border-neon/35 bg-neon/10",
       activeTone: "border-neon bg-neon/15 text-neon shadow-[0_0_20px_rgba(0,240,255,0.2)]",
-      desc: "Data akun & progres pesanan diproses cepat dalam 1–15 menit langsung ke akun atau WhatsApp Anda.",
+      desc: t(
+        "Data akun & progres pesanan diproses cepat dalam 1–15 menit langsung ke akun atau WhatsApp Anda.",
+        "Account credentials & order progress are processed rapidly within 1–15 minutes directly to your account or WhatsApp."
+      ),
     },
     {
       icon: BadgeCheck,
-      label: "Bergaransi",
+      label: t("Bergaransi", "Guaranteed"),
       tone: "text-amber-300 border-amber-400/35 bg-amber-400/10",
       activeTone: "border-amber-400 bg-amber-400/15 text-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.2)]",
-      desc: "Dukungan admin responsif setiap hari pukul 10.00–22.00 WIB siap mengawal transaksi sampai tuntas.",
+      desc: t(
+        "Dukungan admin responsif setiap hari pukul 10.00–22.00 WIB siap mengawal transaksi sampai tuntas.",
+        "Responsive admin support every day from 10:00–22:00 WIB ready to assist your transaction until completion."
+      ),
     },
   ];
 
@@ -350,10 +373,17 @@ export const Hero = ({ featured, products = [], onSelect }) => {
               className="text-[9px] min-[380px]:text-[10px] sm:text-xs uppercase tracking-[0.08em] min-[420px]:tracking-[0.14em] sm:tracking-[0.2em] text-neon/95 font-mono font-semibold leading-tight break-words min-w-0"
               data-testid="hero-eyebrow"
             >
-              Store Game Indonesia &bull; 100% Garansi Aman
+              {t(
+                "Store Game Indonesia • 100% Garansi Aman",
+                "Indonesia Game Store • 100% Safe Guarantee"
+              )}
             </p>
             <span className="hidden sm:inline-flex items-center gap-1 pl-2 border-l border-line text-[10px] font-mono text-lime font-semibold">
-              <Sparkles size={10} /> Ready {safeProducts.length || 12}+ Produk
+              <Sparkles size={10} />{" "}
+              {t(
+                `Ready ${safeProducts.length || 12}+ Produk`,
+                `Ready ${safeProducts.length || 12}+ Products`
+              )}
             </span>
           </motion.div>
 
@@ -389,10 +419,10 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                         <span>
                           {
                             [
-                              "PROSES 1-5 MENIT",
-                              "GARANSI PENUH",
-                              "OTOMATIS 24/7",
-                              "TERVERIFIKASI",
+                              t("PROSES 1-5 MENIT", "1-5 MIN PROCESS"),
+                              t("GARANSI PENUH", "FULL WARRANTY"),
+                              t("OTOMATIS 24/7", "24/7 AUTOMATIC"),
+                              t("TERVERIFIKASI", "VERIFIED"),
                             ][feedIndex % 4]
                           }
                         </span>
@@ -427,9 +457,10 @@ export const Hero = ({ featured, products = [], onSelect }) => {
             className="mt-4 sm:mt-5 max-w-xl text-xs min-[390px]:text-[13px] sm:text-base leading-relaxed text-slate-300/90 break-words"
             data-testid="hero-subtitle"
           >
-            Store game terpercaya, dapatkan akun game berkualitas dan joki
-            dengan harga terjangkau, proses cepat dan tanpa ribet juga
-            bergaransi.
+            {t(
+              "Store game terpercaya, dapatkan akun game berkualitas dan joki dengan harga terjangkau, proses cepat dan tanpa ribet juga bergaransi.",
+              "Trusted gaming marketplace — get premium game accounts and pro rank boosting at affordable prices, fast delivery, zero hassle, and full warranty."
+            )}
           </motion.p>
 
           {/* Interactive Quick-Trust Feature Pills with Dynamic Insight Box */}
@@ -444,7 +475,7 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                 const isSelected = activeTrustIdx === idx;
                 return (
                   <button
-                    key={label}
+                    key={idx}
                     type="button"
                     onClick={() => setActiveTrustIdx(idx)}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-wider border transition-all duration-200 hover:-translate-y-0.5 active:scale-95 ${
@@ -496,7 +527,7 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                 }`}
               >
                 <Share2 size={14} className="text-neon shrink-0" />
-                <span className="whitespace-nowrap">Sosial Media</span>
+                <span className="whitespace-nowrap">{t("Sosial Media", "Social Media")}</span>
                 <ChevronDown
                   size={13}
                   className={`transition-transform duration-300 shrink-0 ${
@@ -519,7 +550,7 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                         className="px-4 py-3 text-[11px] font-mono text-slate-500"
                         data-testid="hero-social-empty"
                       >
-                        Belum ada sosial media
+                        {t("Belum ada sosial media", "No social media links yet")}
                       </p>
                     ) : (
                       socialLinks.map((s) => {
@@ -563,19 +594,19 @@ export const Hero = ({ featured, products = [], onSelect }) => {
             {[
               {
                 v: compact(totalSold || 1240),
-                l: "Produk Terjual",
+                l: t("Produk Terjual", "Products Sold"),
                 t: "hero-metric-sold",
                 accent: "text-neon",
               },
               {
                 v: `${avgRating}/5`,
-                l: "Rating Pembeli",
+                l: t("Rating Pembeli", "Buyer Rating"),
                 t: "hero-metric-rating",
                 accent: "text-lime",
               },
               {
                 v: "10.00-22.00",
-                l: "Jam Operasional",
+                l: t("Jam Operasional", "Operating Hours"),
                 t: "hero-metric-cs",
                 accent: "text-slate-100",
               },
@@ -748,19 +779,19 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                   {/* Top Badges */}
                   <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 flex flex-wrap items-center gap-1.5">
                     <span className="flex items-center gap-1 rounded-lg bg-neon text-void text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest px-2.5 py-1 shadow-md">
-                      <BadgeCheck size={11} /> Unggulan
+                      <BadgeCheck size={11} /> {t("Unggulan", "Featured")}
                     </span>
                     <span className="flex items-center gap-1 rounded-lg bg-void/85 backdrop-blur-md border border-line text-slate-200 text-[9px] sm:text-[10px] font-mono uppercase tracking-wider px-2.5 py-1">
                       <Flame size={10} className="text-coral" />
                       {highlight?.category === "joki"
-                        ? "Jasa Joki Pro"
-                        : "Akun Sultan"}
+                        ? t("Jasa Joki Pro", "Pro Boosting")
+                        : t("Akun Sultan", "Premium Account")}
                     </span>
                   </div>
 
                   {discountPct && (
                     <span className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-20 rounded-lg bg-coral text-white text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 shadow-md">
-                      Hemat {discountPct}%
+                      {t(`Hemat ${discountPct}%`, `Save ${discountPct}%`)}
                     </span>
                   )}
 
@@ -794,8 +825,10 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                       {highlight?.game || "Mobile Legends"}
                     </p>
                     <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 shrink-0 tabular-nums">
-                      {highlight?.sold ?? 214} terjual &bull; Stok{" "}
-                      {highlight?.stock ?? 1}
+                      {t(
+                        `${highlight?.sold ?? 214} terjual • Stok ${highlight?.stock ?? 1}`,
+                        `${highlight?.sold ?? 214} sold • Stock ${highlight?.stock ?? 1}`
+                      )}
                     </span>
                   </div>
 
@@ -816,7 +849,7 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                   <div className="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-slate-500">
-                        Harga Terbaik
+                        {t("Harga Terbaik", "Best Price")}
                       </p>
                       <div className="flex items-baseline gap-1.5 flex-wrap">
                         <span className="font-mono font-bold text-base sm:text-xl text-neon truncate tabular-nums">
@@ -841,7 +874,7 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                       data-testid="hero-spotlight-action"
                       className="group inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-neon to-lime text-void hover:brightness-105 font-display font-bold text-[10px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.16em] px-3.5 sm:px-4 py-2 sm:py-2.5 shadow-[0_0_16px_rgba(0,240,255,0.25)] transition-all duration-300 shrink-0 active:scale-95"
                     >
-                      Lihat Detail
+                      {t("Lihat Detail", "View Details")}
                       <ArrowUpRight
                         size={13}
                         className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
@@ -888,10 +921,12 @@ export const Hero = ({ featured, products = [], onSelect }) => {
                 {/* Inline Trust Footer inside Showcase Card */}
                 <div className="px-3.5 sm:px-4 py-2.5 bg-void/90 border-t border-line/70 flex items-center justify-between gap-2 text-[9px] sm:text-[10px] font-mono">
                   <span className="flex items-center gap-1.5 text-lime font-bold uppercase tracking-wider">
-                    <ShieldCheck size={12} className="shrink-0" /> Garansi 100%
+                    <ShieldCheck size={12} className="shrink-0" />{" "}
+                    {t("Garansi 100%", "100% Warranty")}
                   </span>
                   <span className="flex items-center gap-1.5 text-neon font-bold uppercase tracking-wider">
-                    <Timer size={12} className="shrink-0" /> Proses 5-15 Menit
+                    <Timer size={12} className="shrink-0" />{" "}
+                    {t("Proses 5-15 Menit", "5-15 Min Process")}
                   </span>
                 </div>
               </div>

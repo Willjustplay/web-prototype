@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { formatIDR, formatUSD, imgSrc } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 const badgeCls = (b) =>
   b === "Diskon Hot"
@@ -44,15 +45,9 @@ const CATEGORIES = [
   "Lainnya",
 ];
 
-const SORTS = [
-  { v: "populer", l: "Paling Populer" },
-  { v: "termurah", l: "Harga Terendah" },
-  { v: "termahal", l: "Harga Tertinggi" },
-  { v: "terbaru", l: "Produk Terbaru" },
-];
-
 export const Catalog = ({ products = [], loading = false, onSelect }) => {
   const { isWishlisted, toggleWishlist } = useAuth();
+  const { t, translateCategory, translateBadge } = useLanguage();
   const [game, setGame] = useState("Semua Game");
   const [category, setCategory] = useState("Semua Kategori");
   const [sort, setSort] = useState("populer");
@@ -60,6 +55,13 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
   const [onlyReady, setOnlyReady] = useState(false);
   const [onlyPromo, setOnlyPromo] = useState(false);
   const [mobileCompact, setMobileCompact] = useState(true);
+
+  const sorts = [
+    { v: "populer", l: t("Paling Populer", "Most Popular") },
+    { v: "termurah", l: t("Harga Terendah", "Lowest Price") },
+    { v: "termahal", l: t("Harga Tertinggi", "Highest Price") },
+    { v: "terbaru", l: t("Produk Terbaru", "Newest Products") },
+  ];
 
   // Filter out topup products so they are strictly handled in /topup
   const storeProducts = useMemo(() => {
@@ -124,13 +126,6 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
     return [...list].sort(sorters[sort]);
   }, [storeProducts, game, category, q, sort, onlyReady, onlyPromo]);
 
-  const hasActiveFilters =
-    game !== "Semua Game" ||
-    category !== "Semua Kategori" ||
-    q.trim() !== "" ||
-    onlyReady ||
-    onlyPromo;
-
   const resetFilters = () => {
     setGame("Semua Game");
     setCategory("Semua Kategori");
@@ -156,17 +151,22 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
             <div className="inline-flex items-center gap-2 bg-transparent">
               <Sparkles size={11} className="text-neon shrink-0" />
               <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-neon font-mono font-semibold">
-                Katalog Store &bull; Bergaransi 100%
+                {t("Katalog Store • Bergaransi 100%", "Store Catalog • 100% Guaranteed")}
               </span>
               <span className="pl-2 border-l border-line text-[10px] font-mono text-slate-400 tabular-nums">
-                {filtered.length} Produk
+                {filtered.length}{" "}
+                {t(
+                  "Produk",
+                  filtered.length === 1 ? "Product" : "Products"
+                )}
               </span>
             </div>
             <h2
               className="font-display font-black uppercase tracking-tight text-2xl sm:text-3xl lg:text-4xl text-slate-100"
               data-testid="catalog-title"
             >
-              Pilih Senjata<span className="text-neon">mu.</span>
+              {t("Pilih Senjata", "Choose Your ")}
+              <span className="text-neon">{t("mu.", "Arsenal.")}</span>
             </h2>
           </div>
 
@@ -180,7 +180,10 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Cari akun, game, atau item..."
+                placeholder={t(
+                  "Cari akun, game, atau item...",
+                  "Search accounts, games, or items..."
+                )}
                 data-testid="catalog-search-input"
                 className="w-full rounded-xl bg-panel/80 border border-line/80 focus:border-neon/70 focus:bg-panel outline-none text-xs font-mono pl-9 pr-8 py-2.5 text-slate-100 placeholder:text-slate-500 transition-all shadow-sm"
               />
@@ -188,7 +191,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                 <button
                   type="button"
                   onClick={() => setQ("")}
-                  aria-label="Hapus pencarian"
+                  aria-label={t("Hapus pencarian", "Clear search")}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-neon p-0.5 rounded-md transition-colors"
                 >
                   <X size={13} />
@@ -201,10 +204,10 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                 value={sort}
                 onChange={(e) => setSort(e.target.value)}
                 data-testid="catalog-sort-select"
-                aria-label="Urutkan produk"
+                aria-label={t("Urutkan produk", "Sort products")}
                 className="rounded-xl bg-transparent border border-line/80 focus:border-neon/70 outline-none text-[11px] sm:text-xs font-mono pl-3.5 pr-8 py-2.5 text-slate-200 hover:border-slate-600 transition-colors cursor-pointer appearance-none"
               >
-                {SORTS.map((s) => (
+                {sorts.map((s) => (
                   <option key={s.v} value={s.v} className="bg-void text-slate-200">
                     {s.l}
                   </option>
@@ -219,11 +222,11 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
             <button
               type="button"
               onClick={() => setMobileCompact((v) => !v)}
-              aria-label="Ubah tampilan grid mobile"
+              aria-label={t("Ubah tampilan grid mobile", "Toggle mobile grid layout")}
               title={
                 mobileCompact
-                  ? "Ganti ke tampilan 1 kolom"
-                  : "Ganti ke tampilan 2 kolom"
+                  ? t("Ganti ke tampilan 1 kolom", "Switch to 1-column view")
+                  : t("Ganti ke tampilan 2 kolom", "Switch to 2-column view")
               }
               className="sm:hidden grid place-items-center w-9 h-9 rounded-xl bg-panel/80 border border-line/80 text-slate-300 hover:text-neon active:scale-95 transition-all shrink-0"
             >
@@ -262,7 +265,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                         className="absolute inset-0 rounded-xl bg-gradient-to-r from-neon to-lime z-0 shadow-[0_0_16px_rgba(0,240,255,0.25)]"
                       />
                     )}
-                    <span className="relative z-10">{c}</span>
+                    <span className="relative z-10">{translateCategory(c)}</span>
                     <span
                       className={`relative z-10 text-[10px] font-mono tabular-nums ${
                         isActive
@@ -289,7 +292,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                 }`}
               >
                 <CheckCircle2 size={12} className={onlyReady ? "text-lime" : "text-slate-500"} />
-                <span>Stok Ready</span>
+                <span>{t("Stok Ready", "In Stock")}</span>
               </button>
             </div>
           </div>
@@ -314,7 +317,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                         : "border-line/60 text-slate-400 hover:text-slate-200 bg-panel/40 hover:bg-panel/80 hover:border-line"
                     }`}
                   >
-                    {g}
+                    {g === "Semua Game" ? t("Semua Game", "All Games") : g}
                   </button>
                 );
               })}
@@ -356,10 +359,13 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                 <PackageSearch size={26} />
               </div>
               <h3 className="font-display font-bold uppercase text-sm sm:text-base text-slate-200">
-                Produk tidak ditemukan
+                {t("Produk tidak ditemukan", "No products found")}
               </h3>
               <p className="text-xs text-slate-400 font-mono mt-1 max-w-sm mx-auto">
-                Coba kata kunci lain atau atur ulang filter pencarian Anda.
+                {t(
+                  "Coba kata kunci lain atau atur ulang filter pencarian Anda.",
+                  "Try another keyword or reset your search filters."
+                )}
               </p>
               <button
                 type="button"
@@ -367,7 +373,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                 className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-neon to-lime text-void font-display font-bold text-[11px] uppercase tracking-widest px-5 py-2.5 hover:brightness-105 transition-all active:scale-95"
               >
                 <RotateCcw size={13} />
-                Reset Filter
+                {t("Reset Filter", "Reset Filters")}
               </button>
             </motion.div>
           ) : (
@@ -431,7 +437,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                                 data-testid={`stock-out-${p.id}`}
                                 className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-lg bg-coral text-white shadow-sm"
                               >
-                                Habis
+                                {t("Habis", "Sold Out")}
                               </span>
                             ) : primaryBadge ? (
                               <span
@@ -439,7 +445,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                                   primaryBadge
                                 )}`}
                               >
-                                {primaryBadge}
+                                {translateBadge(primaryBadge)}
                               </span>
                             ) : null}
 
@@ -458,7 +464,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                               toggleWishlist(p.id);
                             }}
                             data-testid={`wishlist-toggle-${p.id}`}
-                            aria-label="Tambah ke favorit"
+                            aria-label={t("Tambah ke favorit", "Add to wishlist")}
                             className="absolute top-2.5 right-2.5 z-20 w-7 h-7 sm:w-8 sm:h-8 rounded-xl grid place-items-center bg-void/80 backdrop-blur-md border border-line/60 hover:border-coral/60 transition-all active:scale-90"
                           >
                             <Heart
@@ -489,7 +495,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                             <span className="truncate">
                               <span className="text-neon/90 font-semibold">{p.game}</span>
                               <span className="mx-1.5 text-slate-600">&bull;</span>
-                              <span>{p.category}</span>
+                              <span>{translateCategory(p.category)}</span>
                             </span>
                             {p.condition && (
                               <span
@@ -535,7 +541,7 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                             )}
                             <span className="truncate">
                               {p.rank ? `${p.rank} · ` : ""}
-                              {p.sold || 0} terjual
+                              {p.sold || 0} {t("terjual", "sold")}
                             </span>
                           </div>
                         </div>
@@ -558,5 +564,3 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
     </section>
   );
 };
-
-

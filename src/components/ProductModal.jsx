@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { api, formatIDR, formatUSD, waLink, imgSrc } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useSwipeNav } from "@/hooks/useSwipeNav";
 import { ImageZoomViewer } from "@/components/ImageZoomViewer";
 
@@ -35,6 +36,7 @@ const condTone = (c) => {
 
 export const ProductModal = ({ product, onClose }) => {
   const { user } = useAuth();
+  const { t, translateDesc, translateCategory, translateBadge } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [buyerContact, setBuyerContact] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
@@ -364,7 +366,7 @@ export const ProductModal = ({ product, onClose }) => {
                     data-testid="modal-badges"
                   >
                     <span className="text-[10px] font-mono font-semibold text-neon tracking-wider">
-                      {mBadges.join(" · ")}
+                      {mBadges.map((b) => translateBadge(b)).join(" · ")}
                     </span>
                   </div>
                 )}
@@ -377,16 +379,18 @@ export const ProductModal = ({ product, onClose }) => {
                       onClick={() =>
                         setImageFit((f) => (f === "contain" ? "cover" : "contain"))
                       }
-                      title="Ubah mode tampilan foto"
+                      title={t("Ubah mode tampilan foto", "Toggle image fit mode")}
                       className="px-2.5 h-8 bg-void/85 backdrop-blur text-[10px] font-mono text-slate-300 hover:text-neon border border-line/70 hover:border-neon transition-colors whitespace-nowrap shrink-0"
                     >
-                      {imageFit === "contain" ? "Layar Penuh" : "Proporsional"}
+                      {imageFit === "contain"
+                        ? t("Layar Penuh", "Full View")
+                        : t("Proporsional", "Fit View")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setZoom(true)}
                       data-testid="modal-zoom-button"
-                      aria-label="Perbesar gambar"
+                      aria-label={t("Perbesar gambar", "Zoom image")}
                       className="grid place-items-center w-8 h-8 bg-void/85 backdrop-blur text-slate-200 hover:text-neon border border-line/70 hover:border-neon transition-colors duration-200"
                     >
                       <Maximize2 size={14} />
@@ -401,7 +405,7 @@ export const ProductModal = ({ product, onClose }) => {
                       type="button"
                       onClick={goPrev}
                       data-testid="modal-prev-button"
-                      aria-label="Gambar sebelumnya"
+                      aria-label={t("Gambar sebelumnya", "Previous image")}
                       className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 grid place-items-center w-8 h-8 bg-void/85 backdrop-blur border border-line/70 hover:border-neon text-slate-200 hover:text-neon opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-200"
                     >
                       <ChevronLeft size={16} />
@@ -410,7 +414,7 @@ export const ProductModal = ({ product, onClose }) => {
                       type="button"
                       onClick={goNext}
                       data-testid="modal-next-button"
-                      aria-label="Gambar selanjutnya"
+                      aria-label={t("Gambar selanjutnya", "Next image")}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 grid place-items-center w-8 h-8 bg-void/85 backdrop-blur border border-line/70 hover:border-neon text-slate-200 hover:text-neon opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-200"
                     >
                       <ChevronRight size={16} />
@@ -437,7 +441,7 @@ export const ProductModal = ({ product, onClose }) => {
                         key={`${g}-${i}`}
                         onClick={() => setActive(i)}
                         data-testid={`modal-thumb-${i}`}
-                        aria-label={`Lihat gambar ${i + 1}`}
+                        aria-label={t(`Lihat gambar ${i + 1}`, `View image ${i + 1}`)}
                         className={`relative w-14 h-11 shrink-0 overflow-hidden border transition-all duration-150 ${
                           active === i
                             ? "border-neon opacity-100"
@@ -468,24 +472,27 @@ export const ProductModal = ({ product, onClose }) => {
                   </div>
                   <div className="px-2">
                     <p className="text-[10px] font-mono text-slate-400">
-                      Stok
+                      {t("Stok", "Stock")}
                     </p>
                     <p
                       className="text-xs font-mono font-semibold tabular-nums text-slate-100 mt-0.5"
                       data-testid="modal-stock"
                     >
-                      {product.stock} Unit
+                      {product.stock}{" "}
+                      {t("Unit", Number(product.stock) === 1 ? "Unit" : "Units")}
                     </p>
                   </div>
                   <div className="px-2">
                     <p className="text-[10px] font-mono text-slate-400">
-                      Garansi
+                      {t("Garansi", "Warranty")}
                     </p>
                     <p
                       className="text-xs font-semibold text-lime mt-0.5"
                       data-testid="modal-warranty"
                     >
-                      {product.warranty || "100% Aman"}
+                      {product.warranty === "100% Aman" || !product.warranty
+                        ? t("100% Aman", "100% Safe")
+                        : product.warranty}
                     </p>
                   </div>
                 </div>
@@ -503,7 +510,7 @@ export const ProductModal = ({ product, onClose }) => {
                       {product.game}
                     </span>
                     <span aria-hidden="true">·</span>
-                    <span className="truncate">{product.category}</span>
+                    <span className="truncate">{translateCategory(product.category)}</span>
                     {product.condition && (
                       <>
                         <span aria-hidden="true">·</span>
@@ -557,16 +564,23 @@ export const ProductModal = ({ product, onClose }) => {
                     data-testid="toggle-product-description"
                     aria-label={
                       showDescription
-                        ? "Sembunyikan deskripsi produk"
-                        : "Tampilkan deskripsi produk"
+                        ? t("Sembunyikan deskripsi produk", "Hide product description")
+                        : t("Tampilkan deskripsi produk", "Show product description")
                     }
                     className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-neon transition-colors py-0.5"
                   >
                     <span className="truncate pr-2">
-                      {showDescription ? "Deskripsi Produk" : product.description || "Deskripsi Produk"}
+                      {showDescription
+                        ? t("Deskripsi Produk", "Product Description")
+                        : translateDesc(product.description) ||
+                          t("Deskripsi Produk", "Product Description")}
                     </span>
                     <span className="inline-flex items-center gap-1 font-mono text-neon shrink-0">
-                      <span>{showDescription ? "Tutup" : "Detail"}</span>
+                      <span>
+                        {showDescription
+                          ? t("Tutup", "Close")
+                          : t("Detail", "Details")}
+                      </span>
                       <ChevronDown
                         size={13}
                         className={`transition-transform duration-200 ${
@@ -586,7 +600,8 @@ export const ProductModal = ({ product, onClose }) => {
                         className="overflow-y-auto max-h-28 text-xs leading-relaxed text-slate-300 mt-2 pt-2 border-t border-line/50 pr-1 whitespace-pre-line"
                         data-testid="modal-product-description"
                       >
-                        {product.description || "Tidak ada deskripsi tambahan."}
+                        {translateDesc(product.description) ||
+                          t("Tidak ada deskripsi tambahan.", "No additional description.")}
                       </motion.p>
                     )}
                   </AnimatePresence>
@@ -602,7 +617,7 @@ export const ProductModal = ({ product, onClose }) => {
                       htmlFor="primary-buyer-email"
                       className="text-xs font-medium text-slate-200"
                     >
-                      Email Penerima
+                      {t("Email Penerima", "Recipient Email")}
                     </label>
                     <button
                       type="button"
@@ -615,7 +630,11 @@ export const ProductModal = ({ product, onClose }) => {
                           showExtraContact ? "rotate-45 text-neon" : ""
                         }`}
                       />
-                      <span>{showExtraContact ? "Tutup WhatsApp" : "WhatsApp"}</span>
+                      <span>
+                        {showExtraContact
+                          ? t("Tutup WhatsApp", "Hide WhatsApp")
+                          : "WhatsApp"}
+                      </span>
                     </button>
                   </div>
 
@@ -667,7 +686,10 @@ export const ProductModal = ({ product, onClose }) => {
                             type="tel"
                             value={buyerWa}
                             onChange={(e) => setBuyerWa(e.target.value)}
-                            placeholder="No. WhatsApp (opsional)"
+                            placeholder={t(
+                              "No. WhatsApp (opsional)",
+                              "WhatsApp No. (optional)"
+                            )}
                             data-testid="buyer-whatsapp-input"
                             className="w-full bg-void/90 border border-line focus:border-neon outline-none text-xs font-mono pl-8 pr-2.5 py-2 text-slate-100 placeholder:text-slate-500 transition-colors"
                           />
@@ -691,7 +713,7 @@ export const ProductModal = ({ product, onClose }) => {
                 {/* Payment Method & Channel Selector */}
                 <div className="space-y-2">
                   <span className="block text-xs font-medium text-slate-200">
-                    Metode Pembayaran
+                    {t("Metode Pembayaran", "Payment Method")}
                   </span>
 
                   {availableTabCount > 0 ? (
@@ -717,7 +739,7 @@ export const ProductModal = ({ product, onClose }) => {
                           }`}
                         >
                           <QrCode size={13} />
-                          <span>QRIS Instan</span>
+                          <span>{t("QRIS Instan", "Instant QRIS")}</span>
                         </button>
                       )}
                       {manualAvailable && (
@@ -732,7 +754,7 @@ export const ProductModal = ({ product, onClose }) => {
                           }`}
                         >
                           <Wallet size={13} />
-                          <span>Transfer / QRIS</span>
+                          <span>{t("Transfer / QRIS", "Transfer / QRIS")}</span>
                         </button>
                       )}
                       {cryptoAvailable && (
@@ -753,7 +775,10 @@ export const ProductModal = ({ product, onClose }) => {
                     </div>
                   ) : (
                     <div className="p-3 bg-coral/10 border border-coral/30 text-xs text-coral">
-                      Metode pembayaran sedang tidak aktif.
+                      {t(
+                        "Metode pembayaran sedang tidak aktif.",
+                        "Payment methods are currently inactive."
+                      )}
                     </div>
                   )}
 
@@ -772,11 +797,14 @@ export const ProductModal = ({ product, onClose }) => {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <QrCode size={16} className="text-neon shrink-0" />
                           <span className="text-xs text-slate-200 truncate">
-                            QRIS Semua E-Wallet &amp; M-Banking
+                            {t(
+                              "QRIS Semua E-Wallet & M-Banking",
+                              "QRIS All E-Wallets & M-Banking"
+                            )}
                           </span>
                         </div>
                         <span className="text-[11px] font-mono text-lime shrink-0">
-                          Otomatis
+                          {t("Otomatis", "Automatic")}
                         </span>
                       </motion.div>
                     ) : method === "crypto" ? (
@@ -824,7 +852,10 @@ export const ProductModal = ({ product, onClose }) => {
                           </div>
                         ) : (
                           <p className="text-xs text-coral py-1">
-                            Wallet crypto belum tersedia.
+                            {t(
+                              "Wallet crypto belum tersedia.",
+                              "Crypto wallet is not available yet."
+                            )}
                           </p>
                         )}
                       </motion.div>
@@ -877,7 +908,10 @@ export const ProductModal = ({ product, onClose }) => {
                               value={selectedDest}
                               onChange={(e) => setSelectedDest(e.target.value)}
                               data-testid="manual-destination-select"
-                              aria-label="Pilih Tujuan Transfer"
+                              aria-label={t(
+                                "Pilih Tujuan Transfer",
+                                "Select Transfer Destination"
+                              )}
                               className="sr-only"
                             >
                               {manualDestinations.map((d) => (
@@ -889,7 +923,10 @@ export const ProductModal = ({ product, onClose }) => {
                           </>
                         ) : (
                           <p className="text-xs text-coral py-1">
-                            Tujuan transfer belum tersedia.
+                            {t(
+                              "Tujuan transfer belum tersedia.",
+                              "Transfer destination is not available yet."
+                            )}
                           </p>
                         )}
                       </motion.div>
@@ -923,12 +960,14 @@ export const ProductModal = ({ product, onClose }) => {
                       )}
                       <span>
                         {product.stock < 1
-                          ? "Stok Habis"
+                          ? t("Stok Habis", "Out of Stock")
                           : loading
-                          ? "Memproses..."
+                          ? t("Memproses...", "Processing...")
                           : method === "crypto"
-                          ? `Beli · ${formatUSD(product)} USD`
-                          : `Beli Sekarang · ${formatIDR(product.price)}`}
+                          ? `${t("Beli", "Buy")} · ${formatUSD(product)} USD`
+                          : `${t("Beli Sekarang", "Buy Now")} · ${formatIDR(
+                              product.price
+                            )}`}
                       </span>
                     </button>
 
@@ -941,11 +980,11 @@ export const ProductModal = ({ product, onClose }) => {
                       target="_blank"
                       rel="noopener noreferrer"
                       data-testid="modal-wa-button"
-                      title="Tanya CS via WhatsApp"
+                      title={t("Tanya CS via WhatsApp", "Ask Support via WhatsApp")}
                       className="inline-flex items-center justify-center gap-1.5 border border-line hover:border-neon bg-void/80 text-slate-200 hover:text-neon text-xs font-medium px-4 py-3.5 transition-colors duration-200 whitespace-nowrap shrink-0"
                     >
                       <MessageCircle size={15} />
-                      <span>Tanya CS</span>
+                      <span>{t("Tanya CS", "Ask Support")}</span>
                     </a>
                   </div>
                 </div>
