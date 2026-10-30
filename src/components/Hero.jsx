@@ -583,51 +583,125 @@ export const Hero = ({ featured, products = [], onSelect }) => {
             </div>
           </motion.div>
 
-          {/* Dynamic Metrics Strip (Transparent Background) */}
+          {/* Dynamic Metrics Strip */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.05, duration: 0.8, ease: EASE }}
-            className="mt-6 sm:mt-8 grid grid-cols-3 w-full max-w-lg divide-x divide-line/60 bg-transparent"
+            className="mt-6 sm:mt-8 grid grid-cols-1 min-[380px]:grid-cols-3 gap-2.5 sm:gap-3 w-full max-w-xl"
             data-testid="hero-metrics"
           >
             {[
               {
                 v: compact(totalSold || 1240),
                 l: t("Produk Terjual", "Products Sold"),
+                sub: t(
+                  `${safeProducts.length || 12}+ Stok Siap Kirim`,
+                  `${safeProducts.length || 12}+ Ready in Stock`
+                ),
+                badge: t("TERLARIS", "HOT"),
                 t: "hero-metric-sold",
+                icon: Flame,
                 accent: "text-neon",
+                iconTone: "text-neon bg-neon/15 border-neon/40",
+                cardTone:
+                  "hover:border-neon/70 hover:bg-neon/[0.07] hover:shadow-[0_10px_30px_-10px_rgba(0,240,255,0.28)]",
+                barTone: "from-neon via-cyan-300 to-transparent",
+                targetId: "katalog",
               },
               {
-                v: `${avgRating}/5`,
+                v: `${avgRating}/5.0`,
                 l: t("Rating Pembeli", "Buyer Rating"),
+                sub: t("100% Ulasan Asli", "100% Verified Reviews"),
+                badge: t("TERPERCAYA", "VERIFIED"),
                 t: "hero-metric-rating",
+                icon: Star,
                 accent: "text-lime",
+                iconTone: "text-lime bg-lime/15 border-lime/40",
+                cardTone:
+                  "hover:border-lime/70 hover:bg-lime/[0.07] hover:shadow-[0_10px_30px_-10px_rgba(163,230,53,0.28)]",
+                barTone: "from-lime via-emerald-300 to-transparent",
+                targetId: "testimoni",
               },
               {
-                v: "10.00-22.00",
+                v: "10.00–22.00",
                 l: t("Jam Operasional", "Operating Hours"),
+                sub: t("WIB • Respon Cepat", "WIB • Fast Response"),
+                badge: t("AKTIF", "ONLINE"),
                 t: "hero-metric-cs",
-                accent: "text-slate-100",
+                icon: Timer,
+                accent: "text-amber-300",
+                iconTone: "text-amber-300 bg-amber-400/15 border-amber-400/40",
+                cardTone:
+                  "hover:border-amber-400/70 hover:bg-amber-400/[0.07] hover:shadow-[0_10px_30px_-10px_rgba(251,191,36,0.25)]",
+                barTone: "from-amber-400 via-yellow-200 to-transparent",
+                targetId: "kontak",
+                isLive: true,
               },
-            ].map((s, idx) => (
-              <div
-                key={s.l}
-                className={`${
-                  idx === 0 ? "pr-2.5 sm:pr-4" : idx === 1 ? "px-2.5 sm:px-4" : "pl-2.5 sm:pl-4"
-                } py-1.5 text-center sm:text-left min-w-0 bg-transparent`}
-              >
-                <p
-                  className={`font-display font-bold text-xs sm:text-xl tabular-nums truncate ${s.accent}`}
-                  data-testid={s.t}
+            ].map((s) => {
+              const Icon = s.icon;
+              return (
+                <div
+                  key={s.t}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const el = document.getElementById(s.targetId);
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      const el = document.getElementById(s.targetId);
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
+                  className={`group relative overflow-hidden rounded-xl border border-white/12 bg-panel/65 backdrop-blur-md px-3.5 py-3 sm:px-4 sm:py-3.5 text-left transition-all duration-300 cursor-pointer hover:-translate-y-0.5 active:scale-[0.99] ${s.cardTone}`}
                 >
-                  {s.v}
-                </p>
-                <p className="text-[8px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-400 mt-0.5 sm:mt-1 truncate">
-                  {s.l}
-                </p>
-              </div>
-            ))}
+                  {/* Top Accent Line */}
+                  <div
+                    className={`pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${s.barTone} opacity-75 group-hover:opacity-100 transition-opacity`}
+                  />
+
+                  {/* Header Row: Icon + Live Badge */}
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <span
+                      className={`inline-flex items-center justify-center w-6 h-6 rounded-lg border ${s.iconTone} transition-transform duration-300 group-hover:scale-110`}
+                    >
+                      <Icon size={13} className="shrink-0" />
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider text-slate-300 bg-white/[0.06] border border-white/10 px-1.5 py-0.5 rounded-md">
+                      {s.isLive && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulse" />
+                      )}
+                      {s.badge}
+                    </span>
+                  </div>
+
+                  {/* Main Metric Value */}
+                  <p
+                    className={`font-display font-black text-base sm:text-xl lg:text-2xl tracking-tight tabular-nums leading-none ${s.accent}`}
+                    data-testid={s.t}
+                  >
+                    {s.v}
+                  </p>
+
+                  {/* Readable Primary Label */}
+                  <p className="text-xs sm:text-[13px] font-semibold text-white tracking-tight mt-1.5 leading-snug">
+                    {s.l}
+                  </p>
+
+                  {/* Dynamic Sub-caption */}
+                  <p className="text-[10px] sm:text-[11px] font-mono text-slate-300/90 mt-0.5 leading-tight flex items-center justify-between gap-1">
+                    <span className="truncate">{s.sub}</span>
+                    <ArrowUpRight
+                      size={11}
+                      className="shrink-0 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
+                    />
+                  </p>
+                </div>
+              );
+            })}
           </motion.div>
         </div>
 
