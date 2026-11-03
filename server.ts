@@ -11,6 +11,9 @@ import nodemailer from "nodemailer";
 import QRCode from "qrcode";
 import { fileURLToPath } from "url";
 import { MongoClient, Db as MongoDb } from "mongodb";
+import pg from "pg";
+
+const { Pool: PgPool } = pg;
 
 dotenv.config();
 
@@ -36,6 +39,8 @@ const ENV_SMTP_PASS = (process.env.SMTP_PASS || "").trim();
 const ENV_SMTP_FROM_EMAIL = (process.env.SMTP_FROM_EMAIL || ENV_SMTP_USER || "").trim();
 const ENV_SMTP_FROM_NAME = (process.env.SMTP_FROM_NAME || process.env.EMAIL_FROM_NAME || "WillJustPlay Security").trim();
 const MONGODB_URI = (process.env.MONGODB_URI || "").trim();
+const ENV_POSTGRES_URL = (process.env.DATABASE_URL || process.env.POSTGRES_URL || "").trim();
+const ENV_POSTGRES_SSL = process.env.POSTGRES_SSL !== "false";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -181,6 +186,672 @@ let db: DbState = {
 };
 
 let mongoDb: MongoDb | null = null;
+let pgPool: InstanceType<typeof PgPool> | null = null;
+let pgSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+interface PostgresRuntimeStatus {
+  connected: boolean;
+  configured: boolean;
+  source: "env" | "admin" | "none";
+  host: string;
+  database: string;
+  user: string;
+  port: number;
+  ssl: boolean;
+  version: string;
+  tables_initialized: boolean;
+  last_sync_at: string | null;
+  last_error: string | null;
+}
+
+const pgRuntime: PostgresRuntimeStatus = {
+  connected: false,
+  configured: false,
+  source: "none",
+  host: "",
+  database: "",
+  user: "",
+  port: 5432,
+  ssl: ENV_POSTGRES_SSL,
+  version: "",
+  tables_initialized: false,
+  last_sync_at: null,
+  last_error: null,
+};
+
+function parsePostgresMeta(connStr: string) {
+  try {
+    const u = new URL(connStr);
+    return {
+      host: u.hostname || "localhost",
+      port: Number(u.port || 5432),
+      database: (u.pathname || "/postgres").replace(/^\/+/, "") || "postgres",
+      user: decodeURIComponent(u.username || "postgres"),
+    };
+  } catch {
+    return { host: "custom-host", port: 5432, database: "postgres", user: "postgres" };
+  }
+}
+
+function getEffectivePostgresConfig(): {
+  connection_string: string;
+  ssl: boolean;
+  auto_sync: boolean;
+  source: "env" | "admin" | "none";
+} {
+  const saved = db.settings?.postgres_config || {};
+  const adminUrl = String(saved.connection_string || "").trim();
+  if (adminUrl) {
+    return {
+      connection_string: adminUrl,
+      ssl: saved.ssl !== false,
+      auto_sync: saved.auto_sync !== false,
+      source: "admin",
+    };
+  }
+  if (ENV_POSTGRES_URL) {
+    return {
+      connection_string: ENV_POSTGRES_URL,
+      ssl: typeof saved.ssl === "boolean" ? saved.ssl : ENV_POSTGRES_SSL,
+      auto_sync: saved.auto_sync !== false,
+      source: "env",
+    };
+  }
+  return {
+    connection_string: "",
+    ssl: ENV_POSTGRES_SSL,
+    auto_sync: true,
+    source: "none",
+  };
+}
+
+const POSTGRES_DDL_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS wjp_users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'buyer',
+    status TEXT NOT NULL DEFAULT 'active',
+    is_verified BOOLEAN NOT NULL DEFAULT true,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_products (
+    id TEXT PRIMARY KEY,
+    game TEXT NOT NULL,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    price NUMERIC NOT NULL DEFAULT 0,
+    stock INTEGER NOT NULL DEFAULT 0,
+    condition TEXT NOT NULL DEFAULT 'ready',
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_games (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    publisher TEXT,
+    currency TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_transactions (
+    id TEXT PRIMARY KEY,
+    product_id TEXT,
+    buyer_email TEXT,
+    amount NUMERIC NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    payment_status TEXT NOT NULL DEFAULT 'pending',
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_testimonials (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    game TEXT,
+    rating NUMERIC NOT NULL DEFAULT 5,
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_manual_destinations (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    data JSONB NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_social_links (
+    id TEXT PRIMARY KEY,
+    platform TEXT NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    data JSONB NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_topup_providers (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    data JSONB NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    expires_at TEXT,
+    data JSONB NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_auth_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    type TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    data JSONB NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_audit_logs (
+    id TEXT PRIMARY KEY,
+    action TEXT NOT NULL,
+    actor_email TEXT,
+    created_at TEXT NOT NULL,
+    data JSONB NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_email_events (
+    id TEXT PRIMARY KEY,
+    to_email TEXT NOT NULL,
+    template TEXT,
+    status TEXT,
+    created_at TEXT NOT NULL,
+    data JSONB NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS wjp_settings (
+    id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );`,
+];
+
+async function ensurePostgresSchema(pool: InstanceType<typeof PgPool>) {
+  const client = await pool.connect();
+  try {
+    for (const ddl of POSTGRES_DDL_STATEMENTS) {
+      await client.query(ddl);
+    }
+    pgRuntime.tables_initialized = true;
+  } finally {
+    client.release();
+  }
+}
+
+async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool): Promise<{ ok: boolean; error?: string; synced_at?: string }> {
+  if (!pool) return { ok: false, error: "PostgreSQL pool belum terhubung" };
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const ddl of POSTGRES_DDL_STATEMENTS) {
+      await client.query(ddl);
+    }
+
+    // 1. Users
+    await client.query("DELETE FROM wjp_users");
+    for (const u of db.users || []) {
+      const id = String(u.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_users (id, email, name, role, status, is_verified, data, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())
+         ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name, role = EXCLUDED.role, status = EXCLUDED.status, is_verified = EXCLUDED.is_verified, data = EXCLUDED.data, updated_at = NOW()`,
+        [
+          id,
+          String(u.email || `${id}@user.local`).toLowerCase(),
+          String(u.name || "User"),
+          String(u.role || "buyer"),
+          String(u.status || "active"),
+          u.is_verified !== false,
+          JSON.stringify({ ...u, id }),
+        ]
+      );
+    }
+
+    // 2. Products
+    await client.query("DELETE FROM wjp_products");
+    for (const p of db.products || []) {
+      const id = String(p.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_products (id, game, category, title, price, stock, condition, data, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW())`,
+        [
+          id,
+          String(p.game || "Game"),
+          String(p.category || "Akun Game"),
+          String(p.title || "Produk"),
+          Number(p.price || 0),
+          Number(p.stock ?? 0),
+          String(p.condition || "ready"),
+          JSON.stringify({ ...p, id }),
+        ]
+      );
+    }
+
+    // 3. Games
+    await client.query("DELETE FROM wjp_games");
+    for (const g of db.games || []) {
+      const id = String(g.id || g.slug || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_games (id, slug, name, publisher, currency, is_active, data, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
+        [
+          id,
+          String(g.slug || id),
+          String(g.name || "Game"),
+          String(g.publisher || ""),
+          String(g.currency || "Item"),
+          g.is_active !== false,
+          JSON.stringify({ ...g, id }),
+        ]
+      );
+    }
+
+    // 4. Transactions
+    await client.query("DELETE FROM wjp_transactions");
+    for (const tx of db.transactions || []) {
+      const id = String(tx.session_id || tx.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_transactions (id, product_id, buyer_email, amount, status, payment_status, data, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
+        [
+          id,
+          String(tx.product_id || ""),
+          String(tx.buyer_email || ""),
+          Number(tx.amount || 0),
+          String(tx.status || "pending"),
+          String(tx.payment_status || "pending"),
+          JSON.stringify({ ...tx, session_id: id, id }),
+        ]
+      );
+    }
+
+    // 5. Testimonials
+    await client.query("DELETE FROM wjp_testimonials");
+    for (const t of db.testimonials || []) {
+      const id = String(t.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_testimonials (id, name, game, rating, data, created_at)
+         VALUES ($1, $2, $3, $4, $5::jsonb, NOW())`,
+        [id, String(t.name || "Buyer"), String(t.game || ""), Number(t.rating || 5), JSON.stringify({ ...t, id })]
+      );
+    }
+
+    // 6. Manual Destinations
+    await client.query("DELETE FROM wjp_manual_destinations");
+    for (const d of db.manual_destinations || []) {
+      const id = String(d.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_manual_destinations (id, type, name, is_active, data)
+         VALUES ($1, $2, $3, $4, $5::jsonb)`,
+        [id, String(d.type || "bank"), String(d.name || "Manual"), d.is_active !== false, JSON.stringify({ ...d, id })]
+      );
+    }
+
+    // 7. Social Links
+    await client.query("DELETE FROM wjp_social_links");
+    for (const s of db.social_links || []) {
+      const id = String(s.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_social_links (id, platform, name, url, is_active, data)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+        [
+          id,
+          String(s.platform || "link"),
+          String(s.name || "Social"),
+          String(s.url || "#"),
+          s.is_active !== false,
+          JSON.stringify({ ...s, id }),
+        ]
+      );
+    }
+
+    // 8. Topup Providers
+    await client.query("DELETE FROM wjp_topup_providers");
+    for (const v of db.topup_providers || []) {
+      const id = String(v.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_topup_providers (id, kind, name, is_active, data)
+         VALUES ($1, $2, $3, $4, $5::jsonb)`,
+        [id, String(v.kind || "digiflazz"), String(v.name || "Vendor"), v.is_active !== false, JSON.stringify({ ...v, id })]
+      );
+    }
+
+    // 9. Sessions
+    await client.query("DELETE FROM wjp_sessions");
+    for (const s of (db.sessions || []).slice(-500)) {
+      const id = String(s.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_sessions (id, user_id, token_hash, expires_at, data)
+         VALUES ($1, $2, $3, $4, $5::jsonb)`,
+        [id, String(s.user_id || ""), String(s.token_hash || ""), String(s.expires_at || ""), JSON.stringify({ ...s, id })]
+      );
+    }
+
+    // 10. Auth Tokens
+    await client.query("DELETE FROM wjp_auth_tokens");
+    for (const t of (db.auth_tokens || []).slice(-500)) {
+      const id = String(t.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_auth_tokens (id, user_id, email, type, token_hash, data)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+        [
+          id,
+          String(t.user_id || ""),
+          String(t.email || ""),
+          String(t.type || "verify_email"),
+          String(t.token_hash || ""),
+          JSON.stringify({ ...t, id }),
+        ]
+      );
+    }
+
+    // 11. Audit Logs
+    await client.query("DELETE FROM wjp_audit_logs");
+    for (const l of (db.audit_logs || []).slice(0, 500)) {
+      const id = String(l.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_audit_logs (id, action, actor_email, created_at, data)
+         VALUES ($1, $2, $3, $4, $5::jsonb)`,
+        [
+          id,
+          String(l.action || "event"),
+          String(l.actor_email || ""),
+          String(l.created_at || nowIso()),
+          JSON.stringify({ ...l, id }),
+        ]
+      );
+    }
+
+    // 12. Email Events
+    await client.query("DELETE FROM wjp_email_events");
+    for (const e of (db.email_events || []).slice(0, 250)) {
+      const id = String(e.id || uuidHex(12));
+      await client.query(
+        `INSERT INTO wjp_email_events (id, to_email, template, status, created_at, data)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+        [
+          id,
+          String(e.to_email || ""),
+          String(e.template || ""),
+          String(e.status || ""),
+          String(e.created_at || nowIso()),
+          JSON.stringify({ ...e, id }),
+        ]
+      );
+    }
+
+    // 13. Settings
+    await client.query("DELETE FROM wjp_settings");
+    for (const [k, v] of Object.entries(db.settings || {})) {
+      if (!k) continue;
+      await client.query(
+        `INSERT INTO wjp_settings (id, data, updated_at)
+         VALUES ($1, $2::jsonb, NOW())`,
+        [k, JSON.stringify({ id: k, ...(v || {}) })]
+      );
+    }
+
+    await client.query("COMMIT");
+    const stamp = nowIso();
+    pgRuntime.last_sync_at = stamp;
+    pgRuntime.last_error = null;
+    return { ok: true, synced_at: stamp };
+  } catch (err: any) {
+    await client.query("ROLLBACK").catch(() => {});
+    const msg = String(err?.message || err || "Gagal sinkronisasi ke PostgreSQL");
+    pgRuntime.last_error = msg;
+    return { ok: false, error: msg };
+  } finally {
+    client.release();
+  }
+}
+
+async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPool): Promise<{ ok: boolean; loaded_rows: number; error?: string }> {
+  if (!pool) return { ok: false, loaded_rows: 0, error: "PostgreSQL pool belum terhubung" };
+  try {
+    await ensurePostgresSchema(pool);
+    let loadedRows = 0;
+
+    const qData = async (table: string) => {
+      const res = await pool.query(`SELECT data FROM ${table}`);
+      loadedRows += res.rows.length;
+      return res.rows.map((r) => r.data).filter(Boolean);
+    };
+
+    const [
+      users,
+      products,
+      games,
+      transactions,
+      testimonials,
+      manualDests,
+      socialLinks,
+      topupProviders,
+      sessions,
+      authTokens,
+      auditLogs,
+      emailEvents,
+      settingsRes,
+    ] = await Promise.all([
+      qData("wjp_users"),
+      qData("wjp_products"),
+      qData("wjp_games"),
+      qData("wjp_transactions"),
+      qData("wjp_testimonials"),
+      qData("wjp_manual_destinations"),
+      qData("wjp_social_links"),
+      qData("wjp_topup_providers"),
+      qData("wjp_sessions"),
+      qData("wjp_auth_tokens"),
+      qData("wjp_audit_logs"),
+      qData("wjp_email_events"),
+      pool.query("SELECT id, data FROM wjp_settings"),
+    ]);
+
+    if (users.length > 0) db.users = users;
+    if (products.length > 0) db.products = products;
+    if (games.length > 0) db.games = games;
+    if (transactions.length > 0) db.transactions = transactions;
+    if (testimonials.length > 0) db.testimonials = testimonials;
+    if (manualDests.length > 0) db.manual_destinations = manualDests;
+    if (socialLinks.length > 0) db.social_links = socialLinks;
+    if (topupProviders.length > 0) db.topup_providers = topupProviders;
+    if (sessions.length > 0) db.sessions = sessions;
+    if (authTokens.length > 0) db.auth_tokens = authTokens;
+    if (auditLogs.length > 0) db.audit_logs = auditLogs;
+    if (emailEvents.length > 0) db.email_events = emailEvents;
+
+    if (settingsRes.rows.length > 0) {
+      loadedRows += settingsRes.rows.length;
+      for (const r of settingsRes.rows) {
+        if (r.id && r.data) {
+          db.settings[r.id] = r.data;
+        }
+      }
+    }
+
+    pgRuntime.last_sync_at = nowIso();
+    pgRuntime.last_error = null;
+    try {
+      fs.writeFileSync(DB_STATE_PATH, JSON.stringify(db, null, 2), "utf-8");
+    } catch {
+      // ignore disk write error
+    }
+    return { ok: true, loaded_rows: loadedRows };
+  } catch (err: any) {
+    const msg = String(err?.message || err || "Gagal memuat data dari PostgreSQL");
+    pgRuntime.last_error = msg;
+    return { ok: false, loaded_rows: 0, error: msg };
+  }
+}
+
+function schedulePostgresSync() {
+  if (!pgPool || !pgRuntime.connected) return;
+  const cfg = getEffectivePostgresConfig();
+  if (!cfg.auto_sync) return;
+  if (pgSyncTimer) clearTimeout(pgSyncTimer);
+  pgSyncTimer = setTimeout(() => {
+    void pushToPostgres(pgPool);
+  }, 400);
+}
+
+async function initPostgresConnection(overrideUrl?: string, overrideSsl?: boolean): Promise<{
+  ok: boolean;
+  version?: string;
+  error?: string;
+}> {
+  const cfg = getEffectivePostgresConfig();
+  const targetUrl = overrideUrl !== undefined ? String(overrideUrl).trim() : cfg.connection_string;
+  const useSsl = overrideSsl !== undefined ? overrideSsl : cfg.ssl;
+
+  if (!targetUrl) {
+    pgRuntime.configured = false;
+    pgRuntime.connected = false;
+    pgRuntime.source = "none";
+    return { ok: false, error: "Connection string PostgreSQL belum dikonfigurasi" };
+  }
+
+  const meta = parsePostgresMeta(targetUrl);
+  pgRuntime.configured = true;
+  pgRuntime.source = overrideUrl ? "admin" : cfg.source;
+  pgRuntime.host = meta.host;
+  pgRuntime.port = meta.port;
+  pgRuntime.database = meta.database;
+  pgRuntime.user = meta.user;
+  pgRuntime.ssl = useSsl;
+
+  try {
+    const nextPool = new PgPool({
+      connectionString: targetUrl,
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
+      connectionTimeoutMillis: 6000,
+      max: 5,
+    });
+    const vRes = await nextPool.query("SELECT version() AS ver");
+    const verStr = String(vRes.rows?.[0]?.ver || "PostgreSQL").split(",")[0];
+    await ensurePostgresSchema(nextPool);
+
+    if (pgPool) {
+      await pgPool.end().catch(() => {});
+    }
+    pgPool = nextPool;
+    pgRuntime.connected = true;
+    pgRuntime.version = verStr;
+    pgRuntime.last_error = null;
+
+    // Check if PostgreSQL already has users; if so, pull existing records, then sync all
+    const countRes = await pgPool.query("SELECT COUNT(*)::int AS cnt FROM wjp_users");
+    const existingUsers = Number(countRes.rows?.[0]?.cnt || 0);
+    if (existingUsers > 0) {
+      await pullFromPostgres(pgPool);
+    }
+    await pushToPostgres(pgPool);
+    console.log(`Connected to PostgreSQL (${meta.host}/${meta.database}) successfully.`);
+    return { ok: true, version: verStr };
+  } catch (err: any) {
+    const msg = String(err?.message || err || "Koneksi PostgreSQL gagal");
+    pgRuntime.connected = false;
+    pgRuntime.last_error = msg;
+    console.warn("PostgreSQL connection skipped or failed:", msg);
+    return { ok: false, error: msg };
+  }
+}
+
+function sqlLiteral(val: any): string {
+  if (val === null || val === undefined) return "NULL";
+  if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
+  if (typeof val === "number") return Number.isFinite(val) ? String(val) : "0";
+  return `'${String(val).replace(/'/g, "''")}'`;
+}
+
+function generatePostgresSqlDump(): string {
+  const lines: string[] = [
+    "-- ============================================================================",
+    "-- WillJustPlay Store & Top-Up — PostgreSQL Relational Schema & Data Dump",
+    `-- Generated At: ${nowIso()}`,
+    "-- Compatible with: PostgreSQL 13+, Supabase, Neon, Google Cloud SQL, AWS RDS",
+    "-- ============================================================================",
+    "",
+    "BEGIN;",
+    "",
+    ...POSTGRES_DDL_STATEMENTS,
+    "",
+  ];
+
+  for (const u of db.users || []) {
+    const id = String(u.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_users (id, email, name, role, status, is_verified, data, updated_at) VALUES (${sqlLiteral(id)}, ${sqlLiteral(String(u.email || "").toLowerCase())}, ${sqlLiteral(u.name || "User")}, ${sqlLiteral(u.role || "buyer")}, ${sqlLiteral(u.status || "active")}, ${sqlLiteral(u.is_verified !== false)}, ${sqlLiteral(JSON.stringify({ ...u, id }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name, role = EXCLUDED.role, status = EXCLUDED.status, is_verified = EXCLUDED.is_verified, data = EXCLUDED.data, updated_at = NOW();`
+    );
+  }
+  lines.push("");
+
+  for (const p of db.products || []) {
+    const id = String(p.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_products (id, game, category, title, price, stock, condition, data, updated_at) VALUES (${sqlLiteral(id)}, ${sqlLiteral(p.game || "Game")}, ${sqlLiteral(p.category || "Akun Game")}, ${sqlLiteral(p.title || "Produk")}, ${sqlLiteral(Number(p.price || 0))}, ${sqlLiteral(Number(p.stock ?? 0))}, ${sqlLiteral(p.condition || "ready")}, ${sqlLiteral(JSON.stringify({ ...p, id }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET game = EXCLUDED.game, category = EXCLUDED.category, title = EXCLUDED.title, price = EXCLUDED.price, stock = EXCLUDED.stock, condition = EXCLUDED.condition, data = EXCLUDED.data, updated_at = NOW();`
+    );
+  }
+  lines.push("");
+
+  for (const g of db.games || []) {
+    const id = String(g.id || g.slug || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_games (id, slug, name, publisher, currency, is_active, data, updated_at) VALUES (${sqlLiteral(id)}, ${sqlLiteral(g.slug || id)}, ${sqlLiteral(g.name || "Game")}, ${sqlLiteral(g.publisher || "")}, ${sqlLiteral(g.currency || "Item")}, ${sqlLiteral(g.is_active !== false)}, ${sqlLiteral(JSON.stringify({ ...g, id }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET slug = EXCLUDED.slug, name = EXCLUDED.name, publisher = EXCLUDED.publisher, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, data = EXCLUDED.data, updated_at = NOW();`
+    );
+  }
+  lines.push("");
+
+  for (const tx of db.transactions || []) {
+    const id = String(tx.session_id || tx.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_transactions (id, product_id, buyer_email, amount, status, payment_status, data, created_at) VALUES (${sqlLiteral(id)}, ${sqlLiteral(tx.product_id || "")}, ${sqlLiteral(tx.buyer_email || "")}, ${sqlLiteral(Number(tx.amount || 0))}, ${sqlLiteral(tx.status || "pending")}, ${sqlLiteral(tx.payment_status || "pending")}, ${sqlLiteral(JSON.stringify({ ...tx, session_id: id, id }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, payment_status = EXCLUDED.payment_status, data = EXCLUDED.data;`
+    );
+  }
+  lines.push("");
+
+  for (const t of db.testimonials || []) {
+    const id = String(t.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_testimonials (id, name, game, rating, data, created_at) VALUES (${sqlLiteral(id)}, ${sqlLiteral(t.name || "Buyer")}, ${sqlLiteral(t.game || "")}, ${sqlLiteral(Number(t.rating || 5))}, ${sqlLiteral(JSON.stringify({ ...t, id }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, game = EXCLUDED.game, rating = EXCLUDED.rating, data = EXCLUDED.data;`
+    );
+  }
+  lines.push("");
+
+  for (const d of db.manual_destinations || []) {
+    const id = String(d.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_manual_destinations (id, type, name, is_active, data) VALUES (${sqlLiteral(id)}, ${sqlLiteral(d.type || "bank")}, ${sqlLiteral(d.name || "Manual")}, ${sqlLiteral(d.is_active !== false)}, ${sqlLiteral(JSON.stringify({ ...d, id }))}::jsonb) ON CONFLICT (id) DO UPDATE SET type = EXCLUDED.type, name = EXCLUDED.name, is_active = EXCLUDED.is_active, data = EXCLUDED.data;`
+    );
+  }
+  lines.push("");
+
+  for (const s of db.social_links || []) {
+    const id = String(s.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_social_links (id, platform, name, url, is_active, data) VALUES (${sqlLiteral(id)}, ${sqlLiteral(s.platform || "link")}, ${sqlLiteral(s.name || "Social")}, ${sqlLiteral(s.url || "#")}, ${sqlLiteral(s.is_active !== false)}, ${sqlLiteral(JSON.stringify({ ...s, id }))}::jsonb) ON CONFLICT (id) DO UPDATE SET platform = EXCLUDED.platform, name = EXCLUDED.name, url = EXCLUDED.url, is_active = EXCLUDED.is_active, data = EXCLUDED.data;`
+    );
+  }
+  lines.push("");
+
+  for (const [k, v] of Object.entries(db.settings || {})) {
+    if (!k) continue;
+    lines.push(
+      `INSERT INTO wjp_settings (id, data, updated_at) VALUES (${sqlLiteral(k)}, ${sqlLiteral(JSON.stringify({ id: k, ...(v || {}) }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW();`
+    );
+  }
+
+  lines.push("", "COMMIT;", "");
+  return lines.join("\n");
+}
 
 async function syncMongoCollections() {
   if (!mongoDb) return;
@@ -213,6 +884,9 @@ function saveDb() {
   }
   if (mongoDb) {
     void syncMongoCollections();
+  }
+  if (pgPool && pgRuntime.connected) {
+    schedulePostgresSync();
   }
 }
 
@@ -1126,6 +1800,7 @@ function initDatabase() {
 
 initDatabase();
 void initMongoConnection();
+void initPostgresConnection();
 
 // ---------------- Rate Limiter, Token & Audit Helpers ----------------
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -5736,7 +6411,7 @@ const verifyTransactionWithPaykitaServer = async (tx: any, origin?: string): Pro
   }
 
   const defaultGwForTx = tx.product_type === PRODUCT_TYPE ? "duitku" : "paykita";
-  const gatewayId = String(tx.gateway_id || defaultGwForTx).toLowerCase() === "duitku" ? "duitku" : "paykita";
+  const gatewayId: string = String(tx.gateway_id || defaultGwForTx).toLowerCase() === "duitku" ? "duitku" : "paykita";
   const pgGateways = db.settings.payment_gateways?.gateways || {};
   const gCfg = pgGateways[gatewayId] || db.settings.paykita || {};
   const apiKey = String(gCfg.api_key || (gatewayId === "paykita" ? db.settings.paykita?.api_key : "") || "").trim();
@@ -9006,6 +9681,190 @@ admin.get("/email-events", (_req, res) => {
     configured: cfg.configured,
     provider: cfg.active_provider,
     events: db.email_events.slice(0, 100),
+  });
+});
+
+// ---------------- Database & PostgreSQL Management Routes ----------------
+admin.get("/database/status", (_req, res) => {
+  const pgCfg = getEffectivePostgresConfig();
+  const maskedUrl = pgCfg.connection_string
+    ? pgCfg.connection_string.replace(/(:\/\/[^:]+:)([^@]+)(@)/, "$1********$3")
+    : "";
+
+  let firebaseInfo: any = { configured: false, project_id: "", database_id: "" };
+  const fbPath = path.join(__dirname, "firebase-applet-config.json");
+  if (fs.existsSync(fbPath)) {
+    try {
+      const rawFb = JSON.parse(fs.readFileSync(fbPath, "utf-8"));
+      firebaseInfo = {
+        configured: Boolean(rawFb.projectId && rawFb.firestoreDatabaseId),
+        project_id: rawFb.projectId || "",
+        database_id: rawFb.firestoreDatabaseId || "",
+        auth_domain: rawFb.authDomain || "",
+      };
+    } catch {
+      // ignore parse error
+    }
+  }
+
+  const tables = [
+    { name: "wjp_users", label: "Users & Admin", count: (db.users || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_products", label: "Katalog Produk (Beranda & Top-Up)", count: (db.products || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_games", label: "Master Game & Denominasi", count: (db.games || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_transactions", label: "Transaksi & Pesanan", count: (db.transactions || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_testimonials", label: "Testimoni Pelanggan", count: (db.testimonials || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_manual_destinations", label: "Rekening, QRIS & Crypto Manual", count: (db.manual_destinations || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_social_links", label: "Tautan Sosial Media", count: (db.social_links || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_topup_providers", label: "Provider Top-Up (Digiflazz)", count: (db.topup_providers || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_sessions", label: "Sesi Login Aktif", count: (db.sessions || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_auth_tokens", label: "Token OTP & Verifikasi", count: (db.auth_tokens || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_audit_logs", label: "Log Audit Keamanan", count: (db.audit_logs || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_email_events", label: "Riwayat Pengiriman Email", count: (db.email_events || []).length, primary_key: "id (TEXT)" },
+    { name: "wjp_settings", label: "Konfigurasi Sistem & Gateway", count: Object.keys(db.settings || {}).length, primary_key: "id (TEXT)" },
+  ];
+
+  res.json({
+    postgres: {
+      ...pgRuntime,
+      configured: Boolean(pgCfg.connection_string),
+      source: pgCfg.source,
+      ssl: pgCfg.ssl,
+      auto_sync: pgCfg.auto_sync,
+      masked_url: maskedUrl,
+    },
+    firebase: firebaseInfo,
+    mongodb: {
+      connected: Boolean(mongoDb),
+      configured: Boolean(MONGODB_URI),
+    },
+    local_store: {
+      active: true,
+      path: "server/db_state.json",
+      size_bytes: fs.existsSync(DB_STATE_PATH) ? fs.statSync(DB_STATE_PATH).size : 0,
+    },
+    tables,
+    total_records: tables.reduce((acc, t) => acc + t.count, 0),
+  });
+});
+
+admin.post("/database/postgres/config", async (req, res) => {
+  const actor = (req as any).adminUser || null;
+  const body = req.body || {};
+  const rawConn = typeof body.connection_string === "string" ? body.connection_string.trim() : "";
+  const existingConn = String(db.settings?.postgres_config?.connection_string || ENV_POSTGRES_URL || "").trim();
+  const nextConn = rawConn && !rawConn.includes("********") ? rawConn : existingConn;
+  const ssl = body.ssl !== false;
+  const autoSync = body.auto_sync !== false;
+
+  db.settings.postgres_config = {
+    id: "postgres_config",
+    connection_string: nextConn,
+    ssl,
+    auto_sync: autoSync,
+    updated_at: nowIso(),
+  };
+  saveDb();
+
+  if (!nextConn) {
+    if (pgPool) {
+      await pgPool.end().catch(() => {});
+      pgPool = null;
+    }
+    pgRuntime.connected = false;
+    pgRuntime.configured = false;
+    pgRuntime.last_error = null;
+    return res.json({
+      ok: true,
+      connected: false,
+      message: "Konfigurasi PostgreSQL dikosongkan. Sistem menggunakan penyimpanan Cloud & Lokal aktif.",
+    });
+  }
+
+  const connRes = await initPostgresConnection(nextConn, ssl);
+  writeAuditLog({
+    actor,
+    action: "admin.postgres_config_updated",
+    metadata: { host: pgRuntime.host, database: pgRuntime.database, connected: connRes.ok },
+    req,
+  });
+
+  if (!connRes.ok) {
+    return res.status(400).json({
+      ok: false,
+      connected: false,
+      detail: connRes.error || "Gagal terhubung ke server PostgreSQL. Periksa kembali URI koneksi Anda.",
+      postgres: pgRuntime,
+    });
+  }
+
+  res.json({
+    ok: true,
+    connected: true,
+    version: connRes.version,
+    message: `Berhasil terhubung ke PostgreSQL (${pgRuntime.host}/${pgRuntime.database}) & menginisialisasi 13 tabel relasional!`,
+    postgres: pgRuntime,
+  });
+});
+
+admin.post("/database/postgres/sync", async (req, res) => {
+  const actor = (req as any).adminUser || null;
+  const direction = String(req.body?.direction || "push").toLowerCase();
+
+  if (!pgPool || !pgRuntime.connected) {
+    const connRes = await initPostgresConnection();
+    if (!connRes.ok) {
+      return res.status(400).json({
+        ok: false,
+        detail: connRes.error || "PostgreSQL belum terhubung. Masukkan Connection URI terlebih dahulu.",
+      });
+    }
+  }
+
+  if (direction === "pull") {
+    const pullRes = await pullFromPostgres(pgPool);
+    if (!pullRes.ok) {
+      return res.status(400).json({ ok: false, detail: pullRes.error || "Gagal menarik data dari PostgreSQL" });
+    }
+    writeAuditLog({
+      actor,
+      action: "admin.postgres_pull",
+      metadata: { loaded_rows: pullRes.loaded_rows },
+      req,
+    });
+    return res.json({
+      ok: true,
+      direction: "pull",
+      loaded_rows: pullRes.loaded_rows,
+      synced_at: pgRuntime.last_sync_at,
+      message: `Berhasil memuat ${pullRes.loaded_rows} baris data dari PostgreSQL ke aplikasi!`,
+    });
+  }
+
+  const pushRes = await pushToPostgres(pgPool);
+  if (!pushRes.ok) {
+    return res.status(400).json({ ok: false, detail: pushRes.error || "Gagal mendorong data ke PostgreSQL" });
+  }
+  writeAuditLog({
+    actor,
+    action: "admin.postgres_push",
+    metadata: { synced_at: pushRes.synced_at },
+    req,
+  });
+  res.json({
+    ok: true,
+    direction: "push",
+    synced_at: pushRes.synced_at,
+    message: "Seluruh 13 tabel relasional berhasil disinkronkan ke PostgreSQL!",
+  });
+});
+
+admin.get("/database/postgres/sql-dump", (_req, res) => {
+  const sql = generatePostgresSqlDump();
+  res.json({
+    ok: true,
+    filename: `willjustplay_postgres_${new Date().toISOString().slice(0, 10)}.sql`,
+    sql,
+    ddl_statements: POSTGRES_DDL_STATEMENTS,
   });
 });
 

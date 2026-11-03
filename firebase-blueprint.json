@@ -1,0 +1,322 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered buyer or administrator account in WillJustPlay Store.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique user identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User email address",
+          "maxLength": 254
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the user",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user",
+          "enum": ["buyer", "admin"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Account status",
+          "enum": ["active", "suspended"]
+        },
+        "is_verified": {
+          "type": "boolean",
+          "description": "Whether the user email is verified"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp in ISO 8601 format",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "email", "name", "role", "status", "created_at"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Game account, top-up denomination, or gaming service listed in the catalog.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique product identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "game": {
+          "type": "string",
+          "description": "Name of the game",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "category": {
+          "type": "string",
+          "description": "Product category",
+          "maxLength": 80
+        },
+        "title": {
+          "type": "string",
+          "description": "Product display title",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "price": {
+          "type": "number",
+          "description": "Price in IDR"
+        },
+        "stock": {
+          "type": "number",
+          "description": "Available stock count"
+        },
+        "condition": {
+          "type": "string",
+          "description": "Availability status",
+          "enum": ["ready", "unready", "sold"]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "game", "category", "title", "price", "stock", "condition"]
+    },
+    "Game": {
+      "title": "Game",
+      "description": "Top-up game catalog definition and destination field schema.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique game identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL-safe slug for the game",
+          "maxLength": 120,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the game",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "publisher": {
+          "type": "string",
+          "description": "Game publisher",
+          "maxLength": 120
+        },
+        "currency": {
+          "type": "string",
+          "description": "In-game currency name",
+          "maxLength": 80
+        },
+        "is_active": {
+          "type": "boolean",
+          "description": "Whether the game is active for top-up"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "slug", "name", "currency", "is_active"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Customer order and payment record for game accounts or top-ups.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique transaction / session identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "product_id": {
+          "type": "string",
+          "description": "Purchased product identifier",
+          "maxLength": 128
+        },
+        "product_title": {
+          "type": "string",
+          "description": "Purchased product title",
+          "maxLength": 240
+        },
+        "buyer_email": {
+          "type": "string",
+          "format": "email",
+          "description": "Buyer email address",
+          "maxLength": 254
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transaction total in IDR"
+        },
+        "status": {
+          "type": "string",
+          "description": "Order fulfillment status",
+          "enum": ["pending", "paid", "completed", "cancelled", "failed", "expired"]
+        },
+        "payment_status": {
+          "type": "string",
+          "description": "Payment verification status",
+          "enum": ["pending", "paid", "unpaid", "expired", "failed", "refunded"]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Order creation timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "product_id", "product_title", "amount", "status", "payment_status", "created_at"]
+    },
+    "Testimonial": {
+      "title": "Testimonial",
+      "description": "Verified customer review and rating.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique testimonial identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Reviewer display name",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "game": {
+          "type": "string",
+          "description": "Game title reviewed",
+          "maxLength": 120
+        },
+        "product": {
+          "type": "string",
+          "description": "Product name reviewed",
+          "maxLength": 200
+        },
+        "rating": {
+          "type": "number",
+          "description": "Star rating from 1 to 5"
+        },
+        "text": {
+          "type": "string",
+          "description": "Review comment text",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "name", "rating", "text", "created_at"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Application configuration document for gateways, email auth, and store settings.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Setting key identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["id"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Security and administrative audit event record.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique audit log identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action identifier",
+          "maxLength": 120
+        },
+        "actor_email": {
+          "type": "string",
+          "description": "Email of the actor performing the action",
+          "maxLength": 254
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the event",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "action", "created_at"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores registered user accounts and profile metadata."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Stores catalog products including game accounts and top-up items."
+    },
+    "/games/{gameId}": {
+      "schema": { "$ref": "#/entities/Game" },
+      "description": "Stores top-up games, form fields, and denomination configurations."
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Stores customer checkout orders, payment statuses, and delivery records."
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": { "$ref": "#/entities/Testimonial" },
+      "description": "Stores verified customer testimonials and ratings."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Setting" },
+      "description": "Stores payment gateway, email verification, social links, and vendor configurations."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Stores administrative and authentication security audit logs."
+    }
+  }
+}

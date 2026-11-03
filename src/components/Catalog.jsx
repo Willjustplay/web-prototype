@@ -225,8 +225,8 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
               aria-label={t("Ubah tampilan grid mobile", "Toggle mobile grid layout")}
               title={
                 mobileCompact
-                  ? t("Ganti ke tampilan 1 kolom", "Switch to 1-column view")
-                  : t("Ganti ke tampilan 2 kolom", "Switch to 2-column view")
+                  ? t("Ganti ke tampilan 2 kolom", "Switch to 2-column view")
+                  : t("Ganti ke tampilan 3 kolom", "Switch to 3-column view")
               }
               className="sm:hidden grid place-items-center w-9 h-9 rounded-xl bg-panel/80 border border-line/80 text-slate-300 hover:text-neon active:scale-95 transition-all shrink-0"
             >
@@ -325,25 +325,25 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
           </div>
         </div>
 
-        {/* Dynamic Products Grid */}
-        <div className="mt-6 sm:mt-8">
+        {/* High-Density Compact Products Grid */}
+        <div className="mt-5 sm:mt-6">
           {loading ? (
             <div
               className={`grid ${
-                mobileCompact ? "grid-cols-2" : "grid-cols-1"
-              } sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 sm:gap-5`}
+                mobileCompact ? "grid-cols-3" : "grid-cols-2"
+              } sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5 lg:gap-3`}
               data-testid="catalog-loading"
             >
-              {Array.from({ length: 8 }).map((_, i) => (
+              {Array.from({ length: 12 }).map((_, i) => (
                 <div
                   key={i}
-                  className="min-w-0 rounded-2xl overflow-hidden bg-panel/60 border border-line/60 animate-pulse"
+                  className="min-w-0 rounded-xl overflow-hidden bg-panel/60 border border-line/60 animate-pulse"
                 >
                   <div className="aspect-[16/10] bg-panelhover/60" />
-                  <div className="p-3.5 sm:p-4 space-y-2.5">
-                    <div className="h-2.5 w-1/3 rounded bg-panelhover/60" />
-                    <div className="h-4 w-3/4 rounded bg-panelhover/60" />
-                    <div className="h-3 w-1/2 rounded bg-panelhover/60" />
+                  <div className="p-2.5 space-y-2">
+                    <div className="h-2 w-1/3 rounded bg-panelhover/60" />
+                    <div className="h-3 w-3/4 rounded bg-panelhover/60" />
+                    <div className="h-2.5 w-1/2 rounded bg-panelhover/60" />
                   </div>
                 </div>
               ))}
@@ -380,8 +380,8 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
             <motion.div
               layout
               className={`grid ${
-                mobileCompact ? "grid-cols-2" : "grid-cols-1"
-              } sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 sm:gap-5`}
+                mobileCompact ? "grid-cols-3" : "grid-cols-2"
+              } sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5 lg:gap-3`}
               data-testid="catalog-grid"
             >
               <AnimatePresence mode="popLayout">
@@ -402,21 +402,21 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                     <motion.div
                       key={p.id}
                       layout
-                      initial={{ opacity: 0, y: 12 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.96 }}
-                      whileHover={{ y: -4 }}
+                      whileHover={{ y: -3 }}
                       transition={{
-                        duration: 0.22,
-                        delay: Math.min(i * 0.02, 0.2),
+                        duration: 0.18,
+                        delay: Math.min(i * 0.015, 0.15),
                         ease: [0.16, 1, 0.3, 1],
                       }}
                       onClick={() => onSelect(p)}
                       data-testid={`product-card-${p.id}`}
-                      className="min-w-0 rounded-2xl overflow-hidden group cursor-pointer text-left bg-panel/80 border border-line/80 hover:border-neon/60 hover:bg-panel hover:shadow-[0_12px_32px_rgba(0,240,255,0.1)] transition-all duration-200 flex flex-col justify-between relative"
+                      className="min-w-0 rounded-xl overflow-hidden group cursor-pointer text-left bg-panel/85 border border-line/75 hover:border-neon/60 hover:bg-panel hover:shadow-[0_8px_24px_rgba(0,240,255,0.1)] transition-all duration-200 flex flex-col justify-between relative"
                     >
                       <div>
-                        {/* Product Thumbnail */}
+                        {/* Compact Product Thumbnail */}
                         <div className="relative aspect-[16/10] bg-void overflow-hidden">
                           <img
                             src={imgSrc(p.image)}
@@ -425,23 +425,23 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-panel via-void/20 to-transparent pointer-events-none" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-panel/90 via-void/10 to-transparent pointer-events-none" />
 
-                          {/* Top Left: Single Primary Badge or Sold Out */}
+                          {/* Top Left: Compact Primary Badge or Sold Out */}
                           <div
-                            className="absolute top-2.5 left-2.5 z-20 flex flex-wrap items-center gap-1.5"
+                            className="absolute top-1.5 left-1.5 z-20 flex flex-wrap items-center gap-1"
                             data-testid={`badges-${p.id}`}
                           >
                             {p.stock < 1 ? (
                               <span
                                 data-testid={`stock-out-${p.id}`}
-                                className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-lg bg-coral text-white shadow-sm"
+                                className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-coral text-white shadow-sm"
                               >
                                 {t("Habis", "Sold Out")}
                               </span>
                             ) : primaryBadge ? (
                               <span
-                                className={`text-[8px] sm:text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg ${badgeCls(
+                                className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md ${badgeCls(
                                   primaryBadge
                                 )}`}
                               >
@@ -450,13 +450,13 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                             ) : null}
 
                             {discountPct && p.stock >= 1 && (
-                              <span className="text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-coral/90 text-white">
+                              <span className="text-[8px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-coral/90 text-white">
                                 -{discountPct}%
                               </span>
                             )}
                           </div>
 
-                          {/* Top Right: Minimal Wishlist Button */}
+                          {/* Top Right: Compact Wishlist Button */}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -465,10 +465,10 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                             }}
                             data-testid={`wishlist-toggle-${p.id}`}
                             aria-label={t("Tambah ke favorit", "Add to wishlist")}
-                            className="absolute top-2.5 right-2.5 z-20 w-7 h-7 sm:w-8 sm:h-8 rounded-xl grid place-items-center bg-void/80 backdrop-blur-md border border-line/60 hover:border-coral/60 transition-all active:scale-90"
+                            className="absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-lg grid place-items-center bg-void/80 backdrop-blur-md border border-line/60 hover:border-coral/60 transition-all active:scale-90"
                           >
                             <Heart
-                              size={13}
+                              size={11}
                               className={
                                 isWishlisted(p.id)
                                   ? "text-coral fill-coral"
@@ -481,21 +481,18 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                           {extraPhotos(p) > 0 && (
                             <span
                               data-testid={`gallery-count-${p.id}`}
-                              className="absolute bottom-2 right-2.5 z-20 flex items-center gap-1 rounded-md bg-void/85 backdrop-blur-sm border border-line/60 text-[9px] font-mono text-slate-300 px-1.5 py-0.5 tabular-nums"
+                              className="absolute bottom-1.5 right-1.5 z-20 flex items-center gap-0.5 rounded bg-void/85 backdrop-blur-sm border border-line/60 text-[8px] font-mono text-slate-300 px-1 py-0.5 tabular-nums"
                             >
-                              <Images size={10} className="text-neon" /> +{extraPhotos(p)}
+                              <Images size={9} className="text-neon" /> +{extraPhotos(p)}
                             </span>
                           )}
                         </div>
 
-                        {/* Card Info */}
-                        <div className="p-3.5 sm:p-4 pb-2 space-y-1.5">
-                          {/* Clean Unboxed Metadata Row */}
-                          <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-slate-400">
-                            <span className="truncate">
-                              <span className="text-neon/90 font-semibold">{p.game}</span>
-                              <span className="mx-1.5 text-slate-600">&bull;</span>
-                              <span>{translateCategory(p.category)}</span>
+                        {/* Compact Card Info: Game Tag, Status Badge & Title */}
+                        <div className="p-2 sm:p-2.5 pb-1.5 space-y-1">
+                          <div className="flex items-center justify-between gap-1.5 text-[9px] sm:text-[10px] font-mono text-slate-400">
+                            <span className="text-neon/90 font-semibold truncate">
+                              {p.game}
                             </span>
                             {p.condition && (
                               <span
@@ -509,46 +506,32 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                             )}
                           </div>
 
-                          <h3 className="font-display font-bold text-xs sm:text-sm leading-snug line-clamp-2 min-h-[2.5em] text-slate-100 group-hover:text-neon transition-colors">
+                          <h3 className="font-display font-bold text-[11px] sm:text-xs leading-snug line-clamp-2 min-h-[2.3em] text-slate-100 group-hover:text-neon transition-colors">
                             {p.title}
                           </h3>
                         </div>
                       </div>
 
-                      {/* Clean Price & Dynamic Action Footer */}
-                      <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 pt-2.5 flex items-end justify-between gap-2 border-t border-line/50 mt-2">
+                      {/* Streamlined Price & Action Footer */}
+                      <div className="px-2 sm:px-2.5 pb-2 sm:pb-2.5 pt-1.5 flex items-center justify-between gap-1.5 border-t border-line/40 mt-1">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-baseline gap-1.5">
-                            <span
-                              className="font-mono font-bold text-xs sm:text-[15px] text-neon truncate tabular-nums"
-                              data-testid={`price-${p.id}`}
-                            >
-                              {formatIDR(p.price)}
-                            </span>
-                            <span
-                              className="font-mono text-[10px] sm:text-xs text-lime/90 font-semibold tabular-nums"
-                              data-testid={`price-usd-${p.id}`}
-                            >
-                              · {formatUSD(p)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono tabular-nums mt-0.5">
-                            {p.rating && (
-                              <span className="inline-flex items-center gap-0.5 text-amber-300">
-                                <Star size={9} className="fill-amber-400 text-amber-400" />
-                                {p.rating}
-                              </span>
-                            )}
-                            <span className="truncate">
-                              {p.rank ? `${p.rank} · ` : ""}
-                              {p.sold || 0} {t("terjual", "sold")}
-                            </span>
-                          </div>
+                          <span
+                            className="block font-mono font-bold text-[11px] sm:text-xs text-neon truncate tabular-nums"
+                            data-testid={`price-${p.id}`}
+                          >
+                            {formatIDR(p.price)}
+                          </span>
+                          <span
+                            className="sr-only"
+                            data-testid={`price-usd-${p.id}`}
+                          >
+                            {formatUSD(p)}
+                          </span>
                         </div>
 
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shrink-0 grid place-items-center border border-line/80 bg-void/60 text-slate-300 group-hover:bg-gradient-to-r group-hover:from-neon group-hover:to-lime group-hover:text-void group-hover:border-transparent transition-all duration-200 shadow-sm">
+                        <div className="w-6 h-6 rounded-lg shrink-0 grid place-items-center border border-line/80 bg-void/60 text-slate-300 group-hover:bg-gradient-to-r group-hover:from-neon group-hover:to-lime group-hover:text-void group-hover:border-transparent transition-all duration-200">
                           <ArrowUpRight
-                            size={14}
+                            size={12}
                             className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
                           />
                         </div>

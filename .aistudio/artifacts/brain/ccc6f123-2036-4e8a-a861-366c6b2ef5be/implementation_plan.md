@@ -1,61 +1,26 @@
-# Rencana Perbaikan & Penyempurnaan Sistem Terjemahan Bahasa Inggris (EN)
+# Compact High-Density Product Catalog & Popup Plan
 
-Perbaikan menyeluruh pada sistem lokalisasi dua bahasa (`ID` / `EN`) di platform WillJustPlay agar seluruh antarmuka pengguna, bagian beranda, katalog, alur transaksi, testimoni, footer, modal checkout, halaman top-up, serta halaman akun diterjemahkan secara akurat dan instan ke Bahasa Inggris, sambil mempertahankan judul produk asli.
+## 1. Overview & Goals
+Redesign both the homepage store catalog grid (`#katalog`) and the product detail checkout popup (`ProductModal`) so cards and popup views are significantly smaller, cleaner, and capable of fitting many products on screen at once.
 
-### User Review & Critical Decisions
+## 2. Planned Changes
 
-- **Cakupan Halaman Terjemahan (Dikonfirmasi):** Meliputi seluruh halaman utama (Navbar, Hero, Katalog, Cara Kerja, Testimoni, Footer), Modal Detail & Checkout Produk, Halaman Top-Up Game Instan, Halaman Akun & Riwayat Transaksi, serta Modal Autentikasi.
-- **Perlakuan Konten Produk & Ulasan (Dikonfirmasi):** Seluruh label antarmuka (UI), navigasi, lencana status, filter, tahapan cara kerja, serta deskripsi produk dan ulasan diterjemahkan ke Bahasa Inggris saat mode `EN` aktif, namun **judul produk (`product.title`) tetap dipertahankan sesuai aslinya** agar nama item/akun game tidak berubah menjadi rancu.
-- **Arsitektur Terjemahan Hibrida (Keputusan Teknis):** Menggabungkan penggunaan hook reaktif `useLanguage()` langsung di dalam komponen React (untuk teks yang berubah secara dinamis saat tab atau modal berganti) dengan kamus pola dinamis (`LanguageContext`) untuk menerjemahkan deskripsi produk serta teks berformat angka secara otomatis.
+### A. High-Density Catalog Grid (`/src/components/Catalog.jsx`)
+- **Multi-Column Responsive Grid (`data-testid="catalog-grid"` & `data-testid="catalog-loading"`)**:
+  - Upgrade grid columns to **2–3 columns on mobile** (`grid-cols-2` / `grid-cols-3` via the mobile layout toggle), **3–4 columns on tablet** (`sm:grid-cols-3 md:grid-cols-4`), and **5–6 columns on desktop** (`lg:grid-cols-5 xl:grid-cols-6`) with tight spacing (`gap-2 sm:gap-2.5 lg:gap-3`).
+- **Compact Product Card Anatomy**:
+  - **Thumbnail**: Compact `aspect-[16/10]` frame with a small top-left status/promo badge (`text-[8px] px-1.5 py-0.5`), a compact top-right wishlist button (`w-6 h-6`), and a minimal bottom-right gallery counter.
+  - **Essential Card Body**: Tighter padding (`p-2.5 pb-1.5`) displaying only the unboxed **Game Tag** + **Condition/Status** line and a 2-line **Product Title** (`text-[11px] sm:text-xs leading-snug`).
+  - **Streamlined Price Footer**: Compact bottom bar (`px-2.5 pb-2.5 pt-1.5`) showing the primary **IDR Price** (`text-xs sm:text-[13px] font-mono font-bold text-neon`) and a compact `w-6 h-6` action arrow, removing secondary rating/sold/USD clutter from the small card surface while preserving `data-testid` attributes for compatibility.
 
-### 1. Overview & Core Concept
+### B. Compact Product Popup with Multi-Product Quick Switcher (`/src/components/ProductModal.jsx` & `/src/pages/Home.jsx`)
+- **Smaller Modal Footprint**:
+  - Reduce modal container width from `max-w-4xl` to `max-w-2xl sm:max-w-3xl` with tighter internal padding (`p-3 sm:p-4`) and a more compact media column (`md:col-span-5` media + `md:col-span-7` checkout) so the popup fits comfortably without scrolling on desktop.
+  - Tighten spec bar, input heights (`py-2`), payment tabs, and action buttons (`py-2.5`) for a crisp, high-density layout.
+- **In-Popup Multi-Product Grid/Strip**:
+  - Pass `products` and `onSelectProduct` from `/src/pages/Home.jsx` to `<ProductModal />`.
+  - Add a compact scrollable/grid **"Other Products"** mini-selector inside the popup so users can browse and switch across many products directly inside the popup without closing and reopening it.
 
-Saat ini, beberapa bagian halaman masih menampilkan teks Bahasa Indonesia ketika pengguna beralih ke mode **EN** (seperti lencana `"Ready X+ Produk"` dan pilar kepercayaan di Hero, filter dan kartu produk di Katalog, seluruh tab dan langkah di bagian `"Cara Kerja"`, filter dan label di `"Testimoni"`, informasi di `"Footer"`, serta form pada `"Modal Checkout"`). Hal ini terjadi karena pembaruan salinan teks UI sebelumnya tidak lagi cocok dengan kamus pencocokan teks lama, serta perubahan state React (seperti pergantian tab atau pembukaan modal) merender ulang elemen DOM tanpa memicu terjemahan ulang yang konsisten.
-
-Solusi ini menyempurnakan mesin lokalisasi sehingga perpindahan antara **ID** dan **EN** bekerja secara instan, bebas kedipan (*flicker-free*), dan mencakup 100% elemen antarmuka beserta deskripsi konten.
-
-### 2. User Experience & Visual Design
-
-- **Konsistensi Navigasi & Sakelar Bahasa:** Tombol `ID` / `EN` di bilah navigasi atas langsung memperbarui seluruh teks di layar secara reaktif tanpa perlu memuat ulang halaman (*reload*).
-- **Beranda (Hero, Katalog, Cara Kerja, Testimoni, Footer):**
-  - **Hero:** Lencana stok (`"Ready X+ Products"`), tombol aksi, kartu sorotan produk, serta 3 pilar jaminan keamanan tampil dalam Bahasa Inggris yang natural.
-  - **Katalog:** Pencarian, filter kategori (`"All"`, `"Game Accounts"`, `"Boosting"`, `"In Stock"`), pengurutan harga (`"Lowest Price"`, `"Highest Price"`), penghitung jumlah produk (`"X Products"`, `"X sold"`), dan deskripsi singkat kartu produk diterjemahkan sepenuhnya, sementara judul produk tetap asli.
-  - **Cara Kerja (How It Works):** Tombol pemilih alur (`"Buy Accounts & Boost"` dan `"Instant Game Top-Up"`), lencana estimasi waktu (`"~1 Minute"`, `"5–15 Minutes"`, `"Instant"`), judul langkah, deskripsi langkah, dan poin sorotan diterjemahkan secara langsung mengikuti tab yang aktif.
-  - **Testimoni & Bukti Sosial:** Filter game (`"All Games (X)"`, `"With Photo Proof"`), lencana `"Verified Buyer"`, `"Transaction Proof"`, serta teks ulasan pelanggan diterjemahkan dengan rapi.
-  - **Footer:** Deskripsi toko, daftar `"Service Guarantees"`, navigasi bawah, dan catatan hak cipta menggunakan Bahasa Inggris profesional.
-- **Modal Checkout, Halaman Top-Up, & Akun:**
-  - Seluruh label spesifikasi (`"Stock"`, `"X Units"`, `"Full Screen"`, `"Proportional"`), form pengiriman (`"Recipient Email"`, `"WhatsApp No. (optional)"`), metode pembayaran (`"Instant QRIS"`, `"Automatic"`), tombol beli (`"Buy Now"`), serta tahapan pengisian ID dan riwayat pesanan di halaman Top-Up dan Akun tampil sepenuhnya dalam Bahasa Inggris.
-
-### 3. Key Product Decisions & Trade-Offs
-
-- **Terjemahan Reaktif di Komponen vs Mutasi DOM Murni:**
-  - *Keputusan:* Menggunakan helper `t(idText, enText)` langsung pada komponen React utama sembari memperbarui kamus pola dinamis di `LanguageContext`.
-  - *Alasan:* Mengandalkan mutasi DOM (`MutationObserver`) saja rawan gagal ketika React atau animasi mengganti elemen saat pengguna berpindah tab (misalnya di bagian *Cara Kerja* atau *Modal Checkout*). Dengan mengikat terjemahan langsung ke state `lang`, setiap render ulang dijamin langsung menampilkan bahasa yang benar.
-- **Penerjemah Deskripsi Produk Cerdas Tanpa Mengubah Judul:**
-  - *Keputusan:* Menyediakan fungsi penerjemah deskripsi (`translateDescription`) yang menerjemahkan istilah umum deskripsi akun/joki dan kalimat penjelasan ke Bahasa Inggris, sementara atribut judul produk dikecualikan dari transformasi teks.
-  - *Alasan:* Pembeli internasional maupun pengguna berbahasa Inggris membutuhkan kejelasan spesifikasi dan deskripsi akun, tetapi tetap mengenali nama asli akun, skin, atau paket game tersebut.
-
-### 4. Technical Architecture & Data Strategy
-
-Sistem lokalisasi bekerja melalui dua lapisan yang saling melengkapi: lapisan komponen reaktif menggunakan konteks bahasa, dan lapisan pemformatan teks dinamis untuk konten dari database (deskripsi produk, jumlah terjual, dan ulasan).
-
-```
-+-------------------------------------------------------------------+
-|                   LanguageContext (State: 'id' | 'en')            |
-|  - t(idText, enText): Helper reaktif langsung untuk komponen UI   |
-|  - translateDesc(text): Penerjemah deskripsi produk & ulasan      |
-|  - Dynamic Pattern Matcher: Menangani angka ("12 Produk", dll.)   |
-+---------------------------------+---------------------------------+
-                                  |
-         +------------------------+------------------------+
-         |                                                 |
-         v                                                 v
-+--------------------------------+       +----------------------------------+
-|   Komponen Beranda & Layout    |       |  Transaksi, Top-Up & Akun User   |
-|  - Navbar & Footer             |       |  - ProductModal (Checkout Area)  |
-|  - Hero & Trust Pillars        |       |  - Topup Page (Game & Nominal)   |
-|  - Catalog (Filter, Sort, Card)|       |  - Account Page (Vault & Order)  |
-|  - HowItWorks (Tab & Steps)    |       |  - AuthModal & Payment Status    |
-|  - Testimonials (Filter & Card)|       |  * Judul Produk Tetap Asli *     |
-+--------------------------------+       +----------------------------------+
-```
+## 3. Verification
+- Run `lint_applet` and `compile_applet` to verify zero TypeScript or build errors.
+- Confirm all existing `data-testid` hooks remain intact for automated and interactive flows.

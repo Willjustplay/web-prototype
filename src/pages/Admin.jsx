@@ -39,6 +39,7 @@ import {
   Globe,
   QrCode,
   Coins,
+  Database,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatIDR, formatUSD, resolveUSD, imgSrc, formatApiError } from "@/lib/api";
@@ -50,6 +51,7 @@ import { AdminTopup } from "@/components/AdminTopup";
 import { AdminUsers } from "@/components/AdminUsers";
 import { AdminAuditLogs } from "@/components/AdminAuditLogs";
 import { AdminEmailVerification } from "@/components/AdminEmailVerification";
+import { AdminDatabase } from "@/components/AdminDatabase";
 import { useAuth } from "@/context/AuthContext";
 
 const CATEGORIES = ["Akun Game", "Jasa Joki", "Item Game", "Lainnya"];
@@ -933,6 +935,12 @@ export default function Admin() {
       icon: MailCheck,
     },
     {
+      id: "database",
+      testId: "admin-tab-database",
+      label: "Database & PostgreSQL",
+      icon: Database,
+    },
+    {
       id: "audit",
       testId: "admin-tab-audit",
       label: "Audit Log",
@@ -1733,6 +1741,7 @@ export default function Admin() {
             {tab === "sosial" && <AdminSocials />}
             {tab === "users" && <AdminUsers />}
             {tab === "email_auth" && <AdminEmailVerification />}
+            {tab === "database" && <AdminDatabase onReload={() => load(false)} />}
             {tab === "audit" && <AdminAuditLogs />}
 
             {tab === "integrasi" && (

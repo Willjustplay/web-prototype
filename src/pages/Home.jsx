@@ -71,6 +71,8 @@ export default function Home() {
       {selectedProduct && (
         <ProductModal 
           product={selectedProduct} 
+          products={products}
+          onSelectProduct={setSelectedProduct}
           onClose={() => setSelectedProduct(null)} 
         />
       )}

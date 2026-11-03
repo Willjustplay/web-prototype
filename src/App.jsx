@@ -13,6 +13,7 @@ import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
 import ResetPassword from "@/pages/ResetPassword";
 import VerifyEmail from "@/pages/VerifyEmail";
+import "@/lib/firebase";
 
 class ErrorBoundary extends Component {
   constructor(props) {

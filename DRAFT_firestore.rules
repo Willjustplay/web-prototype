@@ -1,0 +1,220 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'will.buisness7@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'email', 'name', 'role', 'status', 'created_at']) &&
+        data.keys().hasOnly(['id', 'email', 'name', 'role', 'status', 'is_verified', 'created_at', 'updated_at']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.role is string && data.role.size() <= 20 && (data.role == 'buyer' || data.role == 'admin') &&
+        data.status is string && data.status.size() <= 20 && (data.status == 'active' || data.status == 'suspended') &&
+        (!('is_verified' in data) || data.is_verified is bool) &&
+        data.created_at is string && data.created_at.size() >= 1 && data.created_at.size() <= 64 &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 64));
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['id', 'game', 'category', 'title', 'price', 'stock', 'condition']) &&
+        data.keys().hasOnly(['id', 'game', 'category', 'title', 'price', 'stock', 'condition', 'created_at', 'updated_at']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.game is string && data.game.size() >= 1 && data.game.size() <= 120 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 80 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 240 &&
+        data.price is number && data.price >= 0 &&
+        data.stock is number && data.stock >= 0 &&
+        data.condition is string && data.condition.size() <= 20 && (data.condition == 'ready' || data.condition == 'unready' || data.condition == 'sold') &&
+        (!('created_at' in data) || (data.created_at is string && data.created_at.size() <= 64)) &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 64));
+    }
+
+    function isValidGame(data) {
+      return data.keys().hasAll(['id', 'slug', 'name', 'currency', 'is_active']) &&
+        data.keys().hasOnly(['id', 'slug', 'name', 'publisher', 'currency', 'is_active', 'created_at', 'updated_at']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 120 && data.slug.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 140 &&
+        (!('publisher' in data) || (data.publisher is string && data.publisher.size() <= 120)) &&
+        data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 80 &&
+        data.is_active is bool &&
+        (!('created_at' in data) || (data.created_at is string && data.created_at.size() <= 64)) &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 64));
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'product_id', 'product_title', 'amount', 'status', 'payment_status', 'created_at']) &&
+        data.keys().hasOnly(['id', 'product_id', 'product_title', 'buyer_email', 'ownerId', 'amount', 'status', 'payment_status', 'created_at', 'updated_at']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.product_id is string && data.product_id.size() >= 1 && data.product_id.size() <= 128 &&
+        data.product_title is string && data.product_title.size() >= 1 && data.product_title.size() <= 240 &&
+        (!('buyer_email' in data) || (data.buyer_email is string && data.buyer_email.size() <= 254)) &&
+        (!('ownerId' in data) || (data.ownerId is string && data.ownerId.size() <= 128)) &&
+        data.amount is number && data.amount >= 0 &&
+        data.status is string && data.status.size() <= 20 && (data.status == 'pending' || data.status == 'paid' || data.status == 'completed' || data.status == 'cancelled' || data.status == 'failed' || data.status == 'expired') &&
+        data.payment_status is string && data.payment_status.size() <= 20 && (data.payment_status == 'pending' || data.payment_status == 'paid' || data.payment_status == 'unpaid' || data.payment_status == 'expired' || data.payment_status == 'failed' || data.payment_status == 'refunded') &&
+        data.created_at is string && data.created_at.size() >= 1 && data.created_at.size() <= 64 &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 64));
+    }
+
+    function isValidTestimonial(data) {
+      return data.keys().hasAll(['id', 'name', 'rating', 'text', 'created_at']) &&
+        data.keys().hasOnly(['id', 'name', 'game', 'product', 'rating', 'text', 'ownerId', 'created_at', 'updated_at']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        (!('game' in data) || (data.game is string && data.game.size() <= 120)) &&
+        (!('product' in data) || (data.product is string && data.product.size() <= 200)) &&
+        data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1000 &&
+        (!('ownerId' in data) || (data.ownerId is string && data.ownerId.size() <= 128)) &&
+        data.created_at is string && data.created_at.size() >= 1 && data.created_at.size() <= 64 &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 64));
+    }
+
+    function isValidSetting(data) {
+      return data.keys().hasAll(['id']) &&
+        data.keys().hasOnly(['id', 'updated_at']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 64));
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['id', 'action', 'created_at']) &&
+        data.keys().hasOnly(['id', 'action', 'actor_email', 'created_at']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.action is string && data.action.size() >= 1 && data.action.size() <= 120 &&
+        (!('actor_email' in data) || (data.actor_email is string && data.actor_email.size() <= 254)) &&
+        data.created_at is string && data.created_at.size() >= 1 && data.created_at.size() <= 64;
+    }
+
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow list, create, update, delete: if false;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isSignedIn() && existing().id == request.auth.uid;
+      allow create: if isValidId(userId) && isSignedIn() && isValidUser(incoming()) &&
+        incoming().id == userId &&
+        ((isOwner(userId) && incoming().role == 'buyer' && incoming().status == 'active') || isAdmin());
+      allow update: if isValidId(userId) && isSignedIn() && isValidUser(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().created_at == existing().created_at && (
+          isAdmin() ||
+          (isOwner(userId) &&
+            incoming().role == existing().role &&
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'updated_at']))
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    match /products/{productId} {
+      allow get: if isValidId(productId) && existing().condition in ['ready', 'unready', 'sold'];
+      allow list: if existing().condition in ['ready', 'unready', 'sold'];
+      allow create: if isValidId(productId) && isAdmin() && isValidProduct(incoming()) && incoming().id == productId;
+      allow update: if isValidId(productId) && isValidProduct(incoming()) &&
+        incoming().id == existing().id && (
+          isAdmin()
+        );
+      allow delete: if isValidId(productId) && isAdmin();
+    }
+
+    match /games/{gameId} {
+      allow get: if isValidId(gameId) && existing().is_active == true;
+      allow list: if existing().is_active == true;
+      allow create: if isValidId(gameId) && isAdmin() && isValidGame(incoming()) && incoming().id == gameId;
+      allow update: if isValidId(gameId) && isValidGame(incoming()) &&
+        incoming().id == existing().id && (
+          isAdmin()
+        );
+      allow delete: if isValidId(gameId) && isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow get: if isValidId(transactionId) && isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow create: if isValidId(transactionId) && isSignedIn() && isValidTransaction(incoming()) &&
+        incoming().id == transactionId &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().status == 'pending';
+      allow update: if isValidId(transactionId) && isSignedIn() && isValidTransaction(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().created_at == existing().created_at &&
+        incoming().ownerId == existing().ownerId && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid &&
+            existing().status == 'pending' &&
+            incoming().status == 'cancelled' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updated_at']))
+        );
+      allow delete: if isValidId(transactionId) && isAdmin();
+    }
+
+    match /testimonials/{testimonialId} {
+      allow get: if isValidId(testimonialId) && existing().rating >= 1;
+      allow list: if existing().rating >= 1;
+      allow create: if isValidId(testimonialId) && isSignedIn() && isValidTestimonial(incoming()) &&
+        incoming().id == testimonialId &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(testimonialId) && isSignedIn() && isValidTestimonial(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().created_at == existing().created_at && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid &&
+            incoming().ownerId == existing().ownerId &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['text', 'rating', 'updated_at']))
+        );
+      allow delete: if isValidId(testimonialId) && isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId) && isAdmin();
+      allow list: if false;
+      allow create: if isValidId(settingId) && isAdmin() && isValidSetting(incoming()) && incoming().id == settingId;
+      allow update: if isValidId(settingId) && isValidSetting(incoming()) &&
+        incoming().id == existing().id && (
+          isAdmin()
+        );
+      allow delete: if isValidId(settingId) && isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if false;
+      allow create: if isValidId(logId) && isAdmin() && isValidAuditLog(incoming()) && incoming().id == logId;
+      allow update, delete: if false;
+    }
+  }
+}
