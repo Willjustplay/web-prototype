@@ -45,26 +45,6 @@
       "description": "Dijoki langsung oleh pro player top global. Proses 1-3 hari tergantung rank awal. Privasi akun 100% aman, tanpa cheat, tanpa VPN berbahaya. Update progres harian via WhatsApp."
     },
     {
-      "id": "ml-topup-1000dm",
-      "game": "Mobile Legends",
-      "category": "Topup Game",
-      "title": "Top Up 1000 Diamond Mobile Legends Instant",
-      "price": 250000,
-      "rank": "Via ID Server",
-      "image": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
-      "images": [],
-      "stock": 999,
-      "badge": "",
-      "badges": [],
-      "featured": false,
-      "sold": 2300,
-      "rating": 4.8,
-      "created_at": "2026-09-09T16:14:10.601Z",
-      "warranty": "100%",
-      "delivery_info": "Diamond masuk 1-5 menit setelah pembayaran terverifikasi",
-      "description": "Top up diamond ML legal 100% via ID & server. Masuk otomatis 1-5 menit setelah pembayaran terkonfirmasi. Bonus diamond event mengikuti ketentuan Moonton."
-    },
-    {
       "id": "pubg-conqueror",
       "game": "PUBG Mobile",
       "category": "Akun Game",
@@ -217,26 +197,6 @@
       "description": "Akun Free Fire Grandmaster dengan bundle langka (Criminal, Hip Hop, Sakura), Evo Gun MP40 & AK max, serta 50+ emote rare. Login FB bisa dilepas, data aman."
     },
     {
-      "id": "ff-topup-2180",
-      "game": "Free Fire",
-      "category": "Topup Game",
-      "title": "Top Up 2180 Diamond Free Fire Termurah",
-      "price": 285000,
-      "rank": "Via ID Player",
-      "image": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
-      "images": [],
-      "stock": 999,
-      "badge": "",
-      "badges": [],
-      "featured": false,
-      "sold": 3100,
-      "rating": 4.9,
-      "created_at": "2026-09-08T16:14:10.601Z",
-      "warranty": "100%",
-      "delivery_info": "Proses cepat 1-3 menit",
-      "description": "Top up diamond FF resmi via ID player, proses otomatis 1-5 menit. Harga termurah se-Indonesia, aman 100% tanpa risiko banned."
-    },
-    {
       "id": "hsr-tl70",
       "game": "Honkai Star Rail",
       "category": "Akun Game",
@@ -307,8 +267,8 @@
       "slug": "mobile-legends",
       "name": "Mobile Legends",
       "publisher": "Moonton",
-      "icon": "https://images.unsplash.com/photo-1616588589676-62b3bd4ff6d2?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
-      "banner": "https://images.unsplash.com/photo-1653142267767-a66c7cf17bc1?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
+      "icon": "/src/assets/images/icon_game_mobile_legends_1794083001214.jpg",
+      "banner": "/src/assets/images/icon_game_mobile_legends_1794083001214.jpg",
       "is_active": true,
       "seq": 0,
       "featured": true,
@@ -341,22 +301,15 @@
           "help": "4 angka di dalam tanda kurung setelah User ID, contoh 123456789 (2345)."
         }
       ],
-      "denominations": [
-        { "code": "86", "label": "86 Diamond", "amount": 86, "price": 22000, "price_strike": 25000, "stock": 500, "badge": "", "is_active": true, "seq": 0 },
-        { "code": "172", "label": "172 Diamond", "amount": 172, "price": 43000, "price_strike": 48000, "stock": 500, "badge": "", "is_active": true, "seq": 1 },
-        { "code": "257", "label": "257 Diamond", "amount": 257, "price": 64000, "price_strike": 70000, "stock": 400, "badge": "Populer", "is_active": true, "seq": 2 },
-        { "code": "355", "label": "355 Diamond", "amount": 355, "price": 87000, "price_strike": 95000, "stock": 300, "badge": "", "is_active": true, "seq": 3 },
-        { "code": "706", "label": "706 Diamond", "amount": 706, "price": 172000, "price_strike": 185000, "stock": 200, "badge": "Hemat", "is_active": true, "seq": 4 },
-        { "code": "2195", "label": "2195 Diamond", "amount": 2195, "price": 525000, "price_strike": 560000, "stock": 100, "badge": "", "is_active": true, "seq": 5 }
-      ]
+      "denominations": []
     },
     {
       "id": "g-free-fire",
       "slug": "free-fire",
       "name": "Free Fire",
       "publisher": "Garena",
-      "icon": "https://images.unsplash.com/photo-1589241062272-c0a000072dfa?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
-      "banner": "https://images.unsplash.com/photo-1589241062272-c0a000072dfa?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
+      "icon": "/src/assets/images/icon_game_free_fire_1794083002073.jpg",
+      "banner": "/src/assets/images/icon_game_free_fire_1794083002073.jpg",
       "is_active": true,
       "seq": 1,
       "featured": true,
@@ -377,21 +330,15 @@
           "help": "Buka Profil di dalam game, Player ID tertera di bawah nickname."
         }
       ],
-      "denominations": [
-        { "code": "70", "label": "70 Diamond", "amount": 70, "price": 10000, "price_strike": 12000, "stock": 800, "badge": "Termurah", "is_active": true, "seq": 0 },
-        { "code": "140", "label": "140 Diamond", "amount": 140, "price": 19000, "price_strike": 22000, "stock": 800, "badge": "", "is_active": true, "seq": 1 },
-        { "code": "355", "label": "355 Diamond", "amount": 355, "price": 47000, "price_strike": 53000, "stock": 500, "badge": "Populer", "is_active": true, "seq": 2 },
-        { "code": "720", "label": "720 Diamond", "amount": 720, "price": 94000, "price_strike": 105000, "stock": 300, "badge": "", "is_active": true, "seq": 3 },
-        { "code": "2180", "label": "2180 Diamond", "amount": 2180, "price": 275000, "price_strike": 300000, "stock": 150, "badge": "", "is_active": true, "seq": 4 }
-      ]
+      "denominations": []
     },
     {
       "id": "g-pubg-mobile",
       "slug": "pubg-mobile",
       "name": "PUBG Mobile",
       "publisher": "Tencent",
-      "icon": "https://images.unsplash.com/photo-1542751371-adc38448a05e?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
-      "banner": "https://images.unsplash.com/photo-1542751371-adc38448a05e?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
+      "icon": "/src/assets/images/icon_game_pubg_mobile_1794083004787.jpg",
+      "banner": "/src/assets/images/icon_game_pubg_mobile_1794083004787.jpg",
       "is_active": true,
       "seq": 2,
       "featured": false,
@@ -412,20 +359,15 @@
           "help": "Buka Inventory → Profil, Character ID ada di bawah nama."
         }
       ],
-      "denominations": [
-        { "code": "60", "label": "60 UC", "amount": 60, "price": 15000, "price_strike": 17000, "stock": 600, "badge": "", "is_active": true, "seq": 0 },
-        { "code": "325", "label": "325 UC", "amount": 325, "price": 75000, "price_strike": 82000, "stock": 400, "badge": "Populer", "is_active": true, "seq": 1 },
-        { "code": "660", "label": "660 UC", "amount": 660, "price": 150000, "price_strike": 165000, "stock": 250, "badge": "", "is_active": true, "seq": 2 },
-        { "code": "1800", "label": "1800 UC", "amount": 1800, "price": 400000, "price_strike": 430000, "stock": 120, "badge": "", "is_active": true, "seq": 3 }
-      ]
+      "denominations": []
     },
     {
       "id": "g-genshin-impact",
       "slug": "genshin-impact",
       "name": "Genshin Impact",
       "publisher": "HoYoverse",
-      "icon": "https://images.unsplash.com/photo-1614294148960-9aa740632a87?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
-      "banner": "https://images.unsplash.com/photo-1614294148960-9aa740632a87?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
+      "icon": "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
+      "banner": "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
       "is_active": true,
       "seq": 3,
       "featured": false,
@@ -458,20 +400,15 @@
           "help": "Contoh: Asia, America, Europe, TW/HK/MO."
         }
       ],
-      "denominations": [
-        { "code": "60", "label": "60 Genesis Crystal", "amount": 60, "price": 16000, "price_strike": 18000, "stock": 500, "badge": "", "is_active": true, "seq": 0 },
-        { "code": "300", "label": "300 + 30 Genesis Crystal", "amount": 330, "price": 79000, "price_strike": 85000, "stock": 400, "badge": "Bonus", "is_active": true, "seq": 1 },
-        { "code": "980", "label": "980 + 110 Genesis Crystal", "amount": 1090, "price": 249000, "price_strike": 265000, "stock": 200, "badge": "Populer", "is_active": true, "seq": 2 },
-        { "code": "1980", "label": "1980 + 260 Genesis Crystal", "amount": 2240, "price": 479000, "price_strike": 510000, "stock": 100, "badge": "", "is_active": true, "seq": 3 }
-      ]
+      "denominations": []
     },
     {
       "id": "g-honkai-star-rail",
       "slug": "honkai-star-rail",
       "name": "Honkai Star Rail",
       "publisher": "HoYoverse",
-      "icon": "https://images.unsplash.com/photo-1542751110-97427bbecf20?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
-      "banner": "https://images.unsplash.com/photo-1542751110-97427bbecf20?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
+      "icon": "/src/assets/images/icon_game_honkai_star_rail_1794083007862.jpg",
+      "banner": "/src/assets/images/icon_game_honkai_star_rail_1794083007862.jpg",
       "is_active": true,
       "seq": 4,
       "featured": false,
@@ -504,19 +441,15 @@
           "help": "Contoh: Asia, America, Europe, TW/HK/MO."
         }
       ],
-      "denominations": [
-        { "code": "60", "label": "60 Oneiric Shard", "amount": 60, "price": 16000, "price_strike": 18000, "stock": 400, "badge": "", "is_active": true, "seq": 0 },
-        { "code": "330", "label": "330 Oneiric Shard", "amount": 330, "price": 79000, "price_strike": 85000, "stock": 300, "badge": "Populer", "is_active": true, "seq": 1 },
-        { "code": "1090", "label": "1090 Oneiric Shard", "amount": 1090, "price": 249000, "price_strike": 265000, "stock": 150, "badge": "", "is_active": true, "seq": 2 }
-      ]
+      "denominations": []
     },
     {
       "id": "g-valorant",
       "slug": "valorant",
       "name": "Valorant",
       "publisher": "Riot Games",
-      "icon": "https://images.unsplash.com/photo-1542751371-adc38448a05e?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
-      "banner": "https://images.unsplash.com/photo-1560253023-3ec5d502959f?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
+      "icon": "/src/assets/images/icon_game_valorant_1794083004564.jpg",
+      "banner": "/src/assets/images/icon_game_valorant_1794083004564.jpg",
       "is_active": true,
       "seq": 5,
       "featured": false,
@@ -537,19 +470,15 @@
           "help": "Format: Nama#Tag, contoh Player#ID1."
         }
       ],
-      "denominations": [
-        { "code": "420", "label": "420 VP", "amount": 420, "price": 45000, "price_strike": 50000, "stock": 300, "badge": "", "is_active": true, "seq": 0 },
-        { "code": "875", "label": "875 VP", "amount": 875, "price": 90000, "price_strike": 98000, "stock": 250, "badge": "Populer", "is_active": true, "seq": 1 },
-        { "code": "2200", "label": "2200 VP", "amount": 2200, "price": 220000, "price_strike": 240000, "stock": 120, "badge": "", "is_active": true, "seq": 2 }
-      ]
+      "denominations": []
     },
     {
       "id": "g-honor-of-kings",
       "slug": "honor-of-kings",
       "name": "Honor of Kings",
       "publisher": "Tencent",
-      "icon": "https://images.unsplash.com/photo-1511512578047-dfb367046420?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
-      "banner": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
+      "icon": "/src/assets/images/icon_game_honor_of_kings_1794083008199.jpg",
+      "banner": "/src/assets/images/icon_game_honor_of_kings_1794083008199.jpg",
       "is_active": true,
       "seq": 6,
       "featured": false,
@@ -570,19 +499,15 @@
           "help": "Buka Profil di dalam game untuk melihat Player ID."
         }
       ],
-      "denominations": [
-        { "code": "80", "label": "80 Tokens", "amount": 80, "price": 15000, "price_strike": 17000, "stock": 400, "badge": "", "is_active": true, "seq": 0 },
-        { "code": "400", "label": "400 Tokens", "amount": 400, "price": 72000, "price_strike": 80000, "stock": 250, "badge": "Populer", "is_active": true, "seq": 1 },
-        { "code": "2000", "label": "2000 Tokens", "amount": 2000, "price": 350000, "price_strike": 380000, "stock": 100, "badge": "", "is_active": true, "seq": 2 }
-      ]
+      "denominations": []
     },
     {
       "id": "g-call-of-duty-mobile",
       "slug": "call-of-duty-mobile",
       "name": "Call of Duty Mobile",
       "publisher": "Activision",
-      "icon": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
-      "banner": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?crop=entropy&cs=srgb&fm=jpg&w=1080&q=85",
+      "icon": "/src/assets/images/icon_game_cod_mobile_1794083011207.jpg",
+      "banner": "/src/assets/images/icon_game_cod_mobile_1794083011207.jpg",
       "is_active": true,
       "seq": 7,
       "featured": false,
@@ -603,11 +528,7 @@
           "help": "Buka Profil → Player ID di dalam game."
         }
       ],
-      "denominations": [
-        { "code": "80", "label": "80 CP", "amount": 80, "price": 15000, "price_strike": 17000, "stock": 400, "badge": "", "is_active": true, "seq": 0 },
-        { "code": "420", "label": "420 CP", "amount": 420, "price": 73000, "price_strike": 80000, "stock": 250, "badge": "Populer", "is_active": true, "seq": 1 },
-        { "code": "880", "label": "880 CP", "amount": 880, "price": 148000, "price_strike": 160000, "stock": 150, "badge": "", "is_active": true, "seq": 2 }
-      ]
+      "denominations": []
     }
   ]
 }

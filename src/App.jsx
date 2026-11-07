@@ -9,6 +9,7 @@ import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import Topup from "@/pages/Topup";
+import TopupGameDetail from "@/pages/TopupGameDetail";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
 import ResetPassword from "@/pages/ResetPassword";
@@ -126,6 +127,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/topup" element={<Topup />} />
+                <Route path="/topup/:slug" element={<TopupGameDetail />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/akun" element={<Account />} />
                 <Route path="/payment/success" element={<PaymentSuccess />} />

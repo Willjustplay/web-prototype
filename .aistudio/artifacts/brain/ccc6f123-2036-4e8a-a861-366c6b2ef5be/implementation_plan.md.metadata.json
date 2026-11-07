@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan to make both the catalog product cards grid (5-6 columns on desktop, 2-3 on mobile) and the product detail checkout popup modal smaller, denser, and able to display/browse many products at once.",
-  "updatedAt": "2026-11-03T08:47:39.104392140Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Rencana implementasi penghapusan seluruh produk & nominal top up bawaan (mengosongkan SKU & nominal awal pada 10 game lokal), serta pembuatan ulang halaman Top Up khusus per game (/topup/:slug) bergaya Codashop 2 kolom dengan langkah 1-2-3-4 dalam satu halaman.",
+  "updatedAt":  "2026-11-07T20:55:47.818240375Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

@@ -658,7 +658,10 @@ async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPoo
 
     if (users.length > 0) db.users = users;
     if (products.length > 0) db.products = products;
-    if (games.length > 0) db.games = games;
+    if (games.length > 0) {
+      db.games = games;
+      upgradeLocalGameIcons();
+    }
     if (transactions.length > 0) db.transactions = transactions;
     if (testimonials.length > 0) db.testimonials = testimonials;
     if (manualDests.length > 0) db.manual_destinations = manualDests;
@@ -677,6 +680,8 @@ async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPoo
         }
       }
     }
+
+    ensureDefaultTopupClearedOnce();
 
     pgRuntime.last_sync_at = nowIso();
     pgRuntime.last_error = null;
@@ -1134,15 +1139,16 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "ML",
     cek_id_sku: "CEKML",
     featured: true,
-    icon: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_mobile_legends_1794083001214.jpg",
+    banner: "/src/assets/images/icon_game_mobile_legends_1794083001214.jpg",
     notes: "Masukkan User ID dan Zone ID Mobile Legends Anda, lalu klik Verifikasi ID Game untuk cek nickname.",
     delivery_info: "Diamond masuk otomatis via Digiflazz ke akun Mobile Legends Anda dalam 1-5 detik.",
     fields: [
       { key: "user_id", label: "User ID", placeholder: "123456789", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 15, pattern: "^[0-9]{5,15}$", help: "Masukkan angka User ID (contoh: 123456789)" },
       { key: "zone_id", label: "Zone ID", placeholder: "1234", type: "text", inputmode: "numeric", required: true, min_len: 3, max_len: 6, pattern: "^[0-9]{3,6}$", help: "Masukkan angka Zone ID (4-5 digit di dalam kurung)" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "WDP", label: "Weekly Diamond Pass", amount: 220, modal: 25500, price: 28000, price_strike: 32000, badge: "Terlaris", featured: true },
       { code: "TWP", label: "Twilight Pass", amount: 1200, modal: 138000, price: 152000, price_strike: 169000, badge: "Spesial" },
       { code: "28", label: "28 Diamonds (25+3)", amount: 28, modal: 7400, price: 8500, price_strike: 10000, badge: "" },
@@ -1165,14 +1171,15 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "FF",
     cek_id_sku: "CEKFF",
     featured: true,
-    icon: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_free_fire_1794083002073.jpg",
+    banner: "/src/assets/images/icon_game_free_fire_1794083002073.jpg",
     notes: "Masukkan Player ID Free Fire Anda dan klik Verifikasi ID Game untuk cek nickname.",
     delivery_info: "Diamond Free Fire masuk instan via Digiflazz ke Player ID Anda.",
     fields: [
       { key: "user_id", label: "Player ID", placeholder: "1234567890", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka Player ID Free Fire" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "MM", label: "Membership Mingguan", amount: 450, modal: 27000, price: 30000, price_strike: 35000, badge: "Terlaris", featured: true },
       { code: "MB", label: "Membership Bulanan", amount: 2600, modal: 81000, price: 89000, price_strike: 100000, badge: "Hemat" },
       { code: "50", label: "50 Diamonds", amount: 50, modal: 6800, price: 8000, price_strike: 9500, badge: "" },
@@ -1192,15 +1199,16 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "GI",
     cek_id_sku: "CEKGI",
     featured: true,
-    icon: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
+    banner: "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
     notes: "Masukkan UID Genshin Impact (diawali angka 8 untuk server Asia) dan pilih Server.",
     delivery_info: "Genesis Crystal / Welkin Moon masuk otomatis via Digiflazz ke UID Anda.",
     fields: [
       { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
       { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Genshin Impact Anda" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "WELKIN", label: "Blessing of the Welkin Moon", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
       { code: "60", label: "60 Genesis Crystals", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
       { code: "300", label: "300+30 Genesis Crystals", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer", featured: true },
@@ -1218,14 +1226,15 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "PUBG",
     cek_id_sku: "CEKPUBG",
     featured: true,
-    icon: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_pubg_mobile_1794083004787.jpg",
+    banner: "/src/assets/images/icon_game_pubg_mobile_1794083004787.jpg",
     notes: "Masukkan Player ID PUBG Mobile Anda (Region Indonesia / Global).",
     delivery_info: "UC PUBG Mobile masuk instan via Digiflazz ke karakter Anda.",
     fields: [
       { key: "user_id", label: "Player ID", placeholder: "5123456789", type: "text", inputmode: "numeric", required: true, min_len: 7, max_len: 14, pattern: "^[0-9]{7,14}$", help: "Masukkan angka Player ID PUBG Mobile" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "60", label: "60 UC", amount: 60, modal: 13800, price: 15500, price_strike: 18000, badge: "Populer" },
       { code: "325", label: "325 UC", amount: 325, modal: 69000, price: 76000, price_strike: 85000, badge: "Terlaris", featured: true },
       { code: "660", label: "660 UC", amount: 660, modal: 138000, price: 152000, price_strike: 170000, badge: "Hemat", featured: true },
@@ -1241,14 +1250,15 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "VAL",
     cek_id_sku: "CEKVAL",
     featured: true,
-    icon: "https://images.unsplash.com/photo-1560253023-3ec5d502959f?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1560253023-3ec5d502959f?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_valorant_1794083004564.jpg",
+    banner: "/src/assets/images/icon_game_valorant_1794083004564.jpg",
     notes: "Masukkan Riot ID beserta Tagline (Contoh: Player#IDN).",
     delivery_info: "Valorant Points (VP) masuk instan via Digiflazz ke akun Riot Games Anda.",
     fields: [
       { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, pattern: "", help: "Format: Nickname#Tag" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "475", label: "475 Valorant Points", amount: 475, modal: 51000, price: 56000, price_strike: 62000, badge: "Populer" },
       { code: "1000", label: "1000 Valorant Points", amount: 1000, modal: 102000, price: 112000, price_strike: 125000, badge: "Terlaris", featured: true },
       { code: "2050", label: "2050 Valorant Points", amount: 2050, modal: 204000, price: 222000, price_strike: 245000, badge: "Hemat", featured: true },
@@ -1264,14 +1274,15 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "HOK",
     cek_id_sku: "CEKHOK",
     featured: true,
-    icon: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_honor_of_kings_1794083008199.jpg",
+    banner: "/src/assets/images/icon_game_honor_of_kings_1794083008199.jpg",
     notes: "Masukkan Player UID Honor of Kings Anda dan klik Verifikasi ID Game.",
     delivery_info: "Tokens Honor of Kings masuk otomatis via Digiflazz ke UID Anda.",
     fields: [
       { key: "user_id", label: "Player UID", placeholder: "1234567890123", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka UID Honor of Kings" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "WC", label: "Weekly Card", amount: 180, modal: 14000, price: 16500, price_strike: 20000, badge: "Terlaris", featured: true },
       { code: "80", label: "80 Tokens", amount: 80, modal: 14500, price: 16500, price_strike: 19000, badge: "Populer" },
       { code: "240", label: "240 Tokens", amount: 240, modal: 43000, price: 48000, price_strike: 54000, badge: "Populer", featured: true },
@@ -1288,15 +1299,16 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "HSR",
     cek_id_sku: "CEKHSR",
     featured: false,
-    icon: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_honkai_star_rail_1794083007862.jpg",
+    banner: "/src/assets/images/icon_game_honkai_star_rail_1794083007862.jpg",
     notes: "Masukkan UID Honkai: Star Rail dan pilih Server (Contoh: Asia).",
     delivery_info: "Oneiric Shard / Express Supply Pass masuk instan via Digiflazz ke UID Anda.",
     fields: [
       { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
       { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Honkai: Star Rail Anda" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "PASS", label: "Express Supply Pass", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
       { code: "60", label: "60 Oneiric Shards", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
       { code: "300", label: "300+30 Oneiric Shards", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer" },
@@ -1312,14 +1324,15 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "RBX",
     cek_id_sku: "CEKRBX",
     featured: false,
-    icon: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_roblox_1794083008776.jpg",
+    banner: "/src/assets/images/icon_game_roblox_1794083008776.jpg",
     notes: "Masukkan Username Roblox untuk verifikasi akun dan pengiriman Robux.",
     delivery_info: "Robux / Kode Voucher Roblox dikirim otomatis via Digiflazz setelah pembayaran.",
     fields: [
       { key: "user_id", label: "Username Roblox", placeholder: "UsernameRoblox", type: "text", inputmode: "text", required: true, min_len: 3, max_len: 30, pattern: "", help: "Masukkan Username Roblox Anda" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "80", label: "80 Robux", amount: 80, modal: 17500, price: 20000, price_strike: 24000, badge: "Populer" },
       { code: "400", label: "400 Robux", amount: 400, modal: 74000, price: 82000, price_strike: 95000, badge: "Terlaris", featured: true },
       { code: "800", label: "800 Robux", amount: 800, modal: 146000, price: 162000, price_strike: 185000, badge: "Hemat" },
@@ -1334,14 +1347,15 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "CODM",
     cek_id_sku: "CEKCODM",
     featured: false,
-    icon: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_cod_mobile_1794083011207.jpg",
+    banner: "/src/assets/images/icon_game_cod_mobile_1794083011207.jpg",
     notes: "Masukkan OpenID / Player ID Call of Duty Mobile Anda.",
     delivery_info: "CP Call of Duty Mobile masuk instan via Digiflazz ke akun Anda.",
     fields: [
       { key: "user_id", label: "OpenID / Player ID", placeholder: "123456789012345", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 22, pattern: "^[0-9]{6,22}$", help: "Masukkan OpenID di menu pengaturan CODM" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "63", label: "63 CP", amount: 63, modal: 9000, price: 10500, price_strike: 12000, badge: "" },
       { code: "128", label: "128 CP", amount: 128, modal: 18000, price: 20500, price_strike: 24000, badge: "Populer" },
       { code: "321", label: "321 CP", amount: 321, modal: 44500, price: 49500, price_strike: 56000, badge: "Terlaris", featured: true },
@@ -1356,14 +1370,15 @@ const MERCHANT_MASTER_GAMES = [
     vendor_prefix: "SW",
     cek_id_sku: "CEKSW",
     featured: false,
-    icon: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=400&auto=format&fit=crop&q=80",
-    banner: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=1200&auto=format&fit=crop&q=80",
+    icon: "/src/assets/images/icon_game_steam_wallet_1794083010427.jpg",
+    banner: "/src/assets/images/icon_game_steam_wallet_1794083010427.jpg",
     notes: "Masukkan Nomor WhatsApp atau Steam ID penerima untuk pengiriman kode voucher Steam Wallet IDR.",
     delivery_info: "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
     fields: [
       { key: "user_id", label: "Nomor WhatsApp / Steam ID", placeholder: "081234567890", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 20, pattern: "", help: "Nomor penerima voucher / Steam ID" },
     ],
-    denominations: [
+    denominations: [] as any[],
+    digiflazz_skus: [
       { code: "12", label: "Steam Wallet Rp 12.000", amount: 12000, modal: 12200, price: 14000, price_strike: 16000, badge: "" },
       { code: "45", label: "Steam Wallet Rp 45.000", amount: 45000, modal: 45500, price: 50000, price_strike: 55000, badge: "Populer" },
       { code: "60", label: "Steam Wallet Rp 60.000", amount: 60000, modal: 60500, price: 66000, price_strike: 72000, badge: "Terlaris", featured: true },
@@ -1373,6 +1388,74 @@ const MERCHANT_MASTER_GAMES = [
     ],
   },
 ];
+
+function clearAllTopupProductsAndSkus(gameSlugs?: string[]) {
+  const targetSlugs =
+    Array.isArray(gameSlugs) && gameSlugs.length > 0
+      ? new Set(gameSlugs.map((s) => String(s).trim().toLowerCase()).filter(Boolean))
+      : null;
+
+  let gamesCleared = 0;
+  for (const g of db.games || []) {
+    if (targetSlugs && !targetSlugs.has(String(g.slug || "").toLowerCase())) continue;
+    g.denominations = [];
+    g.updated_at = nowIso();
+    gamesCleared++;
+  }
+
+  const prevProdLen = (db.products || []).length;
+  if (targetSlugs) {
+    db.products = (db.products || []).filter((p) => {
+      if (!isTopupProduct(p)) return true;
+      const pSlug = String(p.slug || slugify(p.game || "")).toLowerCase();
+      return !targetSlugs.has(pSlug);
+    });
+  } else {
+    db.products = (db.products || []).filter(
+      (p) =>
+        !isTopupProduct(p) &&
+        p.category !== TOPUP_CATEGORY &&
+        p.product_type !== PRODUCT_TYPE &&
+        p.id !== "ml-topup-1000dm" &&
+        p.id !== "ff-topup-2180"
+    );
+  }
+  const productsRemoved = Math.max(0, prevProdLen - db.products.length);
+  saveDb();
+  return { games_cleared: gamesCleared, products_removed: productsRemoved };
+}
+
+function ensureDefaultTopupClearedOnce() {
+  if (!db.settings || typeof db.settings !== "object") db.settings = {};
+  if (!db.settings.topup_defaults_cleared_v1) {
+    clearAllTopupProductsAndSkus();
+    db.settings.topup_defaults_cleared_v1 = {
+      cleared_at: nowIso(),
+      note: "All default topup products, denominations, and SKUs cleared.",
+    };
+    saveDb();
+  }
+}
+
+function upgradeLocalGameIcons() {
+  if (!Array.isArray(db.games)) return;
+  for (const mg of MERCHANT_MASTER_GAMES) {
+    const existing = db.games.find(
+      (g) => g.slug === mg.slug || String(g.name || "").toLowerCase() === mg.name.toLowerCase()
+    );
+    if (!existing) continue;
+    const isOldUnsplashIcon =
+      !existing.icon ||
+      String(existing.icon).includes("images.unsplash.com") ||
+      String(existing.icon).startsWith("/src/assets/images/icon_game_");
+    const isOldUnsplashBanner =
+      !existing.banner ||
+      String(existing.banner).includes("images.unsplash.com") ||
+      String(existing.banner).startsWith("/src/assets/images/icon_game_");
+    if (isOldUnsplashIcon) existing.icon = mg.icon;
+    if (isOldUnsplashBanner) existing.banner = mg.banner;
+  }
+}
 
 function initDatabase() {
   if (fs.existsSync(DB_STATE_PATH)) {
@@ -1461,7 +1544,7 @@ function initDatabase() {
     db.games.push(...(SEED.SEED_GAMES || []).map((g: any) => ({ ...g })));
   }
 
-  // Ensure all popular Digiflazz master games are present and ready to pull/use
+  // Ensure default local Top Up games are present with 3D icons
   for (const mg of MERCHANT_MASTER_GAMES) {
     const existing = db.games.find(
       (g) => g.slug === mg.slug || String(g.name || "").toLowerCase() === mg.name.toLowerCase()
@@ -1517,6 +1600,7 @@ function initDatabase() {
       }
     }
   }
+  upgradeLocalGameIcons();
 
   for (const g of db.games) {
     syncGameProducts(g, false);
@@ -1584,7 +1668,7 @@ function initDatabase() {
     db.topup_providers = [existingDigiflazz];
   }
 
-  // Ensure all games have Digiflazz vendor_prefix, modal_price, and vendor_sku populated
+  // Ensure all games have Digiflazz vendor_prefix & vendor_id without auto-generating SKUs
   for (const g of db.games) {
     const prefix =
       String(g.vendor_prefix || "").trim() ||
@@ -1594,19 +1678,9 @@ function initDatabase() {
         .toUpperCase();
     g.vendor_prefix = prefix;
     g.vendor_id = "vp-digiflazz";
-    for (const d of g.denominations || []) {
-      const cleanCode = String(d.code || "01")
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .toUpperCase();
-      if (!String(d.vendor_sku || "").trim() || String(d.vendor_sku).includes("-")) {
-        d.vendor_sku = `${prefix}${cleanCode}`;
-      }
-      if (!d.modal_price || Number(d.modal_price) <= 0) {
-        d.modal_price = Math.max(500, Math.round((Number(d.price || 10000) * 0.9) / 100) * 100);
-      }
-    }
-    syncGameProducts(g, false);
+    syncGameProducts(g, true);
   }
+  ensureDefaultTopupClearedOnce();
 
   if (!db.settings.paykita) {
     db.settings.paykita = {
@@ -3667,22 +3741,211 @@ function vendorSkuPrefixForKind(_kind: string): string {
   return "";
 }
 
-function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300) {
-  const vendorKind = String(providerDoc?.kind || "digiflazz").toUpperCase();
-  const vPrefix = vendorSkuPrefixForKind(vendorKind);
+function matchDigiflazzItemToLocalGame(brandStr: string, skuStr: string, productNameStr = ""): string {
+  const brandNorm = String(brandStr || "").trim().toLowerCase();
+  const skuUpper = String(skuStr || "").trim().toUpperCase();
+  const nameNorm = String(productNameStr || "").trim().toLowerCase();
 
+  const aliasMap: Array<{ slug: string; prefixes: string[]; keywords: string[] }> = [
+    { slug: "mobile-legends", prefixes: ["ML", "MLBB", "WDP"], keywords: ["mobile legends", "mobile legend", "mlbb"] },
+    { slug: "free-fire", prefixes: ["FF", "FFMAX"], keywords: ["free fire", "freefire", "garena ff"] },
+    { slug: "genshin-impact", prefixes: ["GI", "GENSHIN"], keywords: ["genshin impact", "genshin"] },
+    { slug: "pubg-mobile", prefixes: ["PUBG", "PUBGM"], keywords: ["pubg mobile", "pubgm", "pubg"] },
+    { slug: "valorant", prefixes: ["VAL", "VP"], keywords: ["valorant", "riot valorant"] },
+    { slug: "honor-of-kings", prefixes: ["HOK"], keywords: ["honor of kings", "honor of king", "hok"] },
+    { slug: "honkai-star-rail", prefixes: ["HSR"], keywords: ["honkai: star rail", "honkai star rail", "star rail"] },
+    { slug: "roblox", prefixes: ["RBX", "ROBLOX"], keywords: ["roblox", "robux"] },
+    { slug: "call-of-duty-mobile", prefixes: ["CODM", "COD"], keywords: ["call of duty", "cod mobile", "codm"] },
+    { slug: "steam-wallet", prefixes: ["SW", "STEAM"], keywords: ["steam wallet", "steam idr", "steam"] },
+  ];
+
+  // 1. Check against local db.games first (supports custom local games created by Admin)
+  for (const g of db.games || []) {
+    const gSlug = String(g.slug || "").trim().toLowerCase();
+    const gName = String(g.name || "").trim().toLowerCase();
+    const gPrefix = String(g.vendor_prefix || "").trim().toUpperCase();
+    if (!gSlug) continue;
+    if (brandNorm && (brandNorm === gSlug || brandNorm === gName || gName.includes(brandNorm) || brandNorm.includes(gName))) {
+      return g.slug;
+    }
+    if (gPrefix && skuUpper.startsWith(gPrefix)) {
+      const rest = skuUpper.slice(gPrefix.length);
+      if (!rest || /^[0-9A-Z_]+$/.test(rest)) {
+        return g.slug;
+      }
+    }
+  }
+
+  // 2. Check standard game aliases if that game exists locally in db.games
+  for (const entry of aliasMap) {
+    const localMatch = (db.games || []).find((g) => g.slug === entry.slug);
+    if (!localMatch) continue;
+    if (entry.keywords.some((kw) => brandNorm.includes(kw) || nameNorm.includes(kw))) {
+      return localMatch.slug;
+    }
+    if (entry.prefixes.some((pfx) => skuUpper.startsWith(pfx) && /^[0-9A-Z]*$/.test(skuUpper.slice(pfx.length)))) {
+      return localMatch.slug;
+    }
+  }
+
+  return "";
+}
+
+function cleanDenomLabelFromProductName(productName: string, brand: string, gameName = ""): string {
+  let label = String(productName || "").trim();
+  const candidates = [brand, gameName, "Mobile Legends: Bang Bang", "Mobile Legends", "Free Fire / Free Fire MAX", "Free Fire", "Genshin Impact", "PUBG Mobile", "Valorant", "Honor of Kings", "Honkai: Star Rail", "Honkai Star Rail", "Call of Duty: Mobile", "Call of Duty Mobile", "Roblox", "Steam Wallet IDR"]
+    .map((s) => String(s || "").trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  for (const c of candidates) {
+    const regex = new RegExp(`^${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[-–—:•]?\\s*`, "i");
+    if (regex.test(label)) {
+      const stripped = label.replace(regex, "").trim();
+      if (stripped.length >= 2) {
+        label = stripped;
+        break;
+      }
+    }
+  }
+  return label || String(productName || "").trim();
+}
+
+function extractAmountFromLabel(labelStr: string, fallback = 0): number {
+  const m = String(labelStr || "").replace(/\./g, "").match(/(\d+)/);
+  if (m && Number(m[1]) > 0) return Number(m[1]);
+  return fallback;
+}
+
+async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): Promise<{
+  items: any[];
+  source: "digiflazz_live" | "digiflazz_catalog";
+  live_count: number;
+  error?: string;
+}> {
+  const doc =
+    providerDoc ||
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+
+  const username = String(doc?.config?.username || process.env.DIGIFLAZZ_USERNAME || "wjp_digiflazz_id").trim();
+  const apiKey = String(
+    (doc?.config?.use_dev ? doc?.config?.dev_key : doc?.config?.api_key) ||
+      doc?.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      "df_live_wjp88291044ff"
+  ).trim();
+
+  const isDemoCreds =
+    !username ||
+    !apiKey ||
+    username === "wjp_digiflazz_id" ||
+    apiKey.startsWith("df_live_wjp") ||
+    apiKey.startsWith("df_dev_wjp");
+
+  let liveItems: any[] = [];
+  let liveError = "";
+
+  // Use cached live pricelist if recent (< 5 minutes) and not forced
+  const cacheAgeMs = doc?.cached_pricelist_at ? Date.now() - new Date(doc.cached_pricelist_at).getTime() : Infinity;
+  if (!forceRefresh && Array.isArray(doc?.cached_pricelist) && doc.cached_pricelist.length > 0 && cacheAgeMs < 5 * 60 * 1000) {
+    liveItems = doc.cached_pricelist;
+  } else if (!isDemoCreds) {
+    try {
+      const sign = crypto.createHash("md5").update(username + apiKey + "pricelist").digest("hex");
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 7000);
+      const resp = await fetch("https://api.digiflazz.com/v1/price-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cmd: "prepaid", username, sign }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      const json: any = await resp.json().catch(() => null);
+      const rawList = Array.isArray(json?.data) ? json.data : [];
+      if (rawList.length > 0) {
+        for (const row of rawList) {
+          if (!row || typeof row !== "object") continue;
+          const sku = String(row.buyer_sku_code || "").trim();
+          const modalPrice = Number(row.price || 0);
+          if (!sku || modalPrice <= 0) continue;
+          // Skip inactive seller/buyer products
+          if (row.buyer_product_status === false || row.seller_product_status === false) continue;
+
+          const brand = String(row.brand || "").trim();
+          const category = String(row.category || "Games").trim();
+          const prodName = String(row.product_name || sku).trim();
+          const matchedSlug = matchDigiflazzItemToLocalGame(brand, sku, prodName);
+          const localGame = matchedSlug ? (db.games || []).find((g) => g.slug === matchedSlug) : null;
+          const gPrefix = String(localGame?.vendor_prefix || "").toUpperCase();
+          let code = sku.toUpperCase();
+          if (gPrefix && code.startsWith(gPrefix) && code.length > gPrefix.length) {
+            code = code.slice(gPrefix.length);
+          }
+          code = code.replace(/[^A-Z0-9_]/g, "") || sku.toUpperCase();
+          const label = cleanDenomLabelFromProductName(prodName, brand, localGame?.name || "");
+          const amount = extractAmountFromLabel(label, 0);
+          const retailPrice = Math.max(modalPrice + 1000, Math.ceil((modalPrice * 1.1) / 100) * 100);
+          const strikePrice = Math.max(retailPrice + 1500, Math.ceil((retailPrice * 1.12) / 500) * 500);
+
+          liveItems.push({
+            sku,
+            code,
+            game_slug: matchedSlug,
+            name: localGame ? `${localGame.name} — ${label}` : `${brand ? `${brand} — ` : ""}${prodName}`,
+            label,
+            brand: brand || localGame?.name || "Digiflazz",
+            category,
+            price: modalPrice,
+            retail_price: retailPrice,
+            price_strike: strikePrice,
+            amount,
+            badge: "",
+            featured: false,
+            status: "available",
+            unlimited_stock: row.unlimited_stock !== false,
+            multi: row.multi !== false,
+            provider: doc?.name || "Digiflazz Indonesia",
+            source: "digiflazz_live",
+          });
+        }
+        if (liveItems.length > 0 && doc) {
+          doc.cached_pricelist = liveItems;
+          doc.cached_pricelist_at = nowIso();
+          saveDb();
+        }
+      } else if (json?.data?.message) {
+        liveError = String(json.data.message);
+      }
+    } catch (err: any) {
+      liveError = String(err?.message || "Koneksi langsung ke endpoint pricelist Digiflazz tidak terjangkau");
+    }
+  }
+
+  // Merge live items with verified Digiflazz catalog items so every local game always has products ready
   const items: any[] = [];
   const seenSkus = new Set<string>();
 
-  // 1. Include all master merchant games & denominations first so full catalog is always available
+  for (const li of liveItems) {
+    const key = String(li.sku || "").toUpperCase();
+    if (!key || seenSkus.has(key)) continue;
+    seenSkus.add(key);
+    items.push(li);
+  }
+
+  // Include Digiflazz product SKUs for any local game when Admin pulls from Digiflazz
+  const localGamesWithLiveSkus = new Set(liveItems.map((x) => x.game_slug).filter(Boolean));
   for (const mg of MERCHANT_MASTER_GAMES) {
-    for (const d of mg.denominations) {
-      const sku = `${vPrefix}${mg.vendor_prefix}${d.code}`;
-      if (seenSkus.has(sku)) continue;
-      seenSkus.add(sku);
+    if (localGamesWithLiveSkus.has(mg.slug)) continue;
+    const skuDefs = (mg as any).digiflazz_skus || mg.denominations || [];
+    for (const d of skuDefs) {
+      const sku = `${mg.vendor_prefix}${d.code}`;
+      const key = sku.toUpperCase();
+      if (seenSkus.has(key)) continue;
+      seenSkus.add(key);
       items.push({
         sku,
-        code: d.code,
+        code: String(d.code),
         game_slug: mg.slug,
         name: `${mg.name} — ${d.label}`,
         label: d.label,
@@ -3697,13 +3960,15 @@ function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300
         status: "available",
         unlimited_stock: true,
         multi: true,
-        provider: providerDoc?.name || vendorKind,
+        provider: doc?.name || "Digiflazz Indonesia",
+        source: liveItems.length > 0 ? "digiflazz_live" : "digiflazz_catalog",
       });
     }
   }
 
-  // 2. Also include any custom games/denominations already in db.games
-  for (const g of db.games) {
+  // Also include any custom local games in db.games
+  for (const g of db.games || []) {
+    const hasProductsForGame = items.some((it) => it.game_slug === g.slug);
     const gPrefix =
       String(g.vendor_prefix || "").trim() ||
       String(g.slug || g.name || "GM")
@@ -3714,11 +3979,13 @@ function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300
       const cleanCode = String(d.code || "01")
         .replace(/[^a-zA-Z0-9]/g, "")
         .toUpperCase();
-      const sku = String(d.vendor_sku || `${vPrefix}${gPrefix}${cleanCode}`).trim();
-      if (seenSkus.has(sku)) continue;
-      seenSkus.add(sku);
+      const sku = String(d.vendor_sku || `${gPrefix}${cleanCode}`).trim();
+      const key = sku.toUpperCase();
+      if (seenSkus.has(key)) continue;
+      if (hasProductsForGame && !d.vendor_sku) continue;
+      seenSkus.add(key);
       const retailPrice = Math.max(1000, Number(d.price || 10000));
-      const modalPrice = Math.max(500, Math.round((retailPrice * 0.9) / 100) * 100);
+      const modalPrice = Math.max(500, Number(d.modal_price || Math.round((retailPrice * 0.9) / 100) * 100));
       items.push({
         sku,
         code: String(d.code),
@@ -3732,13 +3999,26 @@ function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300
         price_strike: Number(d.price_strike || 0),
         amount: Number(d.amount || 0),
         badge: d.badge || "",
+        featured: Boolean(d.featured),
         status: "available",
         unlimited_stock: true,
         multi: true,
-        provider: providerDoc?.name || vendorKind,
+        provider: doc?.name || "Digiflazz Indonesia",
+        source: "digiflazz_catalog",
       });
     }
   }
+
+  return {
+    items,
+    source: liveItems.length > 0 ? "digiflazz_live" : "digiflazz_catalog",
+    live_count: liveItems.length,
+    error: liveError || undefined,
+  };
+}
+
+async function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300, forceRefresh = false) {
+  const { items, source, live_count, error } = await fetchDigiflazzPriceList(providerDoc, forceRefresh);
 
   const needle = String(queryStr || "").trim().toLowerCase();
   let filtered = items;
@@ -3748,7 +4028,8 @@ function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300
         String(item.sku || "").toLowerCase().includes(needle) ||
         String(item.name || "").toLowerCase().includes(needle) ||
         String(item.brand || "").toLowerCase().includes(needle) ||
-        String(item.game_slug || "").toLowerCase().includes(needle)
+        String(item.game_slug || "").toLowerCase().includes(needle) ||
+        String(item.label || "").toLowerCase().includes(needle)
     );
     if (filtered.length === 0) {
       filtered = items;
@@ -3757,14 +4038,18 @@ function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit = 300
   return {
     total: items.length,
     count: Math.min(filtered.length, limit),
+    source,
+    live_count,
+    live_error: error || null,
     products: filtered.slice(0, limit),
   };
 }
 
-function pullGamesFromMerchant(opts: {
+async function pullGamesFromMerchant(opts: {
   vendorKind?: string;
   providerId?: string;
   gameSlugs?: string[];
+  selectedSkusByGame?: Record<string, string[]>;
   marginPercent?: number;
   useRecommendedPrice?: boolean;
   autoActivateVendor?: boolean;
@@ -3781,7 +4066,12 @@ function pullGamesFromMerchant(opts: {
   }
 
   const vendorKind = String(provider?.kind || "digiflazz").toLowerCase();
-  const vPrefix = vendorSkuPrefixForKind(vendorKind);
+
+  // Ensure local games have their 3D icons intact
+  upgradeLocalGameIcons();
+
+  // Fetch products (SKUs & prices) from Digiflazz
+  const { items: digiflazzProducts, source } = await fetchDigiflazzPriceList(provider, true);
 
   if (provider && opts.autoActivateVendor !== false && provider.kind !== "manual") {
     for (const v of db.topup_providers) v.is_active = false;
@@ -3789,9 +4079,9 @@ function pullGamesFromMerchant(opts: {
     provider.auto_dispatch = true;
     provider.last_test = {
       ok: true,
-      mode: "verified",
+      mode: source === "digiflazz_live" ? "production" : "verified",
       balance: Number(provider.cached_balance || 15750000),
-      message: `${provider.name} aktif & produk topup berhasil ditarik otomatis`,
+      message: `${provider.name} aktif & daftar produk berhasil disinkronkan ke game lokal`,
       at: nowIso(),
     };
   }
@@ -3801,122 +4091,110 @@ function pullGamesFromMerchant(opts: {
       ? new Set(opts.gameSlugs.map((s) => String(s).trim().toLowerCase()).filter(Boolean))
       : null;
 
-  const selectedMasterGames = targetSlugs
-    ? MERCHANT_MASTER_GAMES.filter((g) => targetSlugs.has(g.slug))
-    : MERCHANT_MASTER_GAMES;
+  // IMPORTANT: Only iterate over EXISTING local games in db.games!
+  // Never create new raw games from Digiflazz, only pull products into local games.
+  const localGamesToUpdate = targetSlugs
+    ? (db.games || []).filter((g) => targetSlugs.has(String(g.slug || "").toLowerCase()))
+    : (db.games || []);
 
-  const margin = Number(opts.marginPercent || 0);
-  const useMargin = margin > 0 && !opts.useRecommendedPrice;
+  const margin = Math.max(0, Number(opts.marginPercent ?? 0));
+  const useMargin = margin > 0 || !opts.useRecommendedPrice;
 
-  let gamesCreated = 0;
   let gamesUpdated = 0;
   let denominationsPulled = 0;
 
-  for (const mg of selectedMasterGames) {
-    let existingGame = db.games.find(
-      (g) => g.slug === mg.slug || String(g.name || "").toLowerCase() === mg.name.toLowerCase()
-    );
+  for (const existingGame of localGamesToUpdate) {
+    const gameSlug = String(existingGame.slug || "").toLowerCase();
+    const gPrefix = String(existingGame.vendor_prefix || "").trim().toUpperCase();
 
-    const builtDenoms = mg.denominations.map((d, idx) => {
-      const sku = `${vPrefix}${mg.vendor_prefix}${d.code}`;
-      const sellingPrice = useMargin
-        ? Math.max(1000, Math.ceil((d.modal * (1 + margin / 100)) / 100) * 100)
-        : d.price;
-      const strikePrice = Math.max(
-        sellingPrice + 1500,
-        d.price_strike || Math.ceil((sellingPrice * 1.12) / 500) * 500
-      );
-      return {
-        code: String(d.code),
-        label: d.label,
-        amount: d.amount,
-        price: sellingPrice,
-        price_strike: strikePrice,
-        modal_price: d.modal,
-        stock: 999,
-        badge: d.badge || "",
-        featured: Boolean(d.featured),
-        is_active: true,
-        vendor_sku: sku,
-        seq: idx,
-      };
+    // Find all Digiflazz products matching this local game
+    let matchedProducts = digiflazzProducts.filter((p) => {
+      if (String(p.game_slug || "").toLowerCase() === gameSlug) return true;
+      const matched = matchDigiflazzItemToLocalGame(p.brand, p.sku, p.name);
+      return matched && matched.toLowerCase() === gameSlug;
     });
 
-    if (!existingGame) {
-      const newGame = {
-        id: `gm-${mg.slug}-${uuidHex(4)}`,
-        name: mg.name,
-        slug: mg.slug,
-        publisher: mg.publisher,
-        currency: mg.currency,
-        icon: mg.icon,
-        banner: mg.banner,
-        notes: mg.notes,
-        delivery_info: mg.delivery_info,
-        vendor_prefix: mg.vendor_prefix,
-        vendor_id: provider?.id || "vp-digiflazz",
-        is_active: true,
-        featured: Boolean(mg.featured),
-        seq: db.games.length,
-        fields: mg.fields.map((f) => ({ ...f })),
-        denominations: builtDenoms,
-        created_at: nowIso(),
-        updated_at: nowIso(),
-      };
-      db.games.push(newGame);
-      gamesCreated++;
-      denominationsPulled += builtDenoms.length;
-    } else {
-      existingGame.is_active = true;
-      existingGame.vendor_prefix = existingGame.vendor_prefix || mg.vendor_prefix;
-      existingGame.vendor_id = provider?.id || existingGame.vendor_id || "vp-digiflazz";
-      if (!existingGame.icon) existingGame.icon = mg.icon;
-      if (!existingGame.banner) existingGame.banner = mg.banner;
-      if (!existingGame.publisher) existingGame.publisher = mg.publisher;
-      if (!existingGame.currency) existingGame.currency = mg.currency;
-      if (!Array.isArray(existingGame.fields) || existingGame.fields.length === 0) {
-        existingGame.fields = mg.fields.map((f) => ({ ...f }));
-      }
-
-      const currentDenoms: any[] = Array.isArray(existingGame.denominations)
-        ? [...existingGame.denominations]
-        : [];
-      const byCode = new Map(currentDenoms.map((cd) => [String(cd.code).toUpperCase(), cd]));
-
-      for (const bd of builtDenoms) {
-        const key = String(bd.code).toUpperCase();
-        const found = byCode.get(key);
-        if (found) {
-          found.vendor_sku = bd.vendor_sku;
-          found.price = bd.price;
-          found.price_strike = bd.price_strike;
-          found.modal_price = bd.modal_price;
-          found.label = bd.label || found.label;
-          found.amount = bd.amount || found.amount;
-          found.is_active = true;
-          if (!found.stock || found.stock < 10) found.stock = 999;
-        } else {
-          currentDenoms.push({ ...bd, seq: currentDenoms.length });
-        }
-        denominationsPulled++;
-      }
-
-      // Ensure any remaining custom denominations on existingGame also have vendor_sku
-      for (const cd of currentDenoms) {
-        if (!String(cd.vendor_sku || "").trim()) {
-          const cleanCode = String(cd.code || "01").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-          cd.vendor_sku = `${vPrefix}${existingGame.vendor_prefix || mg.vendor_prefix}${cleanCode}`;
-        }
-      }
-
-      existingGame.denominations = currentDenoms;
-      existingGame.updated_at = nowIso();
-      gamesUpdated++;
+    // If Admin explicitly selected specific SKUs for this game, filter to those SKUs
+    const explicitSkus = opts.selectedSkusByGame?.[existingGame.slug] || opts.selectedSkusByGame?.[gameSlug];
+    if (Array.isArray(explicitSkus) && explicitSkus.length > 0) {
+      const allowedSet = new Set(explicitSkus.map((s) => String(s).trim().toUpperCase()));
+      matchedProducts = matchedProducts.filter((p) => allowedSet.has(String(p.sku || "").trim().toUpperCase()));
     }
+
+    if (matchedProducts.length === 0) continue;
+
+    existingGame.vendor_id = provider?.id || existingGame.vendor_id || "vp-digiflazz";
+
+    const currentDenoms: any[] = Array.isArray(existingGame.denominations)
+      ? [...existingGame.denominations]
+      : [];
+    const bySku = new Map(
+      currentDenoms
+        .filter((cd) => cd.vendor_sku)
+        .map((cd) => [String(cd.vendor_sku).trim().toUpperCase(), cd])
+    );
+    const byCode = new Map(currentDenoms.map((cd) => [String(cd.code).trim().toUpperCase(), cd]));
+
+    for (const prod of matchedProducts) {
+      const sku = String(prod.sku || "").trim();
+      const code = String(prod.code || sku).trim();
+      const modalPrice = Math.max(500, Number(prod.price || 0));
+      const sellingPrice =
+        useMargin && margin > 0
+          ? Math.max(1000, Math.ceil((modalPrice * (1 + margin / 100)) / 100) * 100)
+          : Math.max(
+              modalPrice + 1000,
+              Number(prod.retail_price || Math.ceil((modalPrice * 1.1) / 100) * 100)
+            );
+      const strikePrice = Math.max(
+        sellingPrice + 1500,
+        Number(prod.price_strike || Math.ceil((sellingPrice * 1.12) / 500) * 500)
+      );
+
+      const found =
+        bySku.get(sku.toUpperCase()) ||
+        byCode.get(code.toUpperCase()) ||
+        (gPrefix && sku.toUpperCase().startsWith(gPrefix)
+          ? byCode.get(sku.toUpperCase().slice(gPrefix.length))
+          : undefined);
+
+      if (found) {
+        found.vendor_sku = sku;
+        found.modal_price = modalPrice;
+        found.price = sellingPrice;
+        found.price_strike = strikePrice;
+        found.label = prod.label || found.label;
+        found.amount = Number(prod.amount || found.amount || 0);
+        found.is_active = true;
+        if (!found.stock || found.stock < 10) found.stock = 999;
+      } else {
+        const newDenom = {
+          code,
+          label: prod.label || prod.name || code,
+          amount: Number(prod.amount || 0),
+          modal_price: modalPrice,
+          price: sellingPrice,
+          price_strike: strikePrice,
+          stock: 999,
+          badge: prod.badge || "",
+          featured: Boolean(prod.featured),
+          is_active: true,
+          vendor_sku: sku,
+          seq: currentDenoms.length,
+        };
+        currentDenoms.push(newDenom);
+        bySku.set(sku.toUpperCase(), newDenom);
+        byCode.set(code.toUpperCase(), newDenom);
+      }
+      denominationsPulled++;
+    }
+
+    existingGame.denominations = currentDenoms.map((d, idx) => ({ ...d, seq: idx }));
+    existingGame.updated_at = nowIso();
+    gamesUpdated++;
   }
 
   const totalProductsSynced = syncAllGames(true);
-  // Ensure price_usd is populated for all synced topup products
   for (const p of db.products) {
     if (isTopupProduct(p)) {
       p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / 16000) * 100) / 100);
@@ -3924,17 +4202,19 @@ function pullGamesFromMerchant(opts: {
   }
   saveDb();
 
+  const marginInfo = margin > 0 ? ` dengan margin otomatis +${margin}%` : "";
   return {
     ok: true,
+    source,
     vendor_id: provider?.id || "vp-digiflazz",
     vendor_kind: vendorKind,
     vendor_name: provider?.name || "Digiflazz Indonesia",
-    games_created: gamesCreated,
+    games_created: 0,
     games_updated: gamesUpdated,
-    games_total: gamesCreated + gamesUpdated,
+    games_total: gamesUpdated,
     denominations_pulled: denominationsPulled,
     products_synced: totalProductsSynced,
-    message: `Berhasil menarik ${gamesCreated + gamesUpdated} game & ${denominationsPulled} nominal top up dari ${provider?.name || "Digiflazz"} (tanpa perlu setting manual)!`,
+    message: `Berhasil menarik ${denominationsPulled} produk/nominal dari ${provider?.name || "Digiflazz"} ke ${gamesUpdated} Game Top Up lokal${marginInfo}!`,
   };
 }
 
@@ -7864,7 +8144,7 @@ admin.get("/topup/vendors/:provider_id/balance", (req, res) => {
   });
 });
 
-admin.get("/topup/vendors/:provider_id/products", (req, res) => {
+admin.get("/topup/vendors/:provider_id/products", async (req, res) => {
   const doc =
     db.topup_providers.find((v) => v.id === req.params.provider_id || v.kind === req.params.provider_id) ||
     db.topup_providers.find((v) => v.kind === "digiflazz") ||
@@ -7872,42 +8152,69 @@ admin.get("/topup/vendors/:provider_id/products", (req, res) => {
   if (!doc) return res.status(404).json({ detail: "Supplier tidak ditemukan" });
   const q = String(req.query.q || "");
   const limit = Math.max(10, Math.min(500, Number(req.query.limit || 200)));
-  const catalogData = buildVendorProductsCatalog(doc, q, limit);
+  const forceRefresh = req.query.refresh === "true" || req.query.refresh === "1";
+  const catalogData = await buildVendorProductsCatalog(doc, q, limit, forceRefresh);
   res.json(catalogData);
 });
 
-admin.get("/topup/merchant-catalog", (req, res) => {
+admin.get("/topup/merchant-catalog", async (req, res) => {
   const vendorKind = String(req.query.vendor_kind || req.query.vendor || "digiflazz").toLowerCase();
   const margin = Math.max(0, Number(req.query.margin_percent || 0));
-  const vPrefix = vendorSkuPrefixForKind(vendorKind);
+  const forceRefresh = req.query.refresh === "true" || req.query.refresh === "1";
+  const provider =
+    db.topup_providers.find((v) => v.kind === vendorKind) ||
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
 
-  const games = MERCHANT_MASTER_GAMES.map((mg) => {
-    const existing = db.games.find((g) => g.slug === mg.slug);
-    const denominations = mg.denominations.map((d) => {
-      const sku = `${vPrefix}${mg.vendor_prefix}${d.code}`;
+  upgradeLocalGameIcons();
+  const { items: digiflazzProducts, source, live_count, error } = await fetchDigiflazzPriceList(
+    provider,
+    forceRefresh
+  );
+
+  // Build catalog strictly around existing LOCAL games in db.games
+  const localGames = [...(db.games || [])].sort((a, b) => (a.seq || 0) - (b.seq || 0));
+  const games = localGames.map((lg) => {
+    const gameSlug = String(lg.slug || "").toLowerCase();
+    const matched = digiflazzProducts.filter((p) => {
+      if (String(p.game_slug || "").toLowerCase() === gameSlug) return true;
+      const mSlug = matchDigiflazzItemToLocalGame(p.brand, p.sku, p.name);
+      return mSlug && mSlug.toLowerCase() === gameSlug;
+    });
+
+    const denominations = matched.map((d) => {
+      const modalPrice = Math.max(500, Number(d.price || 0));
+      const recPrice = Math.max(
+        modalPrice + 1000,
+        Number(d.retail_price || Math.ceil((modalPrice * 1.1) / 100) * 100)
+      );
       const sellingPrice =
-        margin > 0 ? Math.max(1000, Math.ceil((d.modal * (1 + margin / 100)) / 100) * 100) : d.price;
+        margin > 0
+          ? Math.max(1000, Math.ceil((modalPrice * (1 + margin / 100)) / 100) * 100)
+          : recPrice;
       return {
-        code: d.code,
-        label: d.label,
-        amount: d.amount,
-        sku,
-        modal_price: d.modal,
-        recommended_price: d.price,
+        code: String(d.code || d.sku),
+        label: d.label || d.name || String(d.sku),
+        amount: Number(d.amount || 0),
+        sku: String(d.sku),
+        modal_price: modalPrice,
+        recommended_price: recPrice,
         selling_price: sellingPrice,
         badge: d.badge || "",
       };
     });
+
     return {
-      slug: mg.slug,
-      name: mg.name,
-      publisher: mg.publisher,
-      currency: mg.currency,
-      icon: mg.icon,
-      banner: mg.banner,
-      vendor_prefix: mg.vendor_prefix,
-      already_added: Boolean(existing),
-      existing_denom_count: existing?.denominations?.length || 0,
+      id: lg.id,
+      slug: lg.slug,
+      name: lg.name,
+      publisher: lg.publisher,
+      currency: lg.currency,
+      icon: lg.icon,
+      banner: lg.banner,
+      vendor_prefix: lg.vendor_prefix,
+      already_added: true,
+      existing_denom_count: Array.isArray(lg.denominations) ? lg.denominations.length : 0,
       denomination_count: denominations.length,
       denominations,
     };
@@ -7915,23 +8222,40 @@ admin.get("/topup/merchant-catalog", (req, res) => {
 
   res.json({
     vendor_kind: vendorKind,
+    source,
+    live_count,
+    live_error: error || null,
     total_games: games.length,
     total_denominations: games.reduce((sum, g) => sum + g.denomination_count, 0),
     games,
   });
 });
 
-admin.post("/topup/pull-merchant", (req, res) => {
+admin.post("/topup/pull-merchant", async (req, res) => {
   const body = req.body || {};
-  const result = pullGamesFromMerchant({
+  const result = await pullGamesFromMerchant({
     vendorKind: body.vendor_kind || body.vendor || "digiflazz",
     providerId: body.provider_id,
     gameSlugs: Array.isArray(body.game_slugs) ? body.game_slugs : undefined,
+    selectedSkusByGame:
+      body.selected_skus_by_game && typeof body.selected_skus_by_game === "object"
+        ? body.selected_skus_by_game
+        : undefined,
     marginPercent: Number(body.margin_percent || 0),
     useRecommendedPrice: Boolean(body.use_recommended_price),
     autoActivateVendor: body.auto_activate_vendor !== false,
   });
   res.json(result);
+});
+
+admin.post("/topup/clear-products", (req, res) => {
+  const slugs = Array.isArray(req.body?.game_slugs) ? req.body.game_slugs : undefined;
+  const result = clearAllTopupProductsAndSkus(slugs);
+  res.json({
+    ok: true,
+    ...result,
+    message: `Berhasil mengosongkan produk & SKU pada ${result.games_cleared} game lokal (${result.products_removed} produk top up dihapus).`,
+  });
 });
 
 // --- Admin File Upload ---
@@ -8666,28 +8990,115 @@ admin.post("/payments/paykita/test", async (req, res) => {
   });
 });
 
-admin.post("/topup/games/:game_id/import", (req, res) => {
+admin.post("/topup/games/:game_id/import", async (req, res) => {
   const game = db.games.find((g) => g.id === req.params.game_id || g.slug === req.params.game_id);
   if (!game) return res.status(404).json({ detail: "Game tidak ditemukan" });
 
-  // Support one-click full pull for this single game directly from merchant
+  const marginPercent = Math.max(
+    0,
+    req.body?.margin_percent !== undefined ? Number(req.body.margin_percent) : 10
+  );
+
+  // Support one-click product pull for this single local game directly from Digiflazz
   if (req.body?.auto_pull_all) {
-    const resPull = pullGamesFromMerchant({
-      vendorKind: req.body?.vendor_kind,
+    const selectedSkus = Array.isArray(req.body?.selected_skus) ? req.body.selected_skus : undefined;
+    const resPull = await pullGamesFromMerchant({
+      vendorKind: req.body?.vendor_kind || "digiflazz",
       providerId: req.body?.provider_id,
       gameSlugs: [game.slug],
-      marginPercent: Number(req.body?.margin_percent || 0),
+      selectedSkusByGame: selectedSkus?.length ? { [game.slug]: selectedSkus } : undefined,
+      marginPercent,
+      useRecommendedPrice: marginPercent <= 0 && Boolean(req.body?.use_recommended_price),
       autoActivateVendor: true,
     });
     return res.json(resPull);
+  }
+
+  // Support importing selected Digiflazz products directly as denominations on this local game
+  if (Array.isArray(req.body?.selected_products) && req.body.selected_products.length > 0) {
+    const existingDenoms = Array.isArray(game.denominations) ? [...game.denominations] : [];
+    const updatedCodes: string[] = [];
+
+    for (const rawProd of req.body.selected_products) {
+      const sku = String(rawProd?.sku || "").trim();
+      if (!sku) continue;
+      const modalPrice = Math.max(500, Number(rawProd?.price || rawProd?.modal_price || 0));
+      const cleanLabel = String(
+        rawProd?.label ||
+          cleanDenomLabelFromProductName(String(rawProd?.name || sku), game.name, game.currency || "Diamond")
+      ).trim();
+      const amount = Number(rawProd?.amount) || extractAmountFromLabel(cleanLabel, 1);
+      const code = String(rawProd?.code || (amount > 0 ? String(amount) : sku.toLowerCase()));
+      const sellingPrice =
+        marginPercent > 0
+          ? Math.max(1000, Math.ceil((modalPrice * (1 + marginPercent / 100)) / 100) * 100)
+          : Math.max(
+              1000,
+              Number(rawProd?.retail_price) > modalPrice
+                ? Number(rawProd.retail_price)
+                : Math.ceil((modalPrice * 1.1) / 100) * 100
+            );
+      const strikePrice = Math.ceil((sellingPrice * 1.12) / 1000) * 1000;
+
+      const existIdx = existingDenoms.findIndex(
+        (ed: any) =>
+          String(ed.vendor_sku || "").toUpperCase() === sku.toUpperCase() ||
+          String(ed.code || "").toLowerCase() === code.toLowerCase()
+      );
+
+      if (existIdx >= 0) {
+        existingDenoms[existIdx] = {
+          ...existingDenoms[existIdx],
+          code: existingDenoms[existIdx].code || code,
+          label: cleanLabel || existingDenoms[existIdx].label,
+          amount: amount || existingDenoms[existIdx].amount || 1,
+          modal_price: modalPrice,
+          price: sellingPrice,
+          price_strike: strikePrice,
+          vendor_sku: sku,
+          is_active: true,
+        };
+      } else {
+        existingDenoms.push({
+          code,
+          label: cleanLabel || sku,
+          amount: amount || 1,
+          modal_price: modalPrice,
+          price: sellingPrice,
+          price_strike: strikePrice,
+          stock: Number(rawProd?.stock || 999),
+          badge: String(rawProd?.badge || ""),
+          is_active: true,
+          featured: Boolean(rawProd?.featured),
+          vendor_sku: sku,
+          seq: existingDenoms.length,
+        });
+      }
+      updatedCodes.push(sku);
+    }
+
+    existingDenoms.sort((a: any, b: any) => Number(a.price || 0) - Number(b.price || 0));
+    game.denominations = existingDenoms.map((d: any, idx: number) => ({ ...d, seq: idx }));
+    const count = syncGameProducts(game);
+    for (const p of db.products) {
+      if (isTopupProduct(p)) {
+        p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / 16000) * 100) / 100);
+      }
+    }
+    saveDb();
+    return res.json({
+      ok: true,
+      updated: updatedCodes,
+      products: count,
+      message: `${updatedCodes.length} produk Digiflazz berhasil ditarik ke ${game.name} (Margin +${marginPercent}%)`,
+    });
   }
 
   const mapping = req.body?.skus;
   if (!mapping || typeof mapping !== "object") {
     return res.status(400).json({ detail: "Pilih minimal satu SKU untuk diimpor" });
   }
-  const applyPrice = Boolean(req.body?.apply_price);
-  const marginPercent = Math.max(0, Number(req.body?.margin_percent || 0));
+  const applyPrice = Boolean(req.body?.apply_price ?? true);
   const updated: string[] = [];
   for (const denom of game.denominations || []) {
     const code = String(denom.code);
@@ -8703,6 +9114,7 @@ admin.post("/topup/games/:game_id/import", (req, res) => {
         marginPercent > 0
           ? Math.max(1000, Math.ceil((baseModal * (1 + marginPercent / 100)) / 100) * 100)
           : Math.max(1000, Number(entry.retail_price || Math.ceil((baseModal * 1.1) / 100) * 100));
+      denom.price_strike = Math.ceil((denom.price * 1.12) / 1000) * 1000;
     }
     updated.push(code);
   }
@@ -9877,6 +10289,10 @@ app.use("/api", api);
 // ---------------- Vite Dev Middleware / Production Static Serving ----------------
 async function startServer() {
   const distPath = path.join(__dirname, "dist");
+  const assetsImagesPath = path.join(__dirname, "src/assets/images");
+  if (fs.existsSync(assetsImagesPath)) {
+    app.use("/src/assets/images", express.static(assetsImagesPath));
+  }
   const isProd =
     (process.env.NODE_ENV === "production" ||
       Boolean(process.env.COOLIFY_URL || process.env.COOLIFY_FQDN)) &&

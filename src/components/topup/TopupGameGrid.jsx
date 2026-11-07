@@ -206,15 +206,19 @@ export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry 
                   }`}
                 >
                   <div>
-                    <div className="relative aspect-[4/3] overflow-hidden bg-void">
+                    <div className="relative aspect-square overflow-hidden bg-void">
                       <img
-                        src={imgSrc(g.banner || g.icon)}
+                        src={imgSrc(g.icon || g.banner)}
                         alt={g.name}
                         loading="lazy"
                         decoding="async"
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-panel via-void/25 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-panel via-void/15 to-transparent" />
                       {g.featured && (
                         <span className="absolute top-2.5 left-2.5 text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-neon text-void shadow-[0_0_12px_rgba(0,240,255,0.4)]">
                           Populer
@@ -228,11 +232,11 @@ export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry 
                       </p>
                       <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 mt-1 truncate">
                         <span className="truncate">{g.publisher || "Official"}</span>
-                        {g.denominations?.length > 0 && (
-                          <>
-                            <span aria-hidden="true">&middot;</span>
-                            <span className="shrink-0">{g.denominations.length} nominal</span>
-                          </>
+                        <span aria-hidden="true">&middot;</span>
+                        {g.denominations?.length > 0 ? (
+                          <span className="shrink-0 text-lime">{g.denominations.length} nominal</span>
+                        ) : (
+                          <span className="shrink-0 text-slate-500">Belum ada SKU</span>
                         )}
                       </div>
                     </div>
@@ -241,10 +245,10 @@ export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry 
                   <div className="px-3.5 sm:px-4 pb-3.5 pt-2 mt-1 flex items-center justify-between gap-2 border-t border-line/60">
                     <div>
                       <span className="block text-[9px] font-mono uppercase tracking-wider text-slate-500">
-                        Mulai dari
+                        {g.min_price > 0 ? "Mulai dari" : "Status Produk"}
                       </span>
-                      <span className="font-mono font-bold text-xs text-neon">
-                        {g.min_price > 0 ? formatIDR(g.min_price) : "Tersedia"}
+                      <span className={`font-mono font-bold text-xs ${g.min_price > 0 ? "text-neon" : "text-slate-400"}`}>
+                        {g.min_price > 0 ? formatIDR(g.min_price) : "Segera Hadir"}
                       </span>
                     </div>
                     <span className="w-7 h-7 rounded-lg bg-void/90 border border-line group-hover:border-neon group-hover:bg-neon group-hover:text-void text-slate-400 grid place-items-center transition-all duration-200 shrink-0">

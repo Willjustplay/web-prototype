@@ -198,12 +198,12 @@ export const Navbar = () => {
               to="/topup"
               data-testid="bottom-nav-topup"
               className={`group relative flex items-center justify-center gap-2 py-2 px-3 rounded-xl transition-all duration-200 active:scale-95 ${
-                location.pathname === "/topup"
+                location.pathname.startsWith("/topup")
                   ? "text-void font-bold"
                   : "text-slate-400 hover:text-slate-100 hover:bg-panel/70"
               }`}
             >
-              {location.pathname === "/topup" && (
+              {location.pathname.startsWith("/topup") && (
                 <motion.span
                   layoutId="bottomNavActivePill"
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
@@ -214,7 +214,7 @@ export const Navbar = () => {
                 <Zap
                   size={15}
                   className={`transition-transform duration-200 group-hover:scale-110 ${
-                    location.pathname === "/topup" ? "text-void fill-void" : "text-neon"
+                    location.pathname.startsWith("/topup") ? "text-void fill-void" : "text-neon"
                   }`}
                 />
                 <span className="text-[10px] font-mono font-bold uppercase tracking-wider">
