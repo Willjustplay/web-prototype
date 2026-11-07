@@ -9877,7 +9877,10 @@ app.use("/api", api);
 // ---------------- Vite Dev Middleware / Production Static Serving ----------------
 async function startServer() {
   const distPath = path.join(__dirname, "dist");
-  const isProd = process.env.NODE_ENV === "production" && fs.existsSync(distPath);
+  const isProd =
+    (process.env.NODE_ENV === "production" ||
+      Boolean(process.env.COOLIFY_URL || process.env.COOLIFY_FQDN)) &&
+    fs.existsSync(distPath);
 
   if (isProd) {
     app.use(express.static(distPath));
@@ -9887,7 +9890,7 @@ async function startServer() {
   } else {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: { middlewareMode: true, hmr: false, allowedHosts: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
