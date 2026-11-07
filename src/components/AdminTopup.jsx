@@ -23,7 +23,7 @@ const EMPTY_GAME = {
   notes: "", delivery_info: "", is_active: true, featured: false, seq: 0,
   vendor_prefix: "", cek_id_sku: "", vendor_id: "vp-digiflazz",
   fields: [{ ...EMPTY_FIELD, key: "user_id", label: "User ID" }],
-  denominations: [{ ...EMPTY_DENOM }],
+  denominations: [],
 };
 
 const slugify = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -53,7 +53,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
   const [gameStatusFilter, setGameStatusFilter] = useState("all");
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [activeVendor, setActiveVendor] = useState("manual");
+  const [activeVendor, setActiveVendor] = useState("digiflazz");
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,7 +82,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
       if (o.status === "fulfilled") setOrders(Array.isArray(o.value.data) ? o.value.data : []);
       if (v.status === "fulfilled") {
         setVendors(Array.isArray(v.value.data?.vendors) ? v.value.data.vendors : []);
-        setActiveVendor(v.value.data?.active_kind || "manual");
+        setActiveVendor(v.value.data?.active_kind || "digiflazz");
       }
       if (c.status === "fulfilled") setCatalog(Array.isArray(c.value.data) ? c.value.data : []);
       if (i.status === "fulfilled") setIntegration(i.value.data || null);
@@ -127,7 +127,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
   }, [games, gameSearch, gameStatusFilter]);
 
   // ------------------------------------------------------------- game editor
-  const openNew = () => setForm({ ...EMPTY_GAME, fields: [{ ...EMPTY_FIELD, key: "user_id", label: "User ID" }], denominations: [{ ...EMPTY_DENOM }] });
+  const openNew = () => setForm({ ...EMPTY_GAME, fields: [{ ...EMPTY_FIELD, key: "user_id", label: "User ID" }], denominations: [] });
 
   const openEdit = (g) => setForm({
     ...EMPTY_GAME,
@@ -221,14 +221,22 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
     }
   };
 
-  const removeGame = async (g) => {
+  const toggleGameActive = async (g) => {
+    const nextActive = !g.is_active;
+    setBusy(`toggle-${g.id}`);
     try {
-      const { data } = await api.delete(`/admin/games/${g.id}`, { headers });
-      toast.success(`Game dihapus (${data.products_removed} produk)`);
+      await api.post(`/admin/games/${g.id}/toggle-active`, { is_active: nextActive }, { headers });
+      toast.success(
+        nextActive
+          ? `${g.name} diaktifkan dan ditampilkan kembali di halaman publik Top Up`
+          : `${g.name} dinonaktifkan dan disembunyikan dari halaman publik Top Up`
+      );
       load();
       onReload?.();
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Gagal menghapus game");
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal mengubah status game");
+    } finally {
+      setBusy("");
     }
   };
 
@@ -732,12 +740,32 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                           <Pencil size={13} />
                         </button>
                         <button
-                          onClick={() => removeGame(g)}
-                          data-testid={`admin-topup-delete-${g.slug}`}
-                          aria-label="Hapus game"
-                          className="grid place-items-center w-8 h-8 rounded-lg border border-line bg-void/70 text-slate-400 hover:text-coral hover:border-coral/50 transition-colors cursor-pointer"
+                          type="button"
+                          onClick={() => toggleGameActive(g)}
+                          disabled={busy === `toggle-${g.id}`}
+                          data-testid={`admin-topup-toggle-${g.slug}`}
+                          aria-label={g.is_active ? `Nonaktifkan ${g.name}` : `Aktifkan ${g.name}`}
+                          title={
+                            g.is_active
+                              ? "Status Aktif — Klik untuk menonaktifkan dan menyembunyikan dari publik"
+                              : "Status Nonaktif — Klik untuk mengaktifkan kembali di publik"
+                          }
+                          className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[10px] font-display font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 ${
+                            g.is_active
+                              ? "border-lime/50 bg-lime/10 text-lime hover:bg-coral/15 hover:border-coral/50 hover:text-coral"
+                              : "border-line bg-void/70 text-slate-400 hover:border-lime/50 hover:bg-lime/10 hover:text-lime"
+                          }`}
                         >
-                          <Trash2 size={13} />
+                          {busy === `toggle-${g.id}` ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                g.is_active ? "bg-lime shadow-[0_0_6px_rgba(163,255,18,0.8)]" : "bg-slate-500"
+                              }`}
+                            />
+                          )}
+                          <span>{g.is_active ? "Aktif" : "Nonaktif"}</span>
                         </button>
                       </div>
                     </td>
@@ -1006,9 +1034,9 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                   <input id="g-banner" value={form.banner} onChange={(e) => patch({ banner: e.target.value })} className={inputCls} placeholder="https://..." />
                 </div>
                 <div>
-                  <label htmlFor="g-vprefix" className={labelCls}>Prefix SKU Supplier</label>
+                  <label htmlFor="g-vprefix" className={labelCls}>Prefix Pencocokan Digiflazz</label>
                   <input id="g-vprefix" data-testid="game-vendor-prefix" value={form.vendor_prefix} onChange={(e) => patch({ vendor_prefix: e.target.value })} className={inputCls} placeholder="ML" />
-                  <p className="mt-1 text-[10px] font-mono text-slate-600">Dipakai bila nominal tidak punya SKU sendiri.</p>
+                  <p className="mt-1 text-[10px] font-mono text-slate-600">Dipakai untuk mencocokkan produk saat menarik pricelist dari API Digiflazz.</p>
                 </div>
                 <div>
                   <label htmlFor="g-seq" className={labelCls}>Urutan</label>
@@ -1097,93 +1125,149 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                 </div>
               </div>
 
-              {/* denominations */}
+              {/* denominations (Digiflazz Live Pulled Only) */}
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <div>
-                    <p className="font-display font-bold uppercase text-xs text-slate-200">Nominal &amp; Harga Digiflazz</p>
-                    <p className="text-[10px] font-mono text-slate-500">Harga Modal Digiflazz &amp; Harga Jual dapat diedit bebas per item</p>
+                    <p className="font-display font-bold uppercase text-xs text-slate-200">Nominal &amp; SKU Hasil Tarikan Digiflazz</p>
+                    <p className="text-[10px] font-mono text-slate-500">
+                      Input manual SKU &amp; nominal dinonaktifkan. Anda tetap dapat mengatur margin harga jual dan status aktif/nonaktif produk hasil tarikan Digiflazz.
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const m = Number(pullMargin) || 10;
-                        patch({
-                          denominations: form.denominations.map((d) => {
-                            const modal = Number(d.modal_price) || Math.round((Number(d.price) || 10000) * 0.9);
-                            const nextSell = Math.max(1000, Math.ceil((modal * (1 + m / 100)) / 100) * 100);
-                            return { ...d, modal_price: modal, price: nextSell };
-                          }),
-                        });
-                        toast.success(`Harga jual dihitung ulang dengan margin +${m}% dari harga modal`);
-                      }}
-                      className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest border border-lime/40 text-lime hover:bg-lime/10 px-2.5 py-1.5 transition-colors"
-                    >
-                      <Zap size={11} /> Terapkan Margin +{Number(pullMargin) || 10}%
-                    </button>
-                    <button onClick={() => patch({ denominations: [...form.denominations, { ...EMPTY_DENOM }] })} data-testid="add-denom" className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest border border-line text-slate-400 hover:text-neon px-2.5 py-1.5 transition-colors">
-                      <Plus size={11} /> Tambah Nominal
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  {form.denominations.map((d, i) => (
-                    <div key={i} data-testid={`denom-row-${i}`} className="border border-line p-3">
-                      <div className="grid sm:grid-cols-4 gap-3">
-                        <div>
-                          <label className={labelCls}>Kode *</label>
-                          <input value={d.code} onChange={(e) => patchDenom(i, { code: e.target.value })} data-testid={`denom-code-${i}`} className={inputCls} placeholder="86" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Label</label>
-                          <input value={d.label} onChange={(e) => patchDenom(i, { label: e.target.value })} className={inputCls} placeholder="86 Diamond" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Harga Modal Digiflazz</label>
-                          <input
-                            type="number"
-                            value={d.modal_price ?? 0}
-                            onChange={(e) => patchDenom(i, { modal_price: e.target.value })}
-                            data-testid={`denom-modal-${i}`}
-                            className={inputCls}
-                          />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Harga Jual *</label>
-                          <input type="number" value={d.price} onChange={(e) => patchDenom(i, { price: e.target.value })} data-testid={`denom-price-${i}`} className={inputCls} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Harga Coret</label>
-                          <input type="number" value={d.price_strike} onChange={(e) => patchDenom(i, { price_strike: e.target.value })} className={inputCls} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Jumlah Item</label>
-                          <input type="number" value={d.amount} onChange={(e) => patchDenom(i, { amount: e.target.value })} className={inputCls} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Stok</label>
-                          <input type="number" value={d.stock} onChange={(e) => patchDenom(i, { stock: e.target.value })} data-testid={`denom-stock-${i}`} className={inputCls} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>SKU Digiflazz</label>
-                          <input value={d.vendor_sku} onChange={(e) => patchDenom(i, { vendor_sku: e.target.value })} data-testid={`denom-sku-${i}`} className={inputCls} placeholder="ML86" />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-4">
-                          <label className="flex items-center gap-2 text-[11px] font-mono text-slate-300 cursor-pointer">
-                            <input type="checkbox" checked={!!d.is_active} onChange={(e) => patchDenom(i, { is_active: e.target.checked })} data-testid={`denom-active-${i}`} /> Aktif
-                          </label>
-                          <button onClick={() => moveDenom(i, -1)} disabled={i === 0} aria-label="Naik" className="grid place-items-center w-6 h-6 border border-line text-slate-400 hover:text-neon disabled:opacity-30"><ArrowUp size={11} /></button>
-                          <button onClick={() => moveDenom(i, 1)} disabled={i === form.denominations.length - 1} aria-label="Turun" className="grid place-items-center w-6 h-6 border border-line text-slate-400 hover:text-neon disabled:opacity-30"><ArrowDown size={11} /></button>
-                        </div>
-                        {formErrors[`denom-${i}`] && <p className="text-[10px] font-mono text-coral">{formErrors[`denom-${i}`]}</p>}
-                        <button onClick={() => patch({ denominations: form.denominations.filter((_, n) => n !== i) })} data-testid={`remove-denom-${i}`} className="text-[10px] uppercase tracking-widest text-coral hover:underline">Hapus Nominal</button>
-                      </div>
+                  {form.denominations.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const m = Number(pullMargin) || 10;
+                          patch({
+                            denominations: form.denominations.map((d) => {
+                              const modal = Number(d.modal_price) || Math.round((Number(d.price) || 10000) * 0.9);
+                              const nextSell = Math.max(1000, Math.ceil((modal * (1 + m / 100)) / 100) * 100);
+                              return { ...d, modal_price: modal, price: nextSell };
+                            }),
+                          });
+                          toast.success(`Harga jual dihitung ulang dengan margin +${m}% dari harga modal Digiflazz`);
+                        }}
+                        className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest border border-lime/40 text-lime hover:bg-lime/10 px-2.5 py-1.5 transition-colors cursor-pointer"
+                      >
+                        <Zap size={11} /> Terapkan Margin +{Number(pullMargin) || 10}%
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
+
+                {form.denominations.length === 0 ? (
+                  <div className="border border-dashed border-line bg-void/40 p-5 text-center space-y-2.5" data-testid="denom-empty-digiflazz-only">
+                    <p className="text-xs font-mono text-slate-300 font-bold">
+                      Belum ada produk &amp; SKU dari Digiflazz untuk game ini.
+                    </p>
+                    <p className="text-[11px] font-mono text-slate-500 max-w-xl mx-auto">
+                      Penambahan nominal &amp; SKU manual telah dihapus. Produk top up hanya dapat ditarik langsung dari API Digiflazz asli (tanpa data demo).
+                    </p>
+                    {form.id && (
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const targetGame = form;
+                            setForm(null);
+                            setImportTarget(targetGame);
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-neon text-void hover:bg-lime font-display font-bold text-[10px] uppercase tracking-wider px-3.5 py-2 transition-colors cursor-pointer"
+                        >
+                          <Download size={12} /> Tarik Produk dari Digiflazz
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {form.denominations.map((d, i) => (
+                      <div key={d.vendor_sku || d.code || i} data-testid={`denom-row-${i}`} className="border border-line bg-void/30 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-line/60">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-mono font-bold text-neon border border-neon/40 bg-neon/10 px-2 py-0.5" data-testid={`denom-sku-${i}`}>
+                              SKU: {d.vendor_sku}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400 border border-line bg-void px-2 py-0.5" data-testid={`denom-code-${i}`}>
+                              Kode: {d.code}
+                            </span>
+                            <span className="text-xs font-display font-bold text-slate-100">
+                              {d.label}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-mono text-slate-400" data-testid={`denom-modal-${i}`}>
+                            Modal Digiflazz: <strong className="text-slate-200">{formatIDR(d.modal_price || 0)}</strong>
+                          </span>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className={labelCls}>Harga Jual (IDR) *</label>
+                            <input
+                              type="number"
+                              value={d.price}
+                              onChange={(e) => patchDenom(i, { price: e.target.value })}
+                              data-testid={`denom-price-${i}`}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Harga Coret (Opsional)</label>
+                            <input
+                              type="number"
+                              value={d.price_strike}
+                              onChange={(e) => patchDenom(i, { price_strike: e.target.value })}
+                              className={inputCls}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 text-[11px] font-mono text-slate-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!d.is_active}
+                                onChange={(e) => patchDenom(i, { is_active: e.target.checked })}
+                                data-testid={`denom-active-${i}`}
+                              />{" "}
+                              Aktif Ditampilkan
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => moveDenom(i, -1)}
+                              disabled={i === 0}
+                              aria-label="Naik"
+                              className="grid place-items-center w-6 h-6 border border-line text-slate-400 hover:text-neon disabled:opacity-30"
+                            >
+                              <ArrowUp size={11} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveDenom(i, 1)}
+                              disabled={i === form.denominations.length - 1}
+                              aria-label="Turun"
+                              className="grid place-items-center w-6 h-6 border border-line text-slate-400 hover:text-neon disabled:opacity-30"
+                            >
+                              <ArrowDown size={11} />
+                            </button>
+                          </div>
+                          {formErrors[`denom-${i}`] && <p className="text-[10px] font-mono text-coral">{formErrors[`denom-${i}`]}</p>}
+                          <button
+                            type="button"
+                            onClick={() => patch({ denominations: form.denominations.filter((_, n) => n !== i) })}
+                            data-testid={`remove-denom-${i}`}
+                            className="text-[10px] uppercase tracking-widest text-coral hover:underline cursor-pointer"
+                          >
+                            Hapus Produk
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1338,13 +1422,14 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
   );
 };
 
-/** Modal for matching & pulling Digiflazz products (SKUs/denominations) into existing local Top Up games. */
+/** Modal for matching & pulling live Digiflazz products (SKUs/denominations) into existing local Top Up games. */
 const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 10, headers, onClose, onDone }) => {
   const [vendorKind] = useState(initialVendorKind || "digiflazz");
   const [marginPercent, setMarginPercent] = useState(
     initialMargin !== undefined ? Number(initialMargin) : 10
   );
   const [catalogGames, setCatalogGames] = useState([]);
+  const [liveError, setLiveError] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState([]);
   const [selectedSkusByGame, setSelectedSkusByGame] = useState({});
   const [expandedSlug, setExpandedSlug] = useState("");
@@ -1354,6 +1439,7 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
   const loadCatalog = useCallback(
     async (forceRefresh = false) => {
       setLoading(true);
+      setLiveError("");
       try {
         const { data } = await api.get("/admin/topup/merchant-catalog", {
           headers,
@@ -1365,21 +1451,31 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
         });
         const list = Array.isArray(data?.games) ? data.games : [];
         setCatalogGames(list);
-        setSelectedSlugs((prev) => (prev.length > 0 ? prev : list.map((g) => g.slug)));
+        if (data?.live_error) {
+          setLiveError(String(data.live_error));
+        }
+        const gamesWithProducts = list.filter((g) => (g.denominations || []).length > 0);
+        setSelectedSlugs((prev) =>
+          prev.length > 0 ? prev : gamesWithProducts.map((g) => g.slug)
+        );
         setSelectedSkusByGame((prev) => {
           const next = { ...prev };
           for (const g of list) {
-            if (!next[g.slug]) {
-              next[g.slug] = (g.denominations || []).map((d) => d.sku);
-            }
+            next[g.slug] = (g.denominations || []).map((d) => d.sku);
           }
           return next;
         });
         if (forceRefresh) {
-          toast.success("Daftar harga & SKU Digiflazz berhasil diperbarui!");
+          if (data?.live_error) {
+            toast.error(data.live_error);
+          } else {
+            toast.success("Daftar harga & SKU live Digiflazz berhasil diperbarui!");
+          }
         }
       } catch (e) {
-        toast.error(formatApiError(e.response?.data?.detail) || "Gagal memuat produk Digiflazz");
+        const msg = formatApiError(e.response?.data?.detail) || "Gagal memuat produk Digiflazz";
+        setLiveError(msg);
+        toast.error(msg);
       } finally {
         setLoading(false);
       }
@@ -1390,6 +1486,11 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
   useEffect(() => {
     loadCatalog(false);
   }, [loadCatalog]);
+
+  const totalAvailableProducts = useMemo(
+    () => catalogGames.reduce((acc, g) => acc + ((g.denominations || []).length || 0), 0),
+    [catalogGames]
+  );
 
   const toggleSlug = (slug) => {
     setSelectedSlugs((prev) =>
@@ -1417,14 +1518,21 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
   };
 
   const toggleAll = () => {
-    if (selectedSlugs.length === catalogGames.length) {
+    const selectableSlugs = catalogGames
+      .filter((g) => (g.denominations || []).length > 0)
+      .map((g) => g.slug);
+    if (selectedSlugs.length === selectableSlugs.length) {
       setSelectedSlugs([]);
     } else {
-      setSelectedSlugs(catalogGames.map((g) => g.slug));
+      setSelectedSlugs(selectableSlugs);
     }
   };
 
   const handlePull = async () => {
+    if (totalAvailableProducts === 0) {
+      toast.error(liveError || "Tidak ada produk live dari Digiflazz untuk ditarik.");
+      return;
+    }
     if (!selectedSlugs.length) {
       toast.error("Pilih minimal 1 game lokal untuk ditarik produknya");
       return;
@@ -1465,14 +1573,14 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[9px] font-mono font-bold uppercase tracking-widest bg-lime/15 text-lime border border-lime/40 px-2 py-0.5">
-                PRODUK DIGIFLAZZ → GAME LOKAL
+                API DIGIFLAZZ LIVE → GAME LOKAL
               </span>
               <h3 className="font-display font-bold uppercase text-sm">
-                Tarik Produk (SKU &amp; Harga) dari Digiflazz ke Game Lokal
+                Tarik Produk (SKU &amp; Harga) Langsung dari Digiflazz
               </h3>
             </div>
             <p className="text-[10px] font-mono text-slate-400 mt-1">
-              Game Top Up tidak dibuat mentah dari Digiflazz. Sistem mencocokkan produk Digiflazz ke game lokal yang ada &amp; menghitung harga jual otomatis dari Harga Modal + Margin (%).
+              Hanya menarik produk dari API Digiflazz asli. Jika penarikan gagal, daftar produk tetap kosong tanpa menampilkan data demo.
             </p>
           </div>
           <button onClick={onClose} aria-label="Tutup" className="text-slate-400 hover:text-coral">
@@ -1486,7 +1594,7 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
               <label className={labelCls}>Sumber Produk</label>
               <div className="mt-1.5 flex items-center gap-2">
                 <span className="flex-1 bg-void border border-line text-xs font-mono text-neon font-bold px-3 py-2.5">
-                  Digiflazz H2H (Prepaid)
+                  Digiflazz H2H (Live API)
                 </span>
                 <button
                   type="button"
@@ -1533,16 +1641,31 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
               <button
                 type="button"
                 onClick={toggleAll}
-                className="w-full border border-line hover:border-neon/60 text-slate-300 hover:text-neon text-[11px] font-mono uppercase tracking-widest py-2.5 px-3 transition-colors cursor-pointer"
+                disabled={totalAvailableProducts === 0}
+                className="w-full border border-line hover:border-neon/60 text-slate-300 hover:text-neon text-[11px] font-mono uppercase tracking-widest py-2.5 px-3 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                {selectedSlugs.length === catalogGames.length ? "Batalkan Semua Game" : `Pilih Semua (${catalogGames.length} Game Lokal)`}
+                {selectedSlugs.length > 0 && selectedSlugs.length === catalogGames.filter((g) => (g.denominations || []).length > 0).length
+                  ? "Batalkan Semua Game"
+                  : `Pilih Game Tersedia`}
               </button>
             </div>
           </div>
 
+          {!loading && (liveError || totalAvailableProducts === 0) && (
+            <div className="border border-coral/50 bg-coral/10 p-4 space-y-1.5" data-testid="merchant-catalog-live-error">
+              <p className="flex items-start gap-2 text-xs font-mono font-bold text-coral">
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                <span>{liveError || "Pricelist live Digiflazz kosong (0 produk ditemukan)."}</span>
+              </p>
+              <p className="text-[11px] font-mono text-slate-400 pl-5">
+                Sistem tidak menampilkan produk demo. Pastikan Username &amp; Production API Key Digiflazz sudah benar serta IP server telah di-whitelist di dashboard member Digiflazz.
+              </p>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-xs font-mono text-slate-400">
-              <Loader2 size={15} className="animate-spin text-neon" /> Mencocokkan produk Digiflazz ke daftar game lokal...
+              <Loader2 size={15} className="animate-spin text-neon" /> Menarik pricelist live dari API Digiflazz...
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 gap-3">
@@ -1550,19 +1673,21 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
                 const checked = selectedSlugs.includes(g.slug);
                 const expanded = expandedSlug === g.slug;
                 const gameSkus = selectedSkusByGame[g.slug] || [];
+                const hasItems = (g.denominations || []).length > 0;
                 return (
                   <div
                     key={g.slug}
                     data-testid={`merchant-catalog-game-${g.slug}`}
                     className={`border transition-colors p-3.5 ${
-                      checked ? "border-neon/60 bg-neon/5" : "border-line bg-void/40"
+                      checked && hasItems ? "border-neon/60 bg-neon/5" : "border-line bg-void/40"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <label className="flex items-start gap-3 cursor-pointer flex-1">
+                      <label className={`flex items-start gap-3 flex-1 ${hasItems ? "cursor-pointer" : "opacity-60"}`}>
                         <input
                           type="checkbox"
-                          checked={checked}
+                          checked={checked && hasItems}
+                          disabled={!hasItems}
                           onChange={() => toggleSlug(g.slug)}
                           className="mt-1"
                         />
@@ -1577,28 +1702,30 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
                             {g.name}
                           </p>
                           <p className="text-[10px] font-mono text-slate-400">
-                            {g.publisher} • {gameSkus.length}/{g.denomination_count} Produk dipilih ({g.currency})
+                            {g.publisher} • {gameSkus.length}/{g.denomination_count} Produk live ({g.currency})
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
                             <span className="text-[9px] font-mono text-neon border border-neon/30 bg-neon/10 px-1.5 py-0.5">
                               Prefix: {g.vendor_prefix}
                             </span>
                             <span className="text-[9px] font-mono text-lime border border-lime/30 bg-lime/10 px-1.5 py-0.5">
-                              Game Lokal ({g.existing_denom_count} nominal aktif)
+                              Tersimpan: {g.existing_denom_count} nominal
                             </span>
                           </div>
                         </div>
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedSlug(expanded ? "" : g.slug)}
-                        className="text-[10px] font-mono text-neon hover:text-lime underline shrink-0 cursor-pointer"
-                      >
-                        {expanded ? "Tutup SKU" : "Pilih SKU"}
-                      </button>
+                      {hasItems && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedSlug(expanded ? "" : g.slug)}
+                          className="text-[10px] font-mono text-neon hover:text-lime underline shrink-0 cursor-pointer"
+                        >
+                          {expanded ? "Tutup SKU" : "Pilih SKU"}
+                        </button>
+                      )}
                     </div>
 
-                    {expanded && (
+                    {expanded && hasItems && (
                       <div className="mt-3 pt-3 border-t border-line/60 space-y-1.5">
                         <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
                           <span>Pilih produk SKU Digiflazz untuk {g.name}:</span>
@@ -1654,7 +1781,7 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-t border-line bg-void/40">
           <p className="text-[11px] font-mono text-slate-400">
-            Target Game Lokal: <strong className="text-neon">{selectedSlugs.length}</strong> dari {catalogGames.length} game (Margin +{marginPercent}%)
+            Target Game Lokal: <strong className="text-neon">{selectedSlugs.length}</strong> game • <strong className="text-lime">{totalAvailableProducts}</strong> produk live tersedia (Margin +{marginPercent}%)
           </p>
           <div className="flex flex-wrap items-center gap-2.5">
             <button
@@ -1665,7 +1792,7 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
             </button>
             <button
               onClick={handlePull}
-              disabled={pulling || selectedSlugs.length === 0}
+              disabled={pulling || selectedSlugs.length === 0 || totalAvailableProducts === 0}
               data-testid="dialog-merchant-pull-selected"
               className="inline-flex items-center gap-2 bg-neon text-void font-display font-bold text-[11px] uppercase tracking-wider px-5 py-2.5 hover:bg-lime transition-colors disabled:opacity-50 cursor-pointer"
             >
@@ -1679,18 +1806,15 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
   );
 };
 
-/** Per-game dialog: Pull/select Digiflazz products into this local game OR map SKUs to existing denominations. */
+/** Per-game dialog: Pull/select live Digiflazz products directly into this local game (no manual mapping, no demo fallback). */
 const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
   const [providerId, setProviderId] = useState(
     vendors.find((v) => v.kind === "digiflazz")?.id ||
       vendors.find((v) => v.kind !== "manual")?.id ||
       "vp-digiflazz"
   );
-  const [mode, setMode] = useState("pull_products"); // "pull_products" | "map_existing"
-  const [skuMap, setSkuMap] = useState({});
   const [selectedProductSkus, setSelectedProductSkus] = useState([]);
   const [marginPercent, setMarginPercent] = useState(10);
-  const [applyPrice, setApplyPrice] = useState(true);
   const [searchQ, setSearchQ] = useState("");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1724,52 +1848,33 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
             refresh: forceRefresh ? "1" : undefined,
           },
         });
-        const list = Array.isArray(data.products) ? data.products : [];
+        const list = Array.isArray(data?.products) ? data.products : [];
         setRows(list);
-        if (!list.length) {
-          setError(`Tidak ada produk Digiflazz yang cocok. Coba ubah kata kunci pencarian atau klik Segarkan.`);
+        if (data?.live_error) {
+          setError(String(data.live_error));
+          setSelectedProductSkus([]);
+        } else if (!list.length) {
+          setError("Tidak ada produk live Digiflazz yang cocok untuk game ini. Daftar produk dibiarkan kosong tanpa data demo.");
+          setSelectedProductSkus([]);
         } else {
-          // Pre-select all matched products for this game so admin can import or customize
           setSelectedProductSkus((prev) =>
             prev.length > 0 ? prev : list.map((r) => r.sku)
           );
-          setSkuMap((prev) => {
-            const next = { ...prev };
-            (game.denominations || []).forEach((d, idx) => {
-              if (!next[d.code]) {
-                const exact = list.find(
-                  (r) =>
-                    r.sku === d.vendor_sku ||
-                    String(r.code || "").toLowerCase() === String(d.code).toLowerCase() ||
-                    String(r.sku).toLowerCase().endsWith(String(d.code).toLowerCase())
-                );
-                const fallback = list[idx] || list[0];
-                const chosen = exact || fallback;
-                if (chosen) next[d.code] = { sku: chosen.sku, price: chosen.price, retail_price: chosen.retail_price };
-              }
-            });
-            return next;
-          });
         }
       } catch (e) {
-        setError(formatApiError(e.response?.data?.detail) || "Gagal memuat daftar produk Digiflazz");
+        setError(formatApiError(e.response?.data?.detail) || "Gagal memuat daftar produk dari API Digiflazz");
         setRows([]);
+        setSelectedProductSkus([]);
       } finally {
         setLoading(false);
       }
     },
-    [providerId, headers, game.slug, game.vendor_prefix, game.denominations, searchQ]
+    [providerId, headers, game.slug, game.vendor_prefix, searchQ]
   );
 
   useEffect(() => {
     if (providerId) loadProducts(false);
   }, [providerId, loadProducts]);
-
-  const pick = (code, row) =>
-    setSkuMap((m) => ({
-      ...m,
-      [code]: { sku: row.sku, price: row.price, retail_price: row.retail_price },
-    }));
 
   const toggleProductSku = (sku) => {
     setSelectedProductSkus((prev) =>
@@ -1792,42 +1897,16 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
       toast.success(data.message || `Semua produk ${game.name} berhasil ditarik dari Digiflazz!`);
       onDone();
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Gagal menarik produk otomatis");
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal menarik produk dari Digiflazz");
     } finally {
       setSaving(false);
     }
   };
 
   const save = async () => {
-    if (mode === "pull_products") {
-      const chosenProducts = rows.filter((r) => selectedProductSkus.includes(r.sku));
-      if (!chosenProducts.length) {
-        toast.error("Pilih minimal 1 produk Digiflazz untuk ditarik ke game ini");
-        return;
-      }
-      setSaving(true);
-      try {
-        const { data } = await api.post(
-          `/admin/topup/games/${game.id}/import`,
-          {
-            provider_id: providerId,
-            selected_products: chosenProducts,
-            margin_percent: Number(marginPercent) || 0,
-          },
-          { headers }
-        );
-        toast.success(data.message || `${chosenProducts.length} produk berhasil ditarik ke ${game.name}`);
-        onDone();
-      } catch (e) {
-        toast.error(formatApiError(e.response?.data?.detail) || "Gagal menarik produk terpilih");
-      } finally {
-        setSaving(false);
-      }
-      return;
-    }
-
-    if (!Object.keys(skuMap).length) {
-      toast.error("Pilih minimal satu SKU");
+    const chosenProducts = rows.filter((r) => selectedProductSkus.includes(r.sku));
+    if (!chosenProducts.length) {
+      toast.error("Pilih minimal 1 produk live Digiflazz untuk ditarik ke game ini");
       return;
     }
     setSaving(true);
@@ -1836,16 +1915,15 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
         `/admin/topup/games/${game.id}/import`,
         {
           provider_id: providerId,
-          skus: skuMap,
-          apply_price: applyPrice,
+          selected_products: chosenProducts,
           margin_percent: Number(marginPercent) || 0,
         },
         { headers }
       );
-      toast.success(data.message);
+      toast.success(data.message || `${chosenProducts.length} produk berhasil ditarik ke ${game.name}`);
       onDone();
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Gagal impor SKU");
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal menarik produk terpilih dari Digiflazz");
     } finally {
       setSaving(false);
     }
@@ -1867,7 +1945,7 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
             <div>
               <h3 className="font-display font-bold uppercase text-sm">Tarik Produk Digiflazz — {game.name}</h3>
               <p className="text-[10px] font-mono text-slate-400 mt-0.5">
-                Cocokkan otomatis atau pilih manual produk Digiflazz untuk game lokal ini dengan perhitungan harga Modal + Margin (%)
+                Hanya menarik produk langsung dari API Digiflazz asli dengan perhitungan harga Modal + Margin (%) tanpa produk demo.
               </p>
             </div>
           </div>
@@ -1878,10 +1956,10 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
           <div className="border border-lime/40 bg-lime/5 p-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-display font-bold text-lime uppercase">
-                Tarik Otomatis Semua Produk {game.name}
+                Tarik Otomatis Semua Produk Live ({game.name})
               </p>
               <p className="text-[10px] font-mono text-slate-400">
-                Cocokkan otomatis semua nominal {game.name} dari Digiflazz beserta perhitungan harga jual Modal + {marginPercent}%.
+                Tarik langsung semua nominal {game.name} dari API Digiflazz beserta perhitungan harga jual Modal + {marginPercent}%.
               </p>
             </div>
             <button
@@ -1918,7 +1996,7 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
               />
             </div>
             <div>
-              <label className={labelCls}>Cari SKU / Produk</label>
+              <label className={labelCls}>Cari SKU / Produk Live</label>
               <div className="flex items-center gap-1.5">
                 <input
                   type="text"
@@ -1941,43 +2019,24 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 border-b border-line pb-2">
-            <button
-              type="button"
-              onClick={() => setMode("pull_products")}
-              className={`text-[11px] font-mono uppercase tracking-wider px-3 py-1.5 border transition-colors cursor-pointer ${
-                mode === "pull_products"
-                  ? "bg-neon text-void border-neon font-bold"
-                  : "border-line text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Pilih Produk dari Digiflazz ({rows.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("map_existing")}
-              className={`text-[11px] font-mono uppercase tracking-wider px-3 py-1.5 border transition-colors cursor-pointer ${
-                mode === "map_existing"
-                  ? "bg-neon text-void border-neon font-bold"
-                  : "border-line text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Pemetaan ke Nominal Lokal ({(game.denominations || []).length})
-            </button>
-          </div>
-
           {error && (
-            <p className="flex items-start gap-2 text-[11px] font-mono text-coral" data-testid="import-error">
-              <AlertCircle size={12} className="mt-0.5 shrink-0" /> {error}
-            </p>
+            <div className="border border-coral/50 bg-coral/10 p-3.5 space-y-1" data-testid="import-error">
+              <p className="flex items-start gap-2 text-[11px] font-mono font-bold text-coral">
+                <AlertCircle size={13} className="mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </p>
+              <p className="text-[10px] font-mono text-slate-400 pl-5">
+                Daftar produk dibiarkan kosong tanpa data demo. Periksa kredensial Username &amp; API Key Digiflazz atau whitelist IP Anda.
+              </p>
+            </div>
           )}
 
-          {mode === "pull_products" ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                <span>
-                  Terpilih: <strong className="text-neon">{selectedProductSkus.length}</strong> dari {rows.length} produk Digiflazz
-                </span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+              <span>
+                Terpilih: <strong className="text-neon">{selectedProductSkus.length}</strong> dari {rows.length} produk live Digiflazz
+              </span>
+              {rows.length > 0 && (
                 <button
                   type="button"
                   onClick={() =>
@@ -1989,8 +2048,10 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
                 >
                   {selectedProductSkus.length === rows.length ? "Batalkan Semua" : "Pilih Semua Produk"}
                 </button>
-              </div>
+              )}
+            </div>
 
+            {rows.length > 0 && (
               <div className="grid sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
                 {rows.map((r) => {
                   const checked = selectedProductSkus.includes(r.sku);
@@ -2024,47 +2085,20 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
                   );
                 })}
               </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {(game.denominations || []).map((d) => (
-                <div key={d.code} className="border border-line p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] font-mono text-slate-200">
-                      <span className="text-neon">{d.code}</span> — {d.label} • {formatIDR(d.price)}
-                    </p>
-                    <p className="text-[10px] font-mono text-slate-500" data-testid={`import-current-${d.code}`}>
-                      SKU: {skuMap[d.code]?.sku || d.vendor_sku || "—"}
-                    </p>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-                    {rows.length === 0 && <p className="text-[10px] font-mono text-slate-600">Muat daftar SKU dahulu.</p>}
-                    {rows.map((r) => (
-                      <button
-                        key={r.sku}
-                        onClick={() => pick(d.code, r)}
-                        data-testid={`import-pick-${d.code}-${r.sku}`}
-                        className={`text-[10px] font-mono border px-2 py-1 transition-colors cursor-pointer ${
-                          skuMap[d.code]?.sku === r.sku ? "border-neon bg-neon/10 text-neon" : "border-line text-slate-400 hover:text-neon hover:border-neon/50"
-                        }`}
-                      >
-                        {r.sku} • Modal {formatIDR(r.price)} → Jual {formatIDR(calcSellPrice(r.price, r.retail_price))}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-line">
           <button onClick={onClose} className="text-[11px] font-mono uppercase tracking-widest text-slate-400 hover:text-slate-200 px-4 py-2.5">Batal</button>
-          <button onClick={save} disabled={saving} data-testid="import-save" className="inline-flex items-center gap-2 bg-neon text-void font-display font-bold text-[11px] uppercase tracking-[0.2em] px-5 py-2.5 hover:bg-lime transition-colors disabled:opacity-60 cursor-pointer">
+          <button
+            onClick={save}
+            disabled={saving || selectedProductSkus.length === 0 || rows.length === 0}
+            data-testid="import-save"
+            className="inline-flex items-center gap-2 bg-neon text-void font-display font-bold text-[11px] uppercase tracking-[0.2em] px-5 py-2.5 hover:bg-lime transition-colors disabled:opacity-60 cursor-pointer"
+          >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            {mode === "pull_products"
-              ? `Tarik ${selectedProductSkus.length} Produk ke ${game.name}`
-              : "Simpan Pemetaan SKU"}
+            Tarik {selectedProductSkus.length} Produk ke {game.name}
           </button>
         </div>
       </div>

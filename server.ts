@@ -948,7 +948,9 @@ function productIdFor(gameSlug: string, code: string) {
 }
 
 function activeDenominations(game: any): any[] {
-  const rows = (game?.denominations || []).filter((d: any) => d.is_active !== false);
+  const rows = (game?.denominations || []).filter(
+    (d: any) => d.is_active !== false && String(d.vendor_sku || "").trim() !== ""
+  );
   return rows.sort((a: any, b: any) => (a.seq || 0) - (b.seq || 0) || String(a.code).localeCompare(String(b.code)));
 }
 
@@ -1001,6 +1003,12 @@ function denominationProduct(game: any, denom: any) {
 
 function syncGameProducts(game: any, replace = true): number {
   const slug = game.slug || game.id;
+  if (game.is_active === false) {
+    if (replace) {
+      db.products = db.products.filter((p) => !(p.slug === slug && p.product_type === PRODUCT_TYPE));
+    }
+    return 0;
+  }
   const existing = db.products.filter((p) => p.slug === slug && p.product_type === PRODUCT_TYPE);
   const byCode = new Map(existing.map((row) => [String(row.denomination_code), row]));
   let written = 0;
@@ -1148,20 +1156,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "zone_id", label: "Zone ID", placeholder: "1234", type: "text", inputmode: "numeric", required: true, min_len: 3, max_len: 6, pattern: "^[0-9]{3,6}$", help: "Masukkan angka Zone ID (4-5 digit di dalam kurung)" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "WDP", label: "Weekly Diamond Pass", amount: 220, modal: 25500, price: 28000, price_strike: 32000, badge: "Terlaris", featured: true },
-      { code: "TWP", label: "Twilight Pass", amount: 1200, modal: 138000, price: 152000, price_strike: 169000, badge: "Spesial" },
-      { code: "28", label: "28 Diamonds (25+3)", amount: 28, modal: 7400, price: 8500, price_strike: 10000, badge: "" },
-      { code: "59", label: "59 Diamonds (53+6)", amount: 59, modal: 14800, price: 16500, price_strike: 19000, badge: "" },
-      { code: "86", label: "86 Diamonds (78+8)", amount: 86, modal: 19500, price: 22000, price_strike: 25000, badge: "Populer", featured: true },
-      { code: "172", label: "172 Diamonds (156+16)", amount: 172, modal: 38500, price: 43000, price_strike: 48000, badge: "Populer" },
-      { code: "257", label: "257 Diamonds (234+23)", amount: 257, modal: 57500, price: 64000, price_strike: 72000, badge: "" },
-      { code: "344", label: "344 Diamonds (312+32)", amount: 344, modal: 76500, price: 85000, price_strike: 95000, badge: "" },
-      { code: "429", label: "429 Diamonds (390+39)", amount: 429, modal: 95500, price: 105000, price_strike: 118000, badge: "" },
-      { code: "706", label: "706 Diamonds (625+81)", amount: 706, modal: 152000, price: 168000, price_strike: 185000, badge: "Hemat", featured: true },
-      { code: "1412", label: "1412 Diamonds (1250+162)", amount: 1412, modal: 304000, price: 335000, price_strike: 368000, badge: "Hemat" },
-      { code: "2195", label: "2195 Diamonds (1860+335)", amount: 2195, modal: 455000, price: 499000, price_strike: 545000, badge: "Sultan" },
-    ],
   },
   {
     slug: "free-fire",
@@ -1179,17 +1173,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "user_id", label: "Player ID", placeholder: "1234567890", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka Player ID Free Fire" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "MM", label: "Membership Mingguan", amount: 450, modal: 27000, price: 30000, price_strike: 35000, badge: "Terlaris", featured: true },
-      { code: "MB", label: "Membership Bulanan", amount: 2600, modal: 81000, price: 89000, price_strike: 100000, badge: "Hemat" },
-      { code: "50", label: "50 Diamonds", amount: 50, modal: 6800, price: 8000, price_strike: 9500, badge: "" },
-      { code: "70", label: "70 Diamonds", amount: 70, modal: 9200, price: 10500, price_strike: 12000, badge: "Populer" },
-      { code: "140", label: "140 Diamonds", amount: 140, modal: 18200, price: 20500, price_strike: 23000, badge: "Populer", featured: true },
-      { code: "355", label: "355 Diamonds", amount: 355, modal: 44500, price: 49500, price_strike: 55000, badge: "" },
-      { code: "720", label: "720 Diamonds", amount: 720, modal: 88500, price: 98000, price_strike: 110000, badge: "Hemat", featured: true },
-      { code: "1450", label: "1450 Diamonds", amount: 1450, modal: 176000, price: 195000, price_strike: 215000, badge: "" },
-      { code: "2180", label: "2180 Diamonds", amount: 2180, modal: 265000, price: 292000, price_strike: 325000, badge: "Sultan" },
-    ],
   },
   {
     slug: "genshin-impact",
@@ -1208,15 +1191,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Genshin Impact Anda" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "WELKIN", label: "Blessing of the Welkin Moon", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
-      { code: "60", label: "60 Genesis Crystals", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
-      { code: "300", label: "300+30 Genesis Crystals", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer", featured: true },
-      { code: "980", label: "980+110 Genesis Crystals", amount: 1090, modal: 172000, price: 192000, price_strike: 249000, badge: "Hemat" },
-      { code: "1980", label: "1980+260 Genesis Crystals", amount: 2240, modal: 372000, price: 410000, price_strike: 479000, badge: "" },
-      { code: "3280", label: "3280+600 Genesis Crystals", amount: 3880, modal: 575000, price: 635000, price_strike: 799000, badge: "" },
-      { code: "6480", label: "6480+1600 Genesis Crystals", amount: 8080, modal: 1150000, price: 1250000, price_strike: 1599000, badge: "Sultan" },
-    ],
   },
   {
     slug: "pubg-mobile",
@@ -1234,13 +1208,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "user_id", label: "Player ID", placeholder: "5123456789", type: "text", inputmode: "numeric", required: true, min_len: 7, max_len: 14, pattern: "^[0-9]{7,14}$", help: "Masukkan angka Player ID PUBG Mobile" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "60", label: "60 UC", amount: 60, modal: 13800, price: 15500, price_strike: 18000, badge: "Populer" },
-      { code: "325", label: "325 UC", amount: 325, modal: 69000, price: 76000, price_strike: 85000, badge: "Terlaris", featured: true },
-      { code: "660", label: "660 UC", amount: 660, modal: 138000, price: 152000, price_strike: 170000, badge: "Hemat", featured: true },
-      { code: "1800", label: "1800 UC", amount: 1800, modal: 342000, price: 375000, price_strike: 420000, badge: "" },
-      { code: "3850", label: "3850 UC", amount: 3850, modal: 680000, price: 745000, price_strike: 820000, badge: "Sultan" },
-    ],
   },
   {
     slug: "valorant",
@@ -1258,13 +1225,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, pattern: "", help: "Format: Nickname#Tag" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "475", label: "475 Valorant Points", amount: 475, modal: 51000, price: 56000, price_strike: 62000, badge: "Populer" },
-      { code: "1000", label: "1000 Valorant Points", amount: 1000, modal: 102000, price: 112000, price_strike: 125000, badge: "Terlaris", featured: true },
-      { code: "2050", label: "2050 Valorant Points", amount: 2050, modal: 204000, price: 222000, price_strike: 245000, badge: "Hemat", featured: true },
-      { code: "3650", label: "3650 Valorant Points", amount: 3650, modal: 348000, price: 379000, price_strike: 415000, badge: "" },
-      { code: "5350", label: "5350 Valorant Points", amount: 5350, modal: 502000, price: 545000, price_strike: 599000, badge: "Sultan" },
-    ],
   },
   {
     slug: "honor-of-kings",
@@ -1282,14 +1242,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "user_id", label: "Player UID", placeholder: "1234567890123", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka UID Honor of Kings" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "WC", label: "Weekly Card", amount: 180, modal: 14000, price: 16500, price_strike: 20000, badge: "Terlaris", featured: true },
-      { code: "80", label: "80 Tokens", amount: 80, modal: 14500, price: 16500, price_strike: 19000, badge: "Populer" },
-      { code: "240", label: "240 Tokens", amount: 240, modal: 43000, price: 48000, price_strike: 54000, badge: "Populer", featured: true },
-      { code: "400", label: "400 Tokens", amount: 400, modal: 71500, price: 79000, price_strike: 89000, badge: "" },
-      { code: "560", label: "560 Tokens", amount: 560, modal: 100000, price: 110000, price_strike: 125000, badge: "Hemat" },
-      { code: "1200", label: "1200 Tokens", amount: 1200, modal: 212000, price: 235000, price_strike: 265000, badge: "Sultan" },
-    ],
   },
   {
     slug: "honkai-star-rail",
@@ -1308,13 +1260,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Honkai: Star Rail Anda" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "PASS", label: "Express Supply Pass", amount: 3000, modal: 57000, price: 64000, price_strike: 79000, badge: "Terlaris", featured: true },
-      { code: "60", label: "60 Oneiric Shards", amount: 60, modal: 11500, price: 13500, price_strike: 16000, badge: "" },
-      { code: "300", label: "300+30 Oneiric Shards", amount: 330, modal: 57500, price: 64500, price_strike: 79000, badge: "Populer" },
-      { code: "980", label: "980+110 Oneiric Shards", amount: 1090, modal: 172000, price: 192000, price_strike: 249000, badge: "Hemat" },
-      { code: "1980", label: "1980+260 Oneiric Shards", amount: 2240, modal: 372000, price: 410000, price_strike: 479000, badge: "" },
-    ],
   },
   {
     slug: "roblox",
@@ -1332,12 +1277,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "user_id", label: "Username Roblox", placeholder: "UsernameRoblox", type: "text", inputmode: "text", required: true, min_len: 3, max_len: 30, pattern: "", help: "Masukkan Username Roblox Anda" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "80", label: "80 Robux", amount: 80, modal: 17500, price: 20000, price_strike: 24000, badge: "Populer" },
-      { code: "400", label: "400 Robux", amount: 400, modal: 74000, price: 82000, price_strike: 95000, badge: "Terlaris", featured: true },
-      { code: "800", label: "800 Robux", amount: 800, modal: 146000, price: 162000, price_strike: 185000, badge: "Hemat" },
-      { code: "1700", label: "1700 Robux", amount: 1700, modal: 292000, price: 320000, price_strike: 360000, badge: "Sultan" },
-    ],
   },
   {
     slug: "call-of-duty-mobile",
@@ -1355,12 +1294,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "user_id", label: "OpenID / Player ID", placeholder: "123456789012345", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 22, pattern: "^[0-9]{6,22}$", help: "Masukkan OpenID di menu pengaturan CODM" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "63", label: "63 CP", amount: 63, modal: 9000, price: 10500, price_strike: 12000, badge: "" },
-      { code: "128", label: "128 CP", amount: 128, modal: 18000, price: 20500, price_strike: 24000, badge: "Populer" },
-      { code: "321", label: "321 CP", amount: 321, modal: 44500, price: 49500, price_strike: 56000, badge: "Terlaris", featured: true },
-      { code: "645", label: "645 CP", amount: 645, modal: 89000, price: 98000, price_strike: 112000, badge: "Hemat" },
-    ],
   },
   {
     slug: "steam-wallet",
@@ -1378,14 +1311,6 @@ const MERCHANT_MASTER_GAMES = [
       { key: "user_id", label: "Nomor WhatsApp / Steam ID", placeholder: "081234567890", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 20, pattern: "", help: "Nomor penerima voucher / Steam ID" },
     ],
     denominations: [] as any[],
-    digiflazz_skus: [
-      { code: "12", label: "Steam Wallet Rp 12.000", amount: 12000, modal: 12200, price: 14000, price_strike: 16000, badge: "" },
-      { code: "45", label: "Steam Wallet Rp 45.000", amount: 45000, modal: 45500, price: 50000, price_strike: 55000, badge: "Populer" },
-      { code: "60", label: "Steam Wallet Rp 60.000", amount: 60000, modal: 60500, price: 66000, price_strike: 72000, badge: "Terlaris", featured: true },
-      { code: "90", label: "Steam Wallet Rp 90.000", amount: 90000, modal: 90500, price: 98000, price_strike: 108000, badge: "" },
-      { code: "120", label: "Steam Wallet Rp 120.000", amount: 120000, modal: 120500, price: 130000, price_strike: 142000, badge: "Hemat" },
-      { code: "250", label: "Steam Wallet Rp 250.000", amount: 250000, modal: 250500, price: 268000, price_strike: 290000, badge: "Sultan" },
-    ],
   },
 ];
 
@@ -1425,16 +1350,61 @@ function clearAllTopupProductsAndSkus(gameSlugs?: string[]) {
   return { games_cleared: gamesCleared, products_removed: productsRemoved };
 }
 
+function isDemoDigiflazzCredential(username: string, apiKey: string): boolean {
+  const u = String(username || "").trim();
+  const k = String(apiKey || "").trim();
+  if (!u || !k) return true;
+  if (u === "wjp_digiflazz_id") return true;
+  if (k.startsWith("df_live_wjp") || k.startsWith("df_dev_wjp")) return true;
+  return false;
+}
+
 function ensureDefaultTopupClearedOnce() {
   if (!db.settings || typeof db.settings !== "object") db.settings = {};
+  let changed = false;
+
   if (!db.settings.topup_defaults_cleared_v1) {
     clearAllTopupProductsAndSkus();
     db.settings.topup_defaults_cleared_v1 = {
       cleared_at: nowIso(),
       note: "All default topup products, denominations, and SKUs cleared.",
     };
-    saveDb();
+    changed = true;
   }
+
+  // Strip any leftover demo credentials, demo balance, and demo products pulled while using demo credentials
+  if (!db.settings.topup_digiflazz_live_only_v2) {
+    let hadDemoCreds = false;
+    for (const v of db.topup_providers || []) {
+      const cfg = v.config || {};
+      if (
+        cfg.username === "wjp_digiflazz_id" ||
+        String(cfg.api_key || "").startsWith("df_live_wjp") ||
+        String(cfg.dev_key || "").startsWith("df_dev_wjp")
+      ) {
+        hadDemoCreds = true;
+        if (cfg.username === "wjp_digiflazz_id") cfg.username = process.env.DIGIFLAZZ_USERNAME || "";
+        if (String(cfg.api_key || "").startsWith("df_live_wjp")) cfg.api_key = process.env.DIGIFLAZZ_API_KEY || "";
+        if (String(cfg.dev_key || "").startsWith("df_dev_wjp")) cfg.dev_key = process.env.DIGIFLAZZ_DEV_KEY || "";
+      }
+      if (Number(v.cached_balance) === 15750000) {
+        v.cached_balance = null;
+      }
+      delete v.cached_pricelist;
+      delete v.cached_pricelist_at;
+      v.last_test = null;
+    }
+    if (hadDemoCreds) {
+      clearAllTopupProductsAndSkus();
+    }
+    db.settings.topup_digiflazz_live_only_v2 = {
+      migrated_at: nowIso(),
+      note: "Removed all demo Digiflazz credentials, demo balance, and demo fallback SKUs.",
+    };
+    changed = true;
+  }
+
+  if (changed) saveDb();
 }
 
 function upgradeLocalGameIcons() {
@@ -1622,22 +1592,22 @@ function initDatabase() {
       kind: "digiflazz",
       name: "Digiflazz Indonesia",
       config: {
-        username: process.env.DIGIFLAZZ_USERNAME || "wjp_digiflazz_id",
-        api_key: process.env.DIGIFLAZZ_API_KEY || "df_live_wjp88291044ff",
-        dev_key: process.env.DIGIFLAZZ_DEV_KEY || "df_dev_wjp88291044ff",
+        username: process.env.DIGIFLAZZ_USERNAME || "",
+        api_key: process.env.DIGIFLAZZ_API_KEY || "",
+        dev_key: process.env.DIGIFLAZZ_DEV_KEY || "",
         use_dev: false,
         brand_override: "",
       },
       is_active: true,
       auto_dispatch: true,
       seq: 1,
-      cached_balance: 15750000,
-      last_test: { ok: true, message: "Digiflazz Indonesia terhubung & siap memproses transaksi", at: nowIso() },
+      cached_balance: null,
+      last_test: null,
       created_at: nowIso(),
     },
   ];
 
-  // Restrict topup_providers exclusively to Digiflazz
+  // Restrict topup_providers exclusively to Digiflazz without demo credentials
   const existingDigiflazz = Array.isArray(db.topup_providers)
     ? db.topup_providers.find((v) => v.kind === "digiflazz")
     : null;
@@ -1649,22 +1619,21 @@ function initDatabase() {
     existingDigiflazz.kind = "digiflazz";
     existingDigiflazz.name = existingDigiflazz.name || def.name;
     existingDigiflazz.config = { ...(def.config || {}), ...(existingDigiflazz.config || {}) };
-    for (const [k, val] of Object.entries(def.config || {})) {
-      if (existingDigiflazz.config[k] === undefined || String(existingDigiflazz.config[k]).trim() === "") {
-        existingDigiflazz.config[k] = val;
-      }
+    if (existingDigiflazz.config.username === "wjp_digiflazz_id") {
+      existingDigiflazz.config.username = process.env.DIGIFLAZZ_USERNAME || "";
+    }
+    if (String(existingDigiflazz.config.api_key || "").startsWith("df_live_wjp")) {
+      existingDigiflazz.config.api_key = process.env.DIGIFLAZZ_API_KEY || "";
+    }
+    if (String(existingDigiflazz.config.dev_key || "").startsWith("df_dev_wjp")) {
+      existingDigiflazz.config.dev_key = process.env.DIGIFLAZZ_DEV_KEY || "";
+    }
+    if (Number(existingDigiflazz.cached_balance) === 15750000) {
+      existingDigiflazz.cached_balance = null;
     }
     existingDigiflazz.is_active = true;
     existingDigiflazz.auto_dispatch = existingDigiflazz.auto_dispatch !== false;
     existingDigiflazz.seq = 1;
-    if (!existingDigiflazz.cached_balance) existingDigiflazz.cached_balance = def.cached_balance;
-    if (!existingDigiflazz.last_test || existingDigiflazz.last_test.ok === false) {
-      existingDigiflazz.last_test = {
-        ok: true,
-        message: "Digiflazz Indonesia terhubung & siap memproses transaksi",
-        at: nowIso(),
-      };
-    }
     db.topup_providers = [existingDigiflazz];
   }
 
@@ -3651,21 +3620,39 @@ function maskedVendorView(doc: any) {
   const spec = VENDOR_CATALOG[0];
   const cfg = { ...(doc.config || {}) };
   const sources: Record<string, string> = {};
+  const envMap: Record<string, string | undefined> = {
+    username: process.env.DIGIFLAZZ_USERNAME,
+    api_key: process.env.DIGIFLAZZ_API_KEY,
+    dev_key: process.env.DIGIFLAZZ_DEV_KEY,
+  };
   for (const f of spec.fields) {
-    sources[f.key] = cfg[f.key] ? "db" : "";
-    if (f.secret && cfg[f.key]) {
-      cfg[f.key] = maskSecret(String(cfg[f.key]));
+    const dbVal = String(cfg[f.key] ?? "").trim();
+    const envVal = String(envMap[f.key] ?? "").trim();
+    sources[f.key] = dbVal ? "db" : envVal ? "env" : "";
+    if (f.secret && dbVal) {
+      cfg[f.key] = maskSecret(dbVal);
     }
   }
-  const hasCreds = Object.values(doc.config || {}).some((v) => String(v || "").trim() !== "");
+  const rawUser = String(doc.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const rawKey = String(
+    (doc.config?.use_dev ? doc.config?.dev_key : doc.config?.api_key) ||
+      doc.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
+  const hasRealCreds = !isDemoDigiflazzCredential(rawUser, rawKey);
   return {
     ...doc,
     kind: "digiflazz",
     config: cfg,
     kind_label: spec.label,
     config_sources: sources,
-    credential_source: hasCreds ? "db" : "db",
-    available: true,
+    credential_source: hasRealCreds
+      ? String(doc.config?.username || "").trim()
+        ? "db"
+        : "env"
+      : "none",
+    available: hasRealCreds,
   };
 }
 
@@ -3818,7 +3805,7 @@ function extractAmountFromLabel(labelStr: string, fallback = 0): number {
 
 async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): Promise<{
   items: any[];
-  source: "digiflazz_live" | "digiflazz_catalog";
+  source: "digiflazz_live";
   live_count: number;
   error?: string;
 }> {
@@ -3827,33 +3814,43 @@ async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): 
     db.topup_providers.find((v) => v.kind === "digiflazz") ||
     db.topup_providers[0];
 
-  const username = String(doc?.config?.username || process.env.DIGIFLAZZ_USERNAME || "wjp_digiflazz_id").trim();
+  const username = String(doc?.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
   const apiKey = String(
     (doc?.config?.use_dev ? doc?.config?.dev_key : doc?.config?.api_key) ||
       doc?.config?.api_key ||
       process.env.DIGIFLAZZ_API_KEY ||
-      "df_live_wjp88291044ff"
+      ""
   ).trim();
 
-  const isDemoCreds =
-    !username ||
-    !apiKey ||
-    username === "wjp_digiflazz_id" ||
-    apiKey.startsWith("df_live_wjp") ||
-    apiKey.startsWith("df_dev_wjp");
+  if (isDemoDigiflazzCredential(username, apiKey)) {
+    return {
+      items: [],
+      source: "digiflazz_live",
+      live_count: 0,
+      error:
+        "Kredensial Digiflazz (Username & Production API Key) belum dikonfigurasi. Silakan isi kredensial asli Digiflazz pada tab Integrasi & Supplier terlebih dahulu.",
+    };
+  }
 
   let liveItems: any[] = [];
   let liveError = "";
 
   // Use cached live pricelist if recent (< 5 minutes) and not forced
-  const cacheAgeMs = doc?.cached_pricelist_at ? Date.now() - new Date(doc.cached_pricelist_at).getTime() : Infinity;
-  if (!forceRefresh && Array.isArray(doc?.cached_pricelist) && doc.cached_pricelist.length > 0 && cacheAgeMs < 5 * 60 * 1000) {
+  const cacheAgeMs = doc?.cached_pricelist_at
+    ? Date.now() - new Date(doc.cached_pricelist_at).getTime()
+    : Infinity;
+  if (
+    !forceRefresh &&
+    Array.isArray(doc?.cached_pricelist) &&
+    doc.cached_pricelist.length > 0 &&
+    cacheAgeMs < 5 * 60 * 1000
+  ) {
     liveItems = doc.cached_pricelist;
-  } else if (!isDemoCreds) {
+  } else {
     try {
       const sign = crypto.createHash("md5").update(username + apiKey + "pricelist").digest("hex");
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 7000);
+      const timer = setTimeout(() => ctrl.abort(), 8000);
       const resp = await fetch("https://api.digiflazz.com/v1/price-list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3913,19 +3910,22 @@ async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): 
           doc.cached_pricelist = liveItems;
           doc.cached_pricelist_at = nowIso();
           saveDb();
+        } else if (liveItems.length === 0) {
+          liveError = "Respons API Digiflazz tidak berisi produk aktif (0 produk ditemukan).";
         }
       } else if (json?.data?.message) {
-        liveError = String(json.data.message);
+        liveError = `Digiflazz API: ${String(json.data.message)}`;
+      } else {
+        liveError = "Gagal mengambil daftar produk dari API Digiflazz (pastikan Username, API Key, dan IP Whitelist di member.digiflazz.com sudah benar).";
       }
     } catch (err: any) {
-      liveError = String(err?.message || "Koneksi langsung ke endpoint pricelist Digiflazz tidak terjangkau");
+      liveError = `Gagal terhubung ke API Digiflazz: ${String(err?.message || "Koneksi ke endpoint pricelist Digiflazz gagal")}`;
     }
   }
 
-  // Merge live items with verified Digiflazz catalog items so every local game always has products ready
+  // Strictly return ONLY live items from Digiflazz — NEVER return demo/fallback items!
   const items: any[] = [];
   const seenSkus = new Set<string>();
-
   for (const li of liveItems) {
     const key = String(li.sku || "").toUpperCase();
     if (!key || seenSkus.has(key)) continue;
@@ -3933,86 +3933,10 @@ async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): 
     items.push(li);
   }
 
-  // Include Digiflazz product SKUs for any local game when Admin pulls from Digiflazz
-  const localGamesWithLiveSkus = new Set(liveItems.map((x) => x.game_slug).filter(Boolean));
-  for (const mg of MERCHANT_MASTER_GAMES) {
-    if (localGamesWithLiveSkus.has(mg.slug)) continue;
-    const skuDefs = (mg as any).digiflazz_skus || mg.denominations || [];
-    for (const d of skuDefs) {
-      const sku = `${mg.vendor_prefix}${d.code}`;
-      const key = sku.toUpperCase();
-      if (seenSkus.has(key)) continue;
-      seenSkus.add(key);
-      items.push({
-        sku,
-        code: String(d.code),
-        game_slug: mg.slug,
-        name: `${mg.name} — ${d.label}`,
-        label: d.label,
-        brand: mg.name,
-        category: "Games",
-        price: d.modal,
-        retail_price: d.price,
-        price_strike: d.price_strike,
-        amount: d.amount,
-        badge: d.badge || "",
-        featured: Boolean(d.featured),
-        status: "available",
-        unlimited_stock: true,
-        multi: true,
-        provider: doc?.name || "Digiflazz Indonesia",
-        source: liveItems.length > 0 ? "digiflazz_live" : "digiflazz_catalog",
-      });
-    }
-  }
-
-  // Also include any custom local games in db.games
-  for (const g of db.games || []) {
-    const hasProductsForGame = items.some((it) => it.game_slug === g.slug);
-    const gPrefix =
-      String(g.vendor_prefix || "").trim() ||
-      String(g.slug || g.name || "GM")
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .slice(0, 4)
-        .toUpperCase();
-    for (const d of g.denominations || []) {
-      const cleanCode = String(d.code || "01")
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .toUpperCase();
-      const sku = String(d.vendor_sku || `${gPrefix}${cleanCode}`).trim();
-      const key = sku.toUpperCase();
-      if (seenSkus.has(key)) continue;
-      if (hasProductsForGame && !d.vendor_sku) continue;
-      seenSkus.add(key);
-      const retailPrice = Math.max(1000, Number(d.price || 10000));
-      const modalPrice = Math.max(500, Number(d.modal_price || Math.round((retailPrice * 0.9) / 100) * 100));
-      items.push({
-        sku,
-        code: String(d.code),
-        game_slug: g.slug,
-        name: `${g.name} — ${d.label || d.code}`,
-        label: d.label || String(d.code),
-        brand: g.name,
-        category: "Games",
-        price: modalPrice,
-        retail_price: retailPrice,
-        price_strike: Number(d.price_strike || 0),
-        amount: Number(d.amount || 0),
-        badge: d.badge || "",
-        featured: Boolean(d.featured),
-        status: "available",
-        unlimited_stock: true,
-        multi: true,
-        provider: doc?.name || "Digiflazz Indonesia",
-        source: "digiflazz_catalog",
-      });
-    }
-  }
-
   return {
     items,
-    source: liveItems.length > 0 ? "digiflazz_live" : "digiflazz_catalog",
-    live_count: liveItems.length,
+    source: "digiflazz_live",
+    live_count: items.length,
     error: liveError || undefined,
   };
 }
@@ -4031,9 +3955,6 @@ async function buildVendorProductsCatalog(providerDoc: any, queryStr = "", limit
         String(item.game_slug || "").toLowerCase().includes(needle) ||
         String(item.label || "").toLowerCase().includes(needle)
     );
-    if (filtered.length === 0) {
-      filtered = items;
-    }
   }
   return {
     total: items.length,
@@ -4053,35 +3974,57 @@ async function pullGamesFromMerchant(opts: {
   marginPercent?: number;
   useRecommendedPrice?: boolean;
   autoActivateVendor?: boolean;
+  forceRefresh?: boolean;
 }) {
-  let provider =
+  const provider =
     (opts.providerId && db.topup_providers.find((v) => v.id === opts.providerId)) ||
-    (opts.vendorKind && db.topup_providers.find((v) => v.kind === String(opts.vendorKind || "").toLowerCase())) ||
-    db.topup_providers.find((v) => v.is_active && v.kind !== "manual") ||
     db.topup_providers.find((v) => v.kind === "digiflazz") ||
     db.topup_providers[0];
 
-  if (!provider || provider.kind === "manual") {
-    provider = db.topup_providers.find((v) => v.kind === "digiflazz") || provider;
-  }
-
-  const vendorKind = String(provider?.kind || "digiflazz").toLowerCase();
+  const vendorKind = "digiflazz";
 
   // Ensure local games have their 3D icons intact
   upgradeLocalGameIcons();
 
-  // Fetch products (SKUs & prices) from Digiflazz
-  const { items: digiflazzProducts, source } = await fetchDigiflazzPriceList(provider, true);
+  // Strictly fetch live products from Digiflazz API (no demo fallback)
+  const { items: digiflazzProducts, source, error } = await fetchDigiflazzPriceList(provider, true);
 
-  if (provider && opts.autoActivateVendor !== false && provider.kind !== "manual") {
+  if (error || digiflazzProducts.length === 0) {
+    if (provider) {
+      provider.last_test = {
+        ok: false,
+        mode: "production",
+        message: error || "Gagal menarik produk dari API Digiflazz (0 produk diterima)",
+        at: nowIso(),
+      };
+      saveDb();
+    }
+    return {
+      ok: false,
+      error:
+        error ||
+        "Gagal menarik daftar produk dari API Digiflazz (0 produk diterima). Pastikan Username, API Key, dan IP Whitelist Digiflazz sudah sesuai.",
+      source,
+      vendor_id: provider?.id || "vp-digiflazz",
+      vendor_kind: vendorKind,
+      vendor_name: provider?.name || "Digiflazz Indonesia",
+      games_created: 0,
+      games_updated: 0,
+      games_total: 0,
+      denominations_pulled: 0,
+      products_synced: 0,
+    };
+  }
+
+  if (provider && opts.autoActivateVendor !== false) {
     for (const v of db.topup_providers) v.is_active = false;
     provider.is_active = true;
     provider.auto_dispatch = true;
     provider.last_test = {
       ok: true,
-      mode: source === "digiflazz_live" ? "production" : "verified",
-      balance: Number(provider.cached_balance || 15750000),
-      message: `${provider.name} aktif & daftar produk berhasil disinkronkan ke game lokal`,
+      mode: "production",
+      balance: provider.cached_balance ?? undefined,
+      message: `${provider.name} aktif & ${digiflazzProducts.length} produk live berhasil ditarik dari Digiflazz`,
       at: nowIso(),
     };
   }
@@ -4092,7 +4035,6 @@ async function pullGamesFromMerchant(opts: {
       : null;
 
   // IMPORTANT: Only iterate over EXISTING local games in db.games!
-  // Never create new raw games from Digiflazz, only pull products into local games.
   const localGamesToUpdate = targetSlugs
     ? (db.games || []).filter((g) => targetSlugs.has(String(g.slug || "").toLowerCase()))
     : (db.games || []);
@@ -4194,6 +4136,23 @@ async function pullGamesFromMerchant(opts: {
     gamesUpdated++;
   }
 
+  if (denominationsPulled === 0) {
+    return {
+      ok: false,
+      error:
+        "Tidak ada produk dari pricelist Digiflazz yang cocok dengan game lokal yang dipilih.",
+      source,
+      vendor_id: provider?.id || "vp-digiflazz",
+      vendor_kind: vendorKind,
+      vendor_name: provider?.name || "Digiflazz Indonesia",
+      games_created: 0,
+      games_updated: 0,
+      games_total: 0,
+      denominations_pulled: 0,
+      products_synced: 0,
+    };
+  }
+
   const totalProductsSynced = syncAllGames(true);
   for (const p of db.products) {
     if (isTopupProduct(p)) {
@@ -4214,7 +4173,7 @@ async function pullGamesFromMerchant(opts: {
     games_total: gamesUpdated,
     denominations_pulled: denominationsPulled,
     products_synced: totalProductsSynced,
-    message: `Berhasil menarik ${denominationsPulled} produk/nominal dari ${provider?.name || "Digiflazz"} ke ${gamesUpdated} Game Top Up lokal${marginInfo}!`,
+    message: `Berhasil menarik ${denominationsPulled} produk/nominal asli dari ${provider?.name || "Digiflazz"} ke ${gamesUpdated} Game Top Up lokal${marginInfo}!`,
   };
 }
 
@@ -8037,74 +7996,64 @@ admin.post("/topup/vendors/:provider_id/deactivate", (req, res) => {
 });
 
 admin.post("/topup/vendors/:provider_id/test", async (req, res) => {
-  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id);
-  if (!doc) return res.status(404).json({ detail: "Supplier tidak ditemukan" });
+  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id || v.kind === "digiflazz");
+  if (!doc) return res.status(404).json({ detail: "Supplier Digiflazz tidak ditemukan" });
 
-  let result: { ok: boolean; message: string; mode?: string; balance?: number } = {
-    ok: true,
-    mode: "connected",
-    message: `${doc.name || doc.kind} terhubung & siap memproses pesanan otomatis`,
-  };
+  const username = String(doc.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const apiKey = String(
+    (doc.config?.use_dev ? doc.config?.dev_key : doc.config?.api_key) ||
+      doc.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
 
-  if (doc.kind === "manual") {
-    result = { ok: true, mode: "manual", message: "Mode manual siap digunakan oleh Admin" };
-  } else if (doc.kind === "digiflazz") {
-    const username = String(doc.config?.username || process.env.DIGIFLAZZ_USERNAME || "wjp_digiflazz_id").trim();
-    const apiKey = String(
-      (doc.config?.use_dev ? doc.config?.dev_key : doc.config?.api_key) ||
-        doc.config?.api_key ||
-        process.env.DIGIFLAZZ_API_KEY ||
-        "df_live_wjp88291044ff"
-    ).trim();
-    // Ensure config has values saved
-    doc.config = { ...(doc.config || {}), username, api_key: doc.config?.api_key || apiKey };
+  if (isDemoDigiflazzCredential(username, apiKey)) {
+    const failResult = {
+      ok: false,
+      mode: "unconfigured",
+      message: "Username atau API Key Digiflazz belum dikonfigurasi. Silakan isi kredensial asli Digiflazz.",
+    };
+    doc.last_test = { ...failResult, at: nowIso() };
+    saveDb();
+    return res.json(failResult);
+  }
 
-    let liveChecked = false;
-    if (username && apiKey && !apiKey.startsWith("df_live_wjp") && !apiKey.startsWith("df_dev_wjp")) {
-      try {
-        const sign = crypto.createHash("md5").update(username + apiKey + "depo").digest("hex");
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 3500);
-        const resp = await fetch("https://api.digiflazz.com/v1/cek-saldo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cmd: "depo", username, sign }),
-          signal: ctrl.signal,
-        });
-        clearTimeout(timer);
-        const json: any = await resp.json().catch(() => null);
-        if (json?.data && typeof json.data.deposit === "number") {
-          doc.cached_balance = Number(json.data.deposit);
-          result = {
-            ok: true,
-            mode: "production",
-            balance: doc.cached_balance,
-            message: `Terhubung ke Digiflazz Production — Saldo: Rp ${doc.cached_balance.toLocaleString("id-ID")}`,
-          };
-          liveChecked = true;
-        }
-      } catch {
-        // Fallback to verified gateway mode if Cloud Run egress IP is not whitelisted in Digiflazz
-      }
-    }
-    if (!liveChecked) {
-      const bal = Number(doc.cached_balance || 15750000);
-      doc.cached_balance = bal;
+  let result: { ok: boolean; message: string; mode?: string; balance?: number };
+  try {
+    const sign = crypto.createHash("md5").update(username + apiKey + "depo").digest("hex");
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    const resp = await fetch("https://api.digiflazz.com/v1/cek-saldo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "depo", username, sign }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    const json: any = await resp.json().catch(() => null);
+    if (json?.data && typeof json.data.deposit === "number") {
+      doc.cached_balance = Number(json.data.deposit);
       result = {
         ok: true,
-        mode: "verified",
-        balance: bal,
-        message: `Digiflazz (${username}) terhubung & siap digunakan — Saldo Aktif: Rp ${bal.toLocaleString("id-ID")}`,
+        mode: "production",
+        balance: doc.cached_balance,
+        message: `Terhubung ke Digiflazz Production — Saldo: Rp ${doc.cached_balance.toLocaleString("id-ID")}`,
+      };
+    } else {
+      const errMsg = json?.data?.message
+        ? `Digiflazz API: ${String(json.data.message)}`
+        : "Gagal memverifikasi kredensial ke API Digiflazz (periksa Username, API Key, dan IP Whitelist).";
+      result = {
+        ok: false,
+        mode: "error",
+        message: errMsg,
       };
     }
-  } else {
-    const bal = Number(doc.cached_balance || 10000000);
-    doc.cached_balance = bal;
+  } catch (err: any) {
     result = {
-      ok: true,
-      mode: "verified",
-      balance: bal,
-      message: `${doc.name} (${doc.kind.toUpperCase()}) terhubung & siap digunakan — Saldo: Rp ${bal.toLocaleString("id-ID")}`,
+      ok: false,
+      mode: "error",
+      message: `Gagal menghubungi API Digiflazz: ${String(err?.message || "Koneksi gagal")}`,
     };
   }
 
@@ -8113,35 +8062,84 @@ admin.post("/topup/vendors/:provider_id/test", async (req, res) => {
   res.json(result);
 });
 
-admin.get("/topup/vendors/:provider_id/balance", (req, res) => {
-  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id);
-  if (!doc) return res.status(404).json({ detail: "Supplier tidak ditemukan" });
-  if (doc.kind === "manual") {
+admin.get("/topup/vendors/:provider_id/balance", async (req, res) => {
+  const doc = db.topup_providers.find((v) => v.id === req.params.provider_id || v.kind === "digiflazz");
+  if (!doc) return res.status(404).json({ detail: "Supplier Digiflazz tidak ditemukan" });
+
+  const username = String(doc.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const apiKey = String(
+    (doc.config?.use_dev ? doc.config?.dev_key : doc.config?.api_key) ||
+      doc.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
+
+  if (isDemoDigiflazzCredential(username, apiKey)) {
     return res.json({
       supported: true,
-      ok: true,
+      ok: false,
       balance: 0,
-      balance_formatted: "Rp 0 (Mode Manual)",
-      message: "Mode manual aktif (tanpa deposit supplier)",
+      balance_formatted: "—",
+      currency: "IDR",
+      provider: doc.name,
+      message: "Kredensial Digiflazz belum dikonfigurasi",
     });
   }
-  const bal = Number(doc.cached_balance || 15750000);
-  doc.cached_balance = bal;
-  doc.last_test = {
-    ok: true,
-    message: `Saldo tersinkronisasi: Rp ${bal.toLocaleString("id-ID")}`,
-    at: nowIso(),
-  };
-  saveDb();
-  res.json({
-    supported: true,
-    ok: true,
-    balance: bal,
-    balance_formatted: `Rp ${bal.toLocaleString("id-ID")}`,
-    currency: "IDR",
-    provider: doc.name,
-    message: "Saldo supplier tersinkronisasi",
-  });
+
+  try {
+    const sign = crypto.createHash("md5").update(username + apiKey + "depo").digest("hex");
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    const resp = await fetch("https://api.digiflazz.com/v1/cek-saldo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "depo", username, sign }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    const json: any = await resp.json().catch(() => null);
+    if (json?.data && typeof json.data.deposit === "number") {
+      const bal = Number(json.data.deposit);
+      doc.cached_balance = bal;
+      doc.last_test = {
+        ok: true,
+        message: `Saldo tersinkronisasi: Rp ${bal.toLocaleString("id-ID")}`,
+        at: nowIso(),
+      };
+      saveDb();
+      return res.json({
+        supported: true,
+        ok: true,
+        balance: bal,
+        balance_formatted: `Rp ${bal.toLocaleString("id-ID")}`,
+        currency: "IDR",
+        provider: doc.name,
+        message: "Saldo Digiflazz tersinkronisasi",
+      });
+    }
+    const errMsg = json?.data?.message
+      ? `Digiflazz API: ${String(json.data.message)}`
+      : "Gagal mengambil saldo dari API Digiflazz";
+    return res.json({
+      supported: true,
+      ok: false,
+      balance: 0,
+      balance_formatted: "—",
+      currency: "IDR",
+      provider: doc.name,
+      message: errMsg,
+    });
+  } catch (err: any) {
+    return res.json({
+      supported: true,
+      ok: false,
+      balance: 0,
+      balance_formatted: "—",
+      currency: "IDR",
+      provider: doc.name,
+      message: `Gagal terhubung ke API Digiflazz: ${String(err?.message || "Koneksi gagal")}`,
+    });
+  }
 });
 
 admin.get("/topup/vendors/:provider_id/products", async (req, res) => {
@@ -8158,11 +8156,10 @@ admin.get("/topup/vendors/:provider_id/products", async (req, res) => {
 });
 
 admin.get("/topup/merchant-catalog", async (req, res) => {
-  const vendorKind = String(req.query.vendor_kind || req.query.vendor || "digiflazz").toLowerCase();
+  const vendorKind = "digiflazz";
   const margin = Math.max(0, Number(req.query.margin_percent || 0));
   const forceRefresh = req.query.refresh === "true" || req.query.refresh === "1";
   const provider =
-    db.topup_providers.find((v) => v.kind === vendorKind) ||
     db.topup_providers.find((v) => v.kind === "digiflazz") ||
     db.topup_providers[0];
 
@@ -8172,7 +8169,7 @@ admin.get("/topup/merchant-catalog", async (req, res) => {
     forceRefresh
   );
 
-  // Build catalog strictly around existing LOCAL games in db.games
+  // Build catalog strictly around existing LOCAL games in db.games using ONLY live Digiflazz items
   const localGames = [...(db.games || [])].sort((a, b) => (a.seq || 0) - (b.seq || 0));
   const games = localGames.map((lg) => {
     const gameSlug = String(lg.slug || "").toLowerCase();
@@ -8234,7 +8231,7 @@ admin.get("/topup/merchant-catalog", async (req, res) => {
 admin.post("/topup/pull-merchant", async (req, res) => {
   const body = req.body || {};
   const result = await pullGamesFromMerchant({
-    vendorKind: body.vendor_kind || body.vendor || "digiflazz",
+    vendorKind: "digiflazz",
     providerId: body.provider_id,
     gameSlugs: Array.isArray(body.game_slugs) ? body.game_slugs : undefined,
     selectedSkusByGame:
@@ -8244,7 +8241,14 @@ admin.post("/topup/pull-merchant", async (req, res) => {
     marginPercent: Number(body.margin_percent || 0),
     useRecommendedPrice: Boolean(body.use_recommended_price),
     autoActivateVendor: body.auto_activate_vendor !== false,
+    forceRefresh: true,
   });
+  if (!result.ok) {
+    return res.status(400).json({
+      detail: result.error || "Gagal menarik produk dari API Digiflazz. Produk demo dinonaktifkan.",
+      ...result,
+    });
+  }
   res.json(result);
 });
 
@@ -9003,39 +9007,63 @@ admin.post("/topup/games/:game_id/import", async (req, res) => {
   if (req.body?.auto_pull_all) {
     const selectedSkus = Array.isArray(req.body?.selected_skus) ? req.body.selected_skus : undefined;
     const resPull = await pullGamesFromMerchant({
-      vendorKind: req.body?.vendor_kind || "digiflazz",
+      vendorKind: "digiflazz",
       providerId: req.body?.provider_id,
       gameSlugs: [game.slug],
       selectedSkusByGame: selectedSkus?.length ? { [game.slug]: selectedSkus } : undefined,
       marginPercent,
       useRecommendedPrice: marginPercent <= 0 && Boolean(req.body?.use_recommended_price),
       autoActivateVendor: true,
+      forceRefresh: true,
     });
+    if (!resPull.ok) {
+      return res.status(400).json({
+        detail: resPull.error || "Gagal menarik produk dari API Digiflazz. Produk demo dinonaktifkan.",
+        ...resPull,
+      });
+    }
     return res.json(resPull);
   }
 
-  // Support importing selected Digiflazz products directly as denominations on this local game
+  // Strictly pull selected Digiflazz products directly as denominations on this local game
   if (Array.isArray(req.body?.selected_products) && req.body.selected_products.length > 0) {
+    const provider =
+      db.topup_providers.find((v) => v.id === req.body?.provider_id || v.kind === "digiflazz") ||
+      db.topup_providers[0];
+    const { items: liveProducts, error: liveErr } = await fetchDigiflazzPriceList(provider, false);
+    if (liveErr || liveProducts.length === 0) {
+      return res.status(400).json({
+        detail: liveErr || "Gagal memverifikasi produk dari API Digiflazz.",
+      });
+    }
+    const validLiveSkuMap = new Map(
+      liveProducts.map((lp) => [String(lp.sku || "").trim().toUpperCase(), lp])
+    );
+
     const existingDenoms = Array.isArray(game.denominations) ? [...game.denominations] : [];
     const updatedCodes: string[] = [];
 
     for (const rawProd of req.body.selected_products) {
       const sku = String(rawProd?.sku || "").trim();
       if (!sku) continue;
-      const modalPrice = Math.max(500, Number(rawProd?.price || rawProd?.modal_price || 0));
+      const verifiedLive = validLiveSkuMap.get(sku.toUpperCase());
+      if (!verifiedLive) continue;
+
+      const modalPrice = Math.max(500, Number(verifiedLive.price || rawProd?.price || 0));
       const cleanLabel = String(
-        rawProd?.label ||
-          cleanDenomLabelFromProductName(String(rawProd?.name || sku), game.name, game.currency || "Diamond")
+        verifiedLive.label ||
+          rawProd?.label ||
+          cleanDenomLabelFromProductName(String(verifiedLive.name || sku), game.name, game.currency || "Diamond")
       ).trim();
-      const amount = Number(rawProd?.amount) || extractAmountFromLabel(cleanLabel, 1);
-      const code = String(rawProd?.code || (amount > 0 ? String(amount) : sku.toLowerCase()));
+      const amount = Number(verifiedLive.amount || rawProd?.amount) || extractAmountFromLabel(cleanLabel, 1);
+      const code = String(verifiedLive.code || rawProd?.code || (amount > 0 ? String(amount) : sku.toLowerCase()));
       const sellingPrice =
         marginPercent > 0
           ? Math.max(1000, Math.ceil((modalPrice * (1 + marginPercent / 100)) / 100) * 100)
           : Math.max(
               1000,
-              Number(rawProd?.retail_price) > modalPrice
-                ? Number(rawProd.retail_price)
+              Number(verifiedLive.retail_price) > modalPrice
+                ? Number(verifiedLive.retail_price)
                 : Math.ceil((modalPrice * 1.1) / 100) * 100
             );
       const strikePrice = Math.ceil((sellingPrice * 1.12) / 1000) * 1000;
@@ -9066,15 +9094,21 @@ admin.post("/topup/games/:game_id/import", async (req, res) => {
           modal_price: modalPrice,
           price: sellingPrice,
           price_strike: strikePrice,
-          stock: Number(rawProd?.stock || 999),
-          badge: String(rawProd?.badge || ""),
+          stock: 999,
+          badge: String(verifiedLive.badge || ""),
           is_active: true,
-          featured: Boolean(rawProd?.featured),
+          featured: Boolean(verifiedLive.featured),
           vendor_sku: sku,
           seq: existingDenoms.length,
         });
       }
       updatedCodes.push(sku);
+    }
+
+    if (updatedCodes.length === 0) {
+      return res.status(400).json({
+        detail: "Tidak ada SKU valid dari API Digiflazz yang dapat ditarik.",
+      });
     }
 
     existingDenoms.sort((a: any, b: any) => Number(a.price || 0) - Number(b.price || 0));
@@ -9090,42 +9124,13 @@ admin.post("/topup/games/:game_id/import", async (req, res) => {
       ok: true,
       updated: updatedCodes,
       products: count,
-      message: `${updatedCodes.length} produk Digiflazz berhasil ditarik ke ${game.name} (Margin +${marginPercent}%)`,
+      message: `${updatedCodes.length} produk asli Digiflazz berhasil ditarik ke ${game.name} (Margin +${marginPercent}%)`,
     });
   }
 
-  const mapping = req.body?.skus;
-  if (!mapping || typeof mapping !== "object") {
-    return res.status(400).json({ detail: "Pilih minimal satu SKU untuk diimpor" });
-  }
-  const applyPrice = Boolean(req.body?.apply_price ?? true);
-  const updated: string[] = [];
-  for (const denom of game.denominations || []) {
-    const code = String(denom.code);
-    const entry = mapping[code];
-    if (!entry) continue;
-    const sku = typeof entry === "object" ? entry.sku : String(entry);
-    if (!sku) continue;
-    denom.vendor_sku = String(sku).trim();
-    if (applyPrice && typeof entry === "object" && Number(entry.price) > 0) {
-      const baseModal = Number(entry.price);
-      denom.modal_price = baseModal;
-      denom.price =
-        marginPercent > 0
-          ? Math.max(1000, Math.ceil((baseModal * (1 + marginPercent / 100)) / 100) * 100)
-          : Math.max(1000, Number(entry.retail_price || Math.ceil((baseModal * 1.1) / 100) * 100));
-      denom.price_strike = Math.ceil((denom.price * 1.12) / 1000) * 1000;
-    }
-    updated.push(code);
-  }
-  const count = syncGameProducts(game);
-  for (const p of db.products) {
-    if (isTopupProduct(p)) {
-      p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / 16000) * 100) / 100);
-    }
-  }
-  saveDb();
-  res.json({ ok: true, updated, products: count, message: `${updated.length} nominal dihubungkan ke supplier` });
+  return res.status(400).json({
+    detail: "Pengaturan SKU manual telah dinonaktifkan. Produk hanya dapat ditarik langsung dari API Digiflazz.",
+  });
 });
 
 // --- Admin Social Links ---
@@ -9189,16 +9194,18 @@ admin.post("/games", (req, res) => {
   if (db.games.some((g) => g.slug === slug)) {
     return res.status(400).json({ detail: "Game dengan slug tersebut sudah ada" });
   }
+  // New games start with empty denominations; products must be pulled from Digiflazz
   const game = {
     ...data,
     id: `gm-${slug}-${uuidHex(4)}`,
     name,
     slug,
+    vendor_id: "vp-digiflazz",
     is_active: Boolean(data.is_active ?? true),
     featured: Boolean(data.featured ?? false),
     seq: Number(data.seq ?? db.games.length),
     fields: Array.isArray(data.fields) ? data.fields : [],
-    denominations: Array.isArray(data.denominations) ? data.denominations : [],
+    denominations: [],
     created_at: nowIso(),
     updated_at: nowIso(),
   };
@@ -9213,17 +9220,73 @@ admin.put("/games/:game_id", (req, res) => {
   if (idx === -1) return res.status(404).json({ detail: "Game tidak ditemukan" });
   const existing = db.games[idx];
   const data = req.body || {};
+
+  // Only allow existing denominations that were pulled from Digiflazz (keep vendor_sku, code, modal_price locked)
+  const existingBySku = new Map(
+    (existing.denominations || [])
+      .filter((d: any) => String(d.vendor_sku || "").trim() !== "")
+      .map((d: any) => [String(d.vendor_sku).trim().toUpperCase(), d])
+  );
+
+  const sanitizedDenominations = Array.isArray(data.denominations)
+    ? data.denominations
+        .map((incoming: any) => {
+          const skuKey = String(incoming?.vendor_sku || "").trim().toUpperCase();
+          const orig: any = existingBySku.get(skuKey);
+          if (!orig) return null; // Reject any manually created denomination without an existing Digiflazz SKU
+          const modalPrice = Math.max(500, Number(orig.modal_price || 0));
+          const sellingPrice = Math.max(modalPrice, Number(incoming.price || orig.price || modalPrice));
+          const strikePrice = Math.max(0, Number(incoming.price_strike ?? orig.price_strike ?? 0));
+          return {
+            ...orig,
+            code: orig.code,
+            vendor_sku: orig.vendor_sku,
+            label: orig.label,
+            amount: orig.amount,
+            modal_price: modalPrice,
+            price: sellingPrice,
+            price_strike: strikePrice,
+            badge: String(incoming.badge ?? orig.badge ?? ""),
+            featured: Boolean(incoming.featured ?? orig.featured),
+            is_active: incoming.is_active !== undefined ? Boolean(incoming.is_active) : Boolean(orig.is_active),
+          };
+        })
+        .filter(Boolean)
+        .map((d: any, i: number) => ({ ...d, seq: i }))
+    : existing.denominations || [];
+
   const updated = {
     ...existing,
     ...data,
     id: existing.id,
     slug: slugify(data.slug || existing.slug || data.name || existing.name),
+    vendor_id: "vp-digiflazz",
+    denominations: sanitizedDenominations,
     updated_at: nowIso(),
   };
   db.games[idx] = updated;
   syncGameProducts(updated);
   saveDb();
   res.json(updated);
+});
+
+admin.post("/games/:game_id/toggle-active", (req, res) => {
+  const idx = db.games.findIndex((g) => g.id === req.params.game_id);
+  if (idx === -1) return res.status(404).json({ detail: "Game tidak ditemukan" });
+  const game = db.games[idx];
+  const nextActive =
+    req.body && typeof req.body.is_active === "boolean"
+      ? req.body.is_active
+      : game.is_active === false;
+  game.is_active = nextActive;
+  game.updated_at = nowIso();
+  const synced = syncGameProducts(game);
+  saveDb();
+  res.json({
+    ...game,
+    products_synced: synced > 0,
+    product_count: synced,
+  });
 });
 
 admin.delete("/games/:game_id", (req, res) => {
@@ -9274,9 +9337,6 @@ admin.post("/topup/orders/:session_id/complete", async (req, res) => {
   if (tx.payment_status !== "paid") {
     return res.status(400).json({ detail: "Pesanan belum lunas. Setujui pembayaran terlebih dahulu." });
   }
-  const activeRow =
-    db.topup_providers.find((v) => v.kind === "digiflazz") ||
-    db.topup_providers[0] || { id: "vp-digiflazz", kind: "digiflazz", name: "Digiflazz Indonesia" };
   const dispatched = Boolean(req.body?.dispatch !== false);
   tx.status = "delivered";
   tx.vendor_kind = "digiflazz";
@@ -9291,36 +9351,55 @@ admin.post("/topup/orders/:session_id/complete", async (req, res) => {
 admin.get("/topup/integration", (_req, res) => {
   const activeRow =
     db.topup_providers.find((v) => v.kind === "digiflazz") ||
-    db.topup_providers[0] || { id: "vp-digiflazz", kind: "digiflazz", name: "Digiflazz Indonesia", cached_balance: 15750000 };
+    db.topup_providers[0] || { id: "vp-digiflazz", kind: "digiflazz", name: "Digiflazz Indonesia", cached_balance: null };
   const orderRows = db.transactions.filter((t) => t.product_type === PRODUCT_TYPE);
   const missingSku = db.games
     .map((g) => {
       const denoms = (g.denominations || []).filter((d: any) => d.is_active !== false);
-      const prefix = String(g.vendor_prefix || "").trim();
-      const gap = denoms.filter((d: any) => !String(d.vendor_sku || "").trim() && !prefix);
-      return { game: g.name, slug: g.slug, missing: gap.length, total: denoms.length };
+      return {
+        game: g.name,
+        slug: g.slug,
+        missing: denoms.length === 0 ? 1 : 0,
+        total: denoms.length,
+      };
     })
-    .filter((x) => x.total > 0 && x.missing > 0)
-    .sort((a, b) => b.missing - a.missing);
+    .filter((x) => x.total === 0)
+    .sort((a, b) => a.game.localeCompare(b.game));
 
-  const balAmount = Number(activeRow.cached_balance || 15750000);
+  const rawUser = String(activeRow.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const rawKey = String(
+    (activeRow.config?.use_dev ? activeRow.config?.dev_key : activeRow.config?.api_key) ||
+      activeRow.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
+  const hasRealCreds = !isDemoDigiflazzCredential(rawUser, rawKey);
+  const hasBalance = hasRealCreds && typeof activeRow.cached_balance === "number";
 
   res.json({
     active: {
       kind: "digiflazz",
       name: activeRow.name || "Digiflazz Indonesia",
       auto_dispatch: Boolean(activeRow.auto_dispatch !== false),
-      available: true,
+      available: hasRealCreds,
       vendor_id: activeRow.id || "vp-digiflazz",
-      source: "db",
+      source: hasRealCreds
+        ? String(activeRow.config?.username || "").trim()
+          ? "db"
+          : "env"
+        : "none",
     },
     active_id: activeRow.id || "vp-digiflazz",
     vendors: db.topup_providers.filter((v) => v.kind === "digiflazz").map(maskedVendorView),
     balance: {
       supported: true,
-      ok: true,
-      balance: balAmount,
-      message: "Tersinkronisasi dengan Digiflazz",
+      ok: hasBalance,
+      balance: hasBalance ? Number(activeRow.cached_balance) : 0,
+      message: hasBalance
+        ? "Tersinkronisasi dengan Digiflazz"
+        : hasRealCreds
+          ? "Klik Cek Saldo untuk sinkronisasi saldo Digiflazz"
+          : "Kredensial Digiflazz belum dikonfigurasi",
     },
     games_without_sku: missingSku,
     products_unsynced: 0,

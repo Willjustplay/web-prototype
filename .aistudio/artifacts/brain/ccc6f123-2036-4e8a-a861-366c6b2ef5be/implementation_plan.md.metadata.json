@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi penghapusan seluruh produk & nominal top up bawaan (mengosongkan SKU & nominal awal pada 10 game lokal), serta pembuatan ulang halaman Top Up khusus per game (/topup/:slug) bergaya Codashop 2 kolom dengan langkah 1-2-3-4 dalam satu halaman.",
-  "updatedAt":  "2026-11-07T20:55:47.818240375Z",
+  "summary":  "Rencana penggantian tombol hapus game dengan sakelar Aktif dan Nonaktif pada tabel Katalog Top Up Game di Admin serta penyembunyian otomatis game nonaktif dari halaman publik Top Up.",
+  "updatedAt":  "2026-11-07T22:24:12.612607224Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
