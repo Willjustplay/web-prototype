@@ -1159,7 +1159,7 @@ const MERCHANT_MASTER_GAMES = [
   },
   {
     slug: "free-fire",
-    name: "Free Fire / Free Fire MAX",
+    name: "Free Fire & Free Fire MAX",
     publisher: "Garena",
     currency: "Diamond",
     vendor_prefix: "FF",
@@ -1167,35 +1167,17 @@ const MERCHANT_MASTER_GAMES = [
     featured: true,
     icon: "/src/assets/images/icon_game_free_fire_1794083002073.jpg",
     banner: "/src/assets/images/icon_game_free_fire_1794083002073.jpg",
-    notes: "Masukkan Player ID Free Fire Anda dan klik Verifikasi ID Game untuk cek nickname.",
+    notes: "Masukkan Player ID Free Fire / Free Fire MAX Anda dan klik Verifikasi ID Game untuk cek nickname.",
     delivery_info: "Diamond Free Fire masuk instan via Digiflazz ke Player ID Anda.",
     fields: [
-      { key: "user_id", label: "Player ID", placeholder: "1234567890", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka Player ID Free Fire" },
-    ],
-    denominations: [] as any[],
-  },
-  {
-    slug: "genshin-impact",
-    name: "Genshin Impact",
-    publisher: "HoYoverse",
-    currency: "Genesis Crystal",
-    vendor_prefix: "GI",
-    cek_id_sku: "CEKGI",
-    featured: true,
-    icon: "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
-    banner: "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
-    notes: "Masukkan UID Genshin Impact (diawali angka 8 untuk server Asia) dan pilih Server.",
-    delivery_info: "Genesis Crystal / Welkin Moon masuk otomatis via Digiflazz ke UID Anda.",
-    fields: [
-      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
-      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Genshin Impact Anda" },
+      { key: "user_id", label: "Player ID", placeholder: "1234567890", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka Player ID Free Fire / Free Fire MAX" },
     ],
     denominations: [] as any[],
   },
   {
     slug: "pubg-mobile",
     name: "PUBG Mobile",
-    publisher: "Tencent / Krafton",
+    publisher: "Level Infinite",
     currency: "UC",
     vendor_prefix: "PUBG",
     cek_id_sku: "CEKPUBG",
@@ -1210,8 +1192,200 @@ const MERCHANT_MASTER_GAMES = [
     denominations: [] as any[],
   },
   {
+    slug: "honor-of-kings",
+    name: "Honor of Kings",
+    publisher: "Level Infinite",
+    currency: "Tokens",
+    vendor_prefix: "HOK",
+    cek_id_sku: "CEKHOK",
+    featured: true,
+    icon: "/src/assets/images/icon_game_honor_of_kings_1794083008199.jpg",
+    banner: "/src/assets/images/icon_game_honor_of_kings_1794083008199.jpg",
+    notes: "Masukkan Player UID Honor of Kings Anda dan klik Verifikasi ID Game.",
+    delivery_info: "Tokens Honor of Kings masuk otomatis via Digiflazz ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "Player UID", placeholder: "1234567890123", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka UID Honor of Kings" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "genshin-impact",
+    name: "Genshin Impact & Zenless Zone Zero",
+    publisher: "HoYoverse",
+    currency: "Genesis Crystal / Monochrome",
+    vendor_prefix: "GI",
+    cek_id_sku: "CEKGI",
+    featured: true,
+    icon: "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
+    banner: "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
+    notes: "Masukkan UID Genshin Impact / Zenless Zone Zero Anda dan pilih Server.",
+    delivery_info: "Genesis Crystal / Monochrome / Membership masuk otomatis via Digiflazz ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "UID 8-10 digit angka" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun HoYoverse Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "honkai-star-rail",
+    name: "Honkai: Star Rail",
+    publisher: "HoYoverse",
+    currency: "Oneiric Shard",
+    vendor_prefix: "HSR",
+    cek_id_sku: "CEKHSR",
+    featured: true,
+    icon: "/src/assets/images/icon_game_honkai_star_rail_1794083007862.jpg",
+    banner: "/src/assets/images/icon_game_honkai_star_rail_1794083007862.jpg",
+    notes: "Masukkan UID Honkai: Star Rail dan pilih Server (Contoh: Asia).",
+    delivery_info: "Oneiric Shard / Express Supply Pass masuk instan via Digiflazz ke UID Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Honkai: Star Rail Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "wuthering-waves",
+    name: "Wuthering Waves",
+    publisher: "HoYoverse",
+    currency: "Lunites",
+    vendor_prefix: "WW",
+    cek_id_sku: "CEKWW",
+    featured: true,
+    icon: "/src/assets/images/icon_game_wuthering_waves_1794091152462.jpg",
+    banner: "/src/assets/images/icon_game_wuthering_waves_1794091152462.jpg",
+    notes: "Masukkan UID Wuthering Waves Anda dan pilih Server (Contoh: SEA / Asia).",
+    delivery_info: "Lunites / Lunite Subscription masuk otomatis via Digiflazz ke UID Wuthering Waves Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "900123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "Masukkan 9 digit UID Wuthering Waves" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["SEA", "Asia", "America", "Europe", "HMT (HK, MO, TW)"], help: "Pilih server Wuthering Waves Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "arena-of-valor",
+    name: "Arena of Valor",
+    publisher: "Level Infinite",
+    currency: "Vouchers",
+    vendor_prefix: "AOV",
+    cek_id_sku: "CEKAOV",
+    featured: false,
+    icon: "/src/assets/images/icon_game_arena_of_valor_1794091153399.jpg",
+    banner: "/src/assets/images/icon_game_arena_of_valor_1794091153399.jpg",
+    notes: "Masukkan OpenID / Player ID Arena of Valor Anda.",
+    delivery_info: "Vouchers Arena of Valor masuk instan via Digiflazz ke akun Anda.",
+    fields: [
+      { key: "user_id", label: "Player ID / OpenID", placeholder: "123456789012345", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 22, pattern: "^[0-9]{5,22}$", help: "Masukkan Player ID / OpenID Arena of Valor" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "marvel-rivals",
+    name: "Marvel Rivals",
+    publisher: "NetEase Games",
+    currency: "Lattice",
+    vendor_prefix: "MR",
+    cek_id_sku: "CEKMR",
+    featured: true,
+    icon: "/src/assets/images/icon_game_marvel_rivals_1794091155339.jpg",
+    banner: "/src/assets/images/icon_game_marvel_rivals_1794091155339.jpg",
+    notes: "Masukkan UID Marvel Rivals Anda untuk pengiriman Lattice instan.",
+    delivery_info: "Lattice Marvel Rivals masuk otomatis via Digiflazz ke UID akun Anda.",
+    fields: [
+      { key: "user_id", label: "Player UID", placeholder: "1029384756", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka UID Marvel Rivals Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "delta-force",
+    name: "Delta Force - Garena",
+    publisher: "Garena",
+    currency: "Delta Coins",
+    vendor_prefix: "DF",
+    cek_id_sku: "CEKDF",
+    featured: false,
+    icon: "/src/assets/images/icon_game_delta_force_1794091155402.jpg",
+    banner: "/src/assets/images/icon_game_delta_force_1794091155402.jpg",
+    notes: "Masukkan Player UID Delta Force - Garena Anda.",
+    delivery_info: "Delta Coins masuk otomatis via Digiflazz ke akun Delta Force Garena Anda.",
+    fields: [
+      { key: "user_id", label: "Player UID", placeholder: "123456789012", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 20, pattern: "^[0-9]{6,20}$", help: "Masukkan Player UID Delta Force Garena Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "magic-chess-go-go",
+    name: "Magic Chess: Go Go",
+    publisher: "Moonton",
+    currency: "Diamond",
+    vendor_prefix: "MCGG",
+    cek_id_sku: "CEKMCGG",
+    featured: false,
+    icon: "/src/assets/images/icon_game_magic_chess_1794091156121.jpg",
+    banner: "/src/assets/images/icon_game_magic_chess_1794091156121.jpg",
+    notes: "Masukkan User ID dan Zone ID Magic Chess: Go Go Anda.",
+    delivery_info: "Diamond Magic Chess: Go Go masuk instan via Digiflazz ke akun Moonton Anda.",
+    fields: [
+      { key: "user_id", label: "User ID", placeholder: "123456789", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 15, pattern: "^[0-9]{5,15}$", help: "Masukkan angka User ID Magic Chess: Go Go" },
+      { key: "zone_id", label: "Zone ID", placeholder: "1234", type: "text", inputmode: "numeric", required: true, min_len: 3, max_len: 6, pattern: "^[0-9]{3,6}$", help: "Masukkan angka Zone ID (di dalam kurung)" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "ragnarok",
+    name: "Ragnarok M: Eternal Love & Ragnarok Origin",
+    publisher: "Gravity/Gravity Games",
+    currency: "Big Cat Coin / Nyan Berry",
+    vendor_prefix: "RO",
+    cek_id_sku: "CEKRO",
+    featured: false,
+    icon: "/src/assets/images/icon_game_ragnarok_1794091157042.jpg",
+    banner: "/src/assets/images/icon_game_ragnarok_1794091157042.jpg",
+    notes: "Masukkan Character ID / Role ID Ragnarok Anda beserta Server.",
+    delivery_info: "Big Cat Coin / Nyan Berry masuk otomatis via Digiflazz ke karakter Ragnarok Anda.",
+    fields: [
+      { key: "user_id", label: "Role ID / Character ID", placeholder: "4300123456", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 16, pattern: "^[0-9]{5,16}$", help: "Masukkan angka Role ID / Character ID Ragnarok" },
+      { key: "server", label: "Server", placeholder: "Eternal Love / Prontera", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 30, pattern: "", help: "Masukkan nama Server karakter Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "fc-mobile",
+    name: "EA Sports FC Mobile",
+    publisher: "EA Sports",
+    currency: "FC Points / Silver",
+    vendor_prefix: "FCM",
+    cek_id_sku: "CEKFCM",
+    featured: false,
+    icon: "/src/assets/images/icon_game_fc_mobile_1794091158474.jpg",
+    banner: "/src/assets/images/icon_game_fc_mobile_1794091158474.jpg",
+    notes: "Masukkan UID EA Sports FC Mobile Anda (terlihat di menu Pengaturan / Profil).",
+    delivery_info: "FC Points / Silver masuk otomatis via Digiflazz ke UID EA Sports FC Mobile Anda.",
+    fields: [
+      { key: "user_id", label: "UID FC Mobile", placeholder: "501234567890", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 20, pattern: "^[0-9]{6,20}$", help: "Masukkan angka UID EA Sports FC Mobile" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "wild-rift",
+    name: "League of Legends: Wild Rift",
+    publisher: "Riot Games",
+    currency: "Wild Cores",
+    vendor_prefix: "WR",
+    cek_id_sku: "CEKWR",
+    featured: false,
+    icon: "/src/assets/images/icon_game_wild_rift_1794091160165.jpg",
+    banner: "/src/assets/images/icon_game_wild_rift_1794091160165.jpg",
+    notes: "Masukkan Riot ID beserta Tagline (Contoh: Player#IDN).",
+    delivery_info: "Wild Cores masuk otomatis via Digiflazz ke akun Riot Games Wild Rift Anda.",
+    fields: [
+      { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, pattern: "", help: "Format: Nickname#Tag" },
+    ],
+    denominations: [] as any[],
+  },
+  {
     slug: "valorant",
-    name: "Valorant",
+    name: "Valorant (PC/Mobile via Riot Games)",
     publisher: "Riot Games",
     currency: "Valorant Points",
     vendor_prefix: "VAL",
@@ -1227,58 +1401,6 @@ const MERCHANT_MASTER_GAMES = [
     denominations: [] as any[],
   },
   {
-    slug: "honor-of-kings",
-    name: "Honor of Kings",
-    publisher: "Tencent / Level Infinite",
-    currency: "Tokens",
-    vendor_prefix: "HOK",
-    cek_id_sku: "CEKHOK",
-    featured: true,
-    icon: "/src/assets/images/icon_game_honor_of_kings_1794083008199.jpg",
-    banner: "/src/assets/images/icon_game_honor_of_kings_1794083008199.jpg",
-    notes: "Masukkan Player UID Honor of Kings Anda dan klik Verifikasi ID Game.",
-    delivery_info: "Tokens Honor of Kings masuk otomatis via Digiflazz ke UID Anda.",
-    fields: [
-      { key: "user_id", label: "Player UID", placeholder: "1234567890123", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka UID Honor of Kings" },
-    ],
-    denominations: [] as any[],
-  },
-  {
-    slug: "honkai-star-rail",
-    name: "Honkai: Star Rail",
-    publisher: "HoYoverse",
-    currency: "Oneiric Shard",
-    vendor_prefix: "HSR",
-    cek_id_sku: "CEKHSR",
-    featured: false,
-    icon: "/src/assets/images/icon_game_honkai_star_rail_1794083007862.jpg",
-    banner: "/src/assets/images/icon_game_honkai_star_rail_1794083007862.jpg",
-    notes: "Masukkan UID Honkai: Star Rail dan pilih Server (Contoh: Asia).",
-    delivery_info: "Oneiric Shard / Express Supply Pass masuk instan via Digiflazz ke UID Anda.",
-    fields: [
-      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 9, max_len: 10, pattern: "^[0-9]{9,10}$", help: "UID 9-10 digit angka" },
-      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Honkai: Star Rail Anda" },
-    ],
-    denominations: [] as any[],
-  },
-  {
-    slug: "roblox",
-    name: "Roblox",
-    publisher: "Roblox Corporation",
-    currency: "Robux",
-    vendor_prefix: "RBX",
-    cek_id_sku: "CEKRBX",
-    featured: false,
-    icon: "/src/assets/images/icon_game_roblox_1794083008776.jpg",
-    banner: "/src/assets/images/icon_game_roblox_1794083008776.jpg",
-    notes: "Masukkan Username Roblox untuk verifikasi akun dan pengiriman Robux.",
-    delivery_info: "Robux / Kode Voucher Roblox dikirim otomatis via Digiflazz setelah pembayaran.",
-    fields: [
-      { key: "user_id", label: "Username Roblox", placeholder: "UsernameRoblox", type: "text", inputmode: "text", required: true, min_len: 3, max_len: 30, pattern: "", help: "Masukkan Username Roblox Anda" },
-    ],
-    denominations: [] as any[],
-  },
-  {
     slug: "call-of-duty-mobile",
     name: "Call of Duty: Mobile",
     publisher: "Garena / Activision",
@@ -1288,27 +1410,61 @@ const MERCHANT_MASTER_GAMES = [
     featured: false,
     icon: "/src/assets/images/icon_game_cod_mobile_1794083011207.jpg",
     banner: "/src/assets/images/icon_game_cod_mobile_1794083011207.jpg",
-    notes: "Masukkan OpenID / Player ID Call of Duty Mobile Anda.",
-    delivery_info: "CP Call of Duty Mobile masuk instan via Digiflazz ke akun Anda.",
+    notes: "Masukkan OpenID / Player ID Call of Duty: Mobile Anda.",
+    delivery_info: "CP Call of Duty: Mobile masuk instan via Digiflazz ke akun Anda.",
     fields: [
       { key: "user_id", label: "OpenID / Player ID", placeholder: "123456789012345", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 22, pattern: "^[0-9]{6,22}$", help: "Masukkan OpenID di menu pengaturan CODM" },
     ],
     denominations: [] as any[],
   },
   {
-    slug: "steam-wallet",
-    name: "Steam Wallet IDR",
-    publisher: "Valve Corporation",
-    currency: "Voucher IDR",
-    vendor_prefix: "SW",
-    cek_id_sku: "CEKSW",
+    slug: "point-blank",
+    name: "Point Blank",
+    publisher: "Zepetto",
+    currency: "PB Cash",
+    vendor_prefix: "PB",
+    cek_id_sku: "CEKPB",
     featured: false,
-    icon: "/src/assets/images/icon_game_steam_wallet_1794083010427.jpg",
-    banner: "/src/assets/images/icon_game_steam_wallet_1794083010427.jpg",
-    notes: "Masukkan Nomor WhatsApp atau Steam ID penerima untuk pengiriman kode voucher Steam Wallet IDR.",
-    delivery_info: "Kode Voucher Steam Wallet IDR dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+    icon: "/src/assets/images/icon_game_point_blank_1794091160261.jpg",
+    banner: "/src/assets/images/icon_game_point_blank_1794091160261.jpg",
+    notes: "Masukkan ID Akun Zepetto Point Blank Anda.",
+    delivery_info: "PB Cash Zepetto masuk otomatis via Digiflazz ke ID Point Blank Anda.",
     fields: [
-      { key: "user_id", label: "Nomor WhatsApp / Steam ID", placeholder: "081234567890", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 20, pattern: "", help: "Nomor penerima voucher / Steam ID" },
+      { key: "user_id", label: "ID Zepetto / PB ID", placeholder: "trooperpb01", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 24, pattern: "", help: "Masukkan ID Login Point Blank Zepetto Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "bigo-live",
+    name: "Bigo Live",
+    publisher: "Bigo Technology",
+    currency: "Diamonds",
+    vendor_prefix: "BIGO",
+    cek_id_sku: "CEKBIGO",
+    featured: false,
+    icon: "/src/assets/images/icon_game_bigo_live_1794091161452.jpg",
+    banner: "/src/assets/images/icon_game_bigo_live_1794091161452.jpg",
+    notes: "Masukkan Bigo ID Anda (tanpa awalan 'ID:').",
+    delivery_info: "Diamonds Bigo Live masuk otomatis via Digiflazz ke akun Bigo ID Anda.",
+    fields: [
+      { key: "user_id", label: "Bigo ID", placeholder: "987654321", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 24, pattern: "", help: "Masukkan Bigo ID Anda (lihat di halaman profil Bigo Live)" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "roblox",
+    name: "Roblox (Voucher Code)",
+    publisher: "Roblox Corporation",
+    currency: "Robux / Voucher",
+    vendor_prefix: "RBX",
+    cek_id_sku: "CEKRBX",
+    featured: false,
+    icon: "/src/assets/images/icon_game_roblox_1794083008776.jpg",
+    banner: "/src/assets/images/icon_game_roblox_1794083008776.jpg",
+    notes: "Masukkan Username Roblox atau Nomor WhatsApp penerima untuk pengiriman Voucher Code Roblox.",
+    delivery_info: "Kode Voucher Roblox (Robux Gift Card) dikirim otomatis via Digiflazz dan tampil di halaman pesanan.",
+    fields: [
+      { key: "user_id", label: "Username Roblox / No. WhatsApp", placeholder: "UsernameRoblox", type: "text", inputmode: "text", required: true, min_len: 3, max_len: 30, pattern: "", help: "Masukkan Username Roblox atau Nomor WhatsApp penerima voucher" },
     ],
     denominations: [] as any[],
   },
@@ -1404,26 +1560,89 @@ function ensureDefaultTopupClearedOnce() {
     changed = true;
   }
 
+  // Ensure the 19 requested Top Up games are synced in order and obsolete default seed games (e.g. steam-wallet) are removed
+  if (!db.settings.topup_master_games_19_v3) {
+    const masterSlugs = new Set(MERCHANT_MASTER_GAMES.map((mg) => mg.slug));
+    // Remove obsolete default seed game steam-wallet
+    db.games = (db.games || []).filter((g) => g.slug !== "steam-wallet" || masterSlugs.has(g.slug));
+    db.products = (db.products || []).filter((p) => !(p.slug === "steam-wallet" && p.product_type === PRODUCT_TYPE));
+
+    const nextGames: any[] = [];
+    MERCHANT_MASTER_GAMES.forEach((mg, idx) => {
+      const existing = (db.games || []).find((g) => g.slug === mg.slug);
+      if (existing) {
+        existing.name = mg.name;
+        existing.publisher = mg.publisher;
+        existing.currency = mg.currency;
+        existing.icon = mg.icon;
+        existing.banner = mg.banner;
+        existing.notes = mg.notes;
+        existing.delivery_info = mg.delivery_info;
+        existing.vendor_prefix = mg.vendor_prefix;
+        existing.cek_id_sku = (mg as any).cek_id_sku || `CEK${mg.vendor_prefix}`;
+        existing.vendor_id = "vp-digiflazz";
+        existing.featured = Boolean(mg.featured);
+        existing.seq = idx;
+        existing.fields = mg.fields.map((f: any) => ({ ...f }));
+        existing.updated_at = nowIso();
+        nextGames.push(existing);
+      } else {
+        nextGames.push({
+          id: `gm-${mg.slug}-${uuidHex(4)}`,
+          name: mg.name,
+          slug: mg.slug,
+          publisher: mg.publisher,
+          currency: mg.currency,
+          icon: mg.icon,
+          banner: mg.banner,
+          notes: mg.notes,
+          delivery_info: mg.delivery_info,
+          vendor_prefix: mg.vendor_prefix,
+          cek_id_sku: (mg as any).cek_id_sku || `CEK${mg.vendor_prefix}`,
+          vendor_id: "vp-digiflazz",
+          is_active: true,
+          featured: Boolean(mg.featured),
+          seq: idx,
+          fields: mg.fields.map((f: any) => ({ ...f })),
+          denominations: [],
+          created_at: nowIso(),
+          updated_at: nowIso(),
+        });
+      }
+    });
+
+    // Preserve any custom games added by admin that aren't in MERCHANT_MASTER_GAMES
+    for (const g of db.games || []) {
+      if (!masterSlugs.has(g.slug)) {
+        g.seq = nextGames.length;
+        nextGames.push(g);
+      }
+    }
+    db.games = nextGames;
+
+    db.settings.topup_master_games_19_v3 = {
+      migrated_at: nowIso(),
+      games_count: db.games.length,
+    };
+    changed = true;
+  }
+
   if (changed) saveDb();
 }
 
 function upgradeLocalGameIcons() {
   if (!Array.isArray(db.games)) return;
-  for (const mg of MERCHANT_MASTER_GAMES) {
+  for (const [idx, mg] of MERCHANT_MASTER_GAMES.entries()) {
     const existing = db.games.find(
       (g) => g.slug === mg.slug || String(g.name || "").toLowerCase() === mg.name.toLowerCase()
     );
     if (!existing) continue;
-    const isOldUnsplashIcon =
-      !existing.icon ||
-      String(existing.icon).includes("images.unsplash.com") ||
-      String(existing.icon).startsWith("/src/assets/images/icon_game_");
-    const isOldUnsplashBanner =
-      !existing.banner ||
-      String(existing.banner).includes("images.unsplash.com") ||
-      String(existing.banner).startsWith("/src/assets/images/icon_game_");
-    if (isOldUnsplashIcon) existing.icon = mg.icon;
-    if (isOldUnsplashBanner) existing.banner = mg.banner;
+    existing.name = mg.name;
+    existing.publisher = mg.publisher;
+    existing.currency = mg.currency;
+    existing.icon = mg.icon;
+    existing.banner = mg.banner;
+    existing.seq = typeof existing.seq === "number" ? existing.seq : idx;
   }
 }
 
@@ -3736,14 +3955,23 @@ function matchDigiflazzItemToLocalGame(brandStr: string, skuStr: string, product
   const aliasMap: Array<{ slug: string; prefixes: string[]; keywords: string[] }> = [
     { slug: "mobile-legends", prefixes: ["ML", "MLBB", "WDP"], keywords: ["mobile legends", "mobile legend", "mlbb"] },
     { slug: "free-fire", prefixes: ["FF", "FFMAX"], keywords: ["free fire", "freefire", "garena ff"] },
-    { slug: "genshin-impact", prefixes: ["GI", "GENSHIN"], keywords: ["genshin impact", "genshin"] },
     { slug: "pubg-mobile", prefixes: ["PUBG", "PUBGM"], keywords: ["pubg mobile", "pubgm", "pubg"] },
-    { slug: "valorant", prefixes: ["VAL", "VP"], keywords: ["valorant", "riot valorant"] },
     { slug: "honor-of-kings", prefixes: ["HOK"], keywords: ["honor of kings", "honor of king", "hok"] },
+    { slug: "genshin-impact", prefixes: ["GI", "GENSHIN", "ZZZ"], keywords: ["genshin impact", "genshin", "zenless zone zero", "zenless"] },
     { slug: "honkai-star-rail", prefixes: ["HSR"], keywords: ["honkai: star rail", "honkai star rail", "star rail"] },
-    { slug: "roblox", prefixes: ["RBX", "ROBLOX"], keywords: ["roblox", "robux"] },
+    { slug: "wuthering-waves", prefixes: ["WW", "WUTHERING"], keywords: ["wuthering waves", "wuthering wave", "lunites"] },
+    { slug: "arena-of-valor", prefixes: ["AOV"], keywords: ["arena of valor", "aov", "garena aov"] },
+    { slug: "marvel-rivals", prefixes: ["MR", "MARVEL"], keywords: ["marvel rivals", "marvel rival"] },
+    { slug: "delta-force", prefixes: ["DF", "DELTA"], keywords: ["delta force", "garena delta force"] },
+    { slug: "magic-chess-go-go", prefixes: ["MCGG", "MCG", "MC"], keywords: ["magic chess: go go", "magic chess go go", "magic chess"] },
+    { slug: "ragnarok", prefixes: ["RO", "ROM", "ROO"], keywords: ["ragnarok m", "ragnarok origin", "ragnarok eternal love", "ragnarok"] },
+    { slug: "fc-mobile", prefixes: ["FCM", "FIFA"], keywords: ["fc mobile", "ea sports fc", "fifa mobile"] },
+    { slug: "wild-rift", prefixes: ["WR", "LOLWR"], keywords: ["wild rift", "league of legends: wild rift", "lol wild rift"] },
+    { slug: "valorant", prefixes: ["VAL", "VP"], keywords: ["valorant", "riot valorant"] },
     { slug: "call-of-duty-mobile", prefixes: ["CODM", "COD"], keywords: ["call of duty", "cod mobile", "codm"] },
-    { slug: "steam-wallet", prefixes: ["SW", "STEAM"], keywords: ["steam wallet", "steam idr", "steam"] },
+    { slug: "point-blank", prefixes: ["PB", "PBCASH"], keywords: ["point blank", "pb zepetto", "pointblank"] },
+    { slug: "bigo-live", prefixes: ["BIGO"], keywords: ["bigo live", "bigo"] },
+    { slug: "roblox", prefixes: ["RBX", "ROBLOX"], keywords: ["roblox", "robux"] },
   ];
 
   // 1. Check against local db.games first (supports custom local games created by Admin)
@@ -3780,7 +4008,44 @@ function matchDigiflazzItemToLocalGame(brandStr: string, skuStr: string, product
 
 function cleanDenomLabelFromProductName(productName: string, brand: string, gameName = ""): string {
   let label = String(productName || "").trim();
-  const candidates = [brand, gameName, "Mobile Legends: Bang Bang", "Mobile Legends", "Free Fire / Free Fire MAX", "Free Fire", "Genshin Impact", "PUBG Mobile", "Valorant", "Honor of Kings", "Honkai: Star Rail", "Honkai Star Rail", "Call of Duty: Mobile", "Call of Duty Mobile", "Roblox", "Steam Wallet IDR"]
+  const candidates = [
+    brand,
+    gameName,
+    "Mobile Legends: Bang Bang",
+    "Mobile Legends",
+    "Free Fire & Free Fire MAX",
+    "Free Fire / Free Fire MAX",
+    "Free Fire",
+    "PUBG Mobile",
+    "Honor of Kings",
+    "Genshin Impact & Zenless Zone Zero",
+    "Genshin Impact",
+    "Zenless Zone Zero",
+    "Honkai: Star Rail",
+    "Honkai Star Rail",
+    "Wuthering Waves",
+    "Arena of Valor",
+    "Marvel Rivals",
+    "Delta Force - Garena",
+    "Delta Force",
+    "Magic Chess: Go Go",
+    "Magic Chess Go Go",
+    "Ragnarok M: Eternal Love & Ragnarok Origin",
+    "Ragnarok M: Eternal Love",
+    "Ragnarok Origin",
+    "EA Sports FC Mobile",
+    "FC Mobile",
+    "League of Legends: Wild Rift",
+    "Wild Rift",
+    "Valorant (PC/Mobile via Riot Games)",
+    "Valorant",
+    "Call of Duty: Mobile",
+    "Call of Duty Mobile",
+    "Point Blank",
+    "Bigo Live",
+    "Roblox (Voucher Code)",
+    "Roblox",
+  ]
     .map((s) => String(s || "").trim())
     .filter(Boolean)
     .sort((a, b) => b.length - a.length);

@@ -468,7 +468,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                 onClick={() => clearProductsAndSkus()}
                 disabled={busy === "clear-all"}
                 data-testid="admin-topup-clear-all"
-                title="Hapus semua produk topup bawaan dan kosongkan semua nominal & SKU pada 10 game lokal"
+                title="Hapus semua produk topup bawaan dan kosongkan semua nominal & SKU pada semua game lokal"
                 className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider border border-coral/50 text-coral hover:bg-coral/10 px-3.5 py-2 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {busy === "clear-all" ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Kosongkan Produk &amp; SKU
