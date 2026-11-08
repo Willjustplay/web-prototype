@@ -57,35 +57,6 @@ export default function Topup() {
 
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4">
             <div className="space-y-1.5">
-              {/* Top Row: Official Badge + Mobile History Shortcut */}
-              <div className="flex items-center justify-between sm:justify-start flex-wrap gap-1.5 sm:gap-2">
-                <div className="flex items-center flex-wrap gap-1.5">
-                  <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-[0.16em] sm:tracking-[0.22em] text-neon bg-neon/10 border border-neon/30 rounded-lg px-2 py-1">
-                    <Sparkles size={10} className="shrink-0" />
-                    <span>{t("Top Up Resmi 24/7", "Official 24/7 Top Up")}</span>
-                  </span>
-                  {!loading && games.length > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-mono text-slate-300 bg-void/80 border border-line rounded-lg px-2 py-1">
-                      <Gamepad2 size={10} className="text-lime shrink-0" />
-                      <span>
-                        {games.length} {t("Game", "Games")}
-                        <span className="hidden min-[380px]:inline">
-                          {totalSkus > 0 ? ` • ${totalSkus} SKU` : ""}
-                        </span>
-                      </span>
-                    </span>
-                  )}
-                </div>
-
-                <Link
-                  to="/akun"
-                  className="inline-flex lg:hidden items-center gap-1 rounded-lg border border-neon/40 bg-neon/10 active:bg-neon active:text-void text-neon px-2.5 py-1 text-[10px] font-display font-bold uppercase tracking-wider transition-all shrink-0"
-                >
-                  <ReceiptText size={11} />
-                  <span>{t("Riwayat", "History")}</span>
-                </Link>
-              </div>
-
               <h1 className="font-display font-black text-lg min-[380px]:text-xl sm:text-3xl uppercase tracking-tight text-white leading-snug sm:leading-tight">
                 {t("Pilih", "Choose Your")}{" "}
                 <span className="text-stroke">{t("Game", "Favorite")}</span>{" "}

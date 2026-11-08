@@ -517,7 +517,7 @@ export default function TopupGameDetail() {
             <Link
               to="/topup"
               data-testid="topup-back-to-catalog"
-              className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-line bg-panel/85 px-2.5 sm:px-3 py-1.5 text-slate-200 hover:text-neon hover:border-neon/60 transition-colors shrink-0"
+              className="inline-flex items-center gap-1 sm:gap-1.5 bg-transparent py-1 text-slate-200 hover:text-neon transition-colors shrink-0"
             >
               <ArrowLeft size={12} />
               <span>{t("Katalog", "Catalog")}</span>
@@ -634,19 +634,19 @@ export default function TopupGameDetail() {
 
                 {/* Compact Trust Badges */}
                 <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-line/70 grid grid-cols-3 gap-1.5 text-center">
-                  <div className="rounded-xl bg-void/75 border border-line/80 px-1.5 py-1.5 min-w-0">
+                  <div className="bg-transparent px-1.5 py-1 min-w-0">
                     <Zap size={11} className="mx-auto text-lime mb-0.5" />
                     <span className="block text-[9px] font-mono font-bold text-slate-200 truncate">
                       {t("1–5 Detik", "1–5 Secs")}
                     </span>
                   </div>
-                  <div className="rounded-xl bg-void/75 border border-line/80 px-1.5 py-1.5 min-w-0">
+                  <div className="bg-transparent px-1.5 py-1 min-w-0">
                     <ShieldCheck size={11} className="mx-auto text-neon mb-0.5" />
                     <span className="block text-[9px] font-mono font-bold text-slate-200 truncate">
                       {t("100% Resmi", "Official")}
                     </span>
                   </div>
-                  <div className="rounded-xl bg-void/75 border border-line/80 px-1.5 py-1.5 min-w-0">
+                  <div className="bg-transparent px-1.5 py-1 min-w-0">
                     <Clock size={11} className="mx-auto text-cyan-300 mb-0.5" />
                     <span className="block text-[9px] font-mono font-bold text-slate-200 truncate">
                       {t("24/7 Aktif", "24/7 Live")}
@@ -664,7 +664,7 @@ export default function TopupGameDetail() {
                   </p>
 
                   {/* Android/Mobile Collapsible Guide */}
-                  <details className="lg:hidden group rounded-xl border border-line bg-void/70 p-2.5">
+                  <details className="lg:hidden group bg-transparent py-1">
                     <summary className="font-display font-bold text-[10px] sm:text-[11px] uppercase tracking-wider text-neon flex items-center justify-between gap-2 cursor-pointer list-none">
                       <span className="inline-flex items-center gap-1.5 min-w-0">
                         <HelpCircle size={12} className="shrink-0" />
