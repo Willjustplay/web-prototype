@@ -16,7 +16,7 @@ const EMPTY_FIELD = {
 };
 const EMPTY_DENOM = {
   code: "", label: "", amount: 0, modal_price: 0, price: 0, price_strike: 0,
-  stock: 100, badge: "", is_active: true, featured: false, vendor_sku: "",
+  stock: 100, badge: "", sku_group: "currency", is_active: true, featured: false, vendor_sku: "",
 };
 const EMPTY_GAME = {
   name: "", slug: "", publisher: "", icon: "", banner: "", currency: "Diamond",
@@ -26,8 +26,103 @@ const EMPTY_GAME = {
   denominations: [],
 };
 
+const resolveSkuGroup = (d) => {
+  const g = String(d?.sku_group || "").trim().toLowerCase();
+  if (g === "membership" || g === "currency") return g;
+  const hay = `${d?.vendor_sku || d?.sku || ""} ${d?.code || ""} ${d?.label || d?.name || ""} ${d?.badge || ""}`;
+  if (
+    /\b(membership|member|welkin|blessing|inter-knot|interknot|wdp|weekly\s*diamond\s*pass|twilight\s*pass|starlight|supply\s*pass|express\s*supply|lunite\s*subscription|royale\s*pass|booyah\s*pass|elite\s*pass|battle\s*pass|season\s*pass|star\s*pass|premium\s*pass|monthly\s*card|weekly\s*card|monthly\s*pass|weekly\s*pass|vip\s*card|kartu\s*bulanan|kartu\s*mingguan|berkah|langganan|subscription|pass|paket\s*mingguan|paket\s*bulanan|level\s*up\s*pass)\b/i.test(
+      hay
+    )
+  ) {
+    return "membership";
+  }
+  return "currency";
+};
+
 const slugify = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-const keyify = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+
+const resolveBuiltInDigiflazzFields = (gameOrMeta, allGames = []) => {
+  const slug = slugify(gameOrMeta?.slug || gameOrMeta?.name || "");
+  const prefix = String(gameOrMeta?.vendor_prefix || "").trim().toUpperCase();
+
+  const matchedExisting = (allGames || []).find(
+    (g) =>
+      String(g.slug || "").toLowerCase() === slug ||
+      (prefix && String(g.vendor_prefix || "").toUpperCase() === prefix)
+  );
+  if (matchedExisting && Array.isArray(matchedExisting.fields) && matchedExisting.fields.length > 0) {
+    return matchedExisting.fields;
+  }
+
+  if (
+    slug.includes("mobile-legends") ||
+    slug.includes("magic-chess") ||
+    prefix === "ML" ||
+    prefix === "MCGG"
+  ) {
+    return [
+      { key: "user_id", label: "User ID", placeholder: "123456789", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 15, pattern: "^[0-9]{5,15}$", help: "Masukkan angka User ID sesuai profil game Anda" },
+      { key: "zone_id", label: "Zone ID", placeholder: "1234", type: "text", inputmode: "numeric", required: true, min_len: 3, max_len: 6, pattern: "^[0-9]{3,6}$", help: "Masukkan angka Zone ID (di dalam tanda kurung)" },
+    ];
+  }
+
+  if (
+    slug.includes("genshin") ||
+    slug.includes("zenless") ||
+    slug.includes("honkai-star-rail") ||
+    prefix === "GI" ||
+    prefix === "ZZZ" ||
+    prefix === "HSR"
+  ) {
+    return [
+      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "Masukkan UID angka akun HoYoverse Anda" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun HoYoverse Anda" },
+    ];
+  }
+
+  if (slug.includes("wuthering") || prefix === "WW") {
+    return [
+      { key: "user_id", label: "UID", placeholder: "900123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "Masukkan 9 digit UID Wuthering Waves" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, options: ["SEA", "Asia", "America", "Europe", "HMT (HK, MO, TW)"], help: "Pilih server Wuthering Waves Anda" },
+    ];
+  }
+
+  if (slug.includes("ragnarok") || prefix === "ROM" || prefix === "ROO") {
+    return [
+      { key: "user_id", label: "Role ID / Character ID", placeholder: "4300123456", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 16, pattern: "^[0-9]{5,16}$", help: "Masukkan angka Role ID / Character ID karakter Anda" },
+      { key: "server", label: "Server", placeholder: "Nama Server", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 30, help: "Masukkan nama Server karakter Anda" },
+    ];
+  }
+
+  if (slug.includes("valorant") || slug.includes("wild-rift") || prefix === "VAL" || prefix === "WR") {
+    return [
+      { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, help: "Format wajib: Nickname#Tag (Contoh: Player#IDN)" },
+    ];
+  }
+
+  if (Array.isArray(gameOrMeta?.fields) && gameOrMeta.fields.length > 0) {
+    return gameOrMeta.fields;
+  }
+
+  return [
+    { key: "user_id", label: "User ID / Player ID", placeholder: "Masukkan ID Akun Game", type: "text", inputmode: "numeric", required: true, min_len: 4, max_len: 24, help: "Masukkan User ID / Player ID sesuai profil di dalam game" },
+  ];
+};
+
+const resolveCustomerNoFormatLabel = (fields = []) => {
+  const keys = fields.map((f) => f.key);
+  if (keys.includes("user_id") && keys.includes("zone_id")) {
+    return "{user_id}{zone_id} (Digabung otomatis ke Digiflazz)";
+  }
+  if (keys.includes("riot_id")) {
+    return "{riot_id} (Nickname#Tag)";
+  }
+  if (keys.includes("user_id") && keys.includes("server")) {
+    return "{user_id} + {server}";
+  }
+  return "{user_id}";
+};
 
 const statusStyle = (o) => {
   if (o.payment_status === "paid") return "text-lime border-lime/40 bg-lime/10";
@@ -126,22 +221,31 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
     });
   }, [games, gameSearch, gameStatusFilter]);
 
-  // ------------------------------------------------------------- game editor
-  const openNew = () => setForm({ ...EMPTY_GAME, fields: [{ ...EMPTY_FIELD, key: "user_id", label: "User ID" }], denominations: [] });
+  const [adminDenomTab, setAdminDenomTab] = useState("all");
 
-  const openEdit = (g) => setForm({
-    ...EMPTY_GAME,
-    ...g,
-    fields: (g.fields || []).map((f) => ({ ...EMPTY_FIELD, ...f })),
-    denominations: (g.denominations || []).map((d) => ({
-      ...EMPTY_DENOM, vendor_sku: d.vendor_sku || "", price_strike: d.price_strike || 0, ...d,
-    })),
-  });
+  // ------------------------------------------------------------- game editor
+  const openNew = () => {
+    setAdminDenomTab("all");
+    setForm({ ...EMPTY_GAME, fields: [{ ...EMPTY_FIELD, key: "user_id", label: "User ID" }], denominations: [] });
+  };
+
+  const openEdit = (g) => {
+    setAdminDenomTab("all");
+    setForm({
+      ...EMPTY_GAME,
+      ...g,
+      fields: (g.fields || []).map((f) => ({ ...EMPTY_FIELD, ...f })),
+      denominations: (g.denominations || []).map((d) => ({
+        ...EMPTY_DENOM,
+        vendor_sku: d.vendor_sku || "",
+        price_strike: d.price_strike || 0,
+        sku_group: resolveSkuGroup(d),
+        ...d,
+      })),
+    });
+  };
 
   const patch = (changes) => setForm((f) => ({ ...f, ...changes }));
-  const patchField = (i, changes) => setForm((f) => ({
-    ...f, fields: f.fields.map((x, n) => (n === i ? { ...x, ...changes } : x)),
-  }));
   const patchDenom = (i, changes) => setForm((f) => ({
     ...f, denominations: f.denominations.map((x, n) => (n === i ? { ...x, ...changes } : x)),
   }));
@@ -154,18 +258,16 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
     return { ...f, denominations: next.map((d, n) => ({ ...d, seq: n })) };
   });
 
+  const builtInFieldsForForm = useMemo(
+    () => (form ? resolveBuiltInDigiflazzFields(form, games) : []),
+    [form, games]
+  );
+
   const formErrors = useMemo(() => {
     if (!form) return {};
     const errs = {};
     if (!form.name.trim()) errs.name = "Nama game wajib diisi";
     if (!slugify(form.slug || form.name)) errs.slug = "Slug tidak valid";
-    if (!form.fields.length) errs.fields = "Minimal satu field tujuan";
-    form.fields.forEach((f, i) => {
-      if (!keyify(f.key)) errs[`field-${i}`] = "Key field wajib (huruf/angka/underscore)";
-      if (f.pattern) {
-        try { new RegExp(f.pattern); } catch { errs[`field-${i}`] = "Pattern regex tidak valid"; }
-      }
-    });
     const seen = new Set();
     form.denominations.forEach((d, i) => {
       const code = String(d.code).trim();
@@ -211,14 +313,10 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
         slug: slugify(form.slug || form.name),
         icon: String(form.icon || "").trim(),
         banner: String(form.banner || "").trim(),
+        vendor_prefix: String(form.vendor_prefix || "").trim().toUpperCase(),
+        cek_id_sku: String(form.cek_id_sku || "").trim().toUpperCase(),
         seq: Number(form.seq) || 0,
-        fields: form.fields.map((f, i) => ({
-          ...f,
-          key: keyify(f.key),
-          required: !!f.required,
-          min_len: Number(f.min_len) || 0,
-          max_len: Number(f.max_len) || 0,
-        })),
+        fields: builtInFieldsForForm,
         denominations: form.denominations.map((d, i) => ({
           ...d,
           code: String(d.code).trim(),
@@ -227,6 +325,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
           modal_price: Number(d.modal_price) || 0,
           price: Number(d.price) || 0,
           price_strike: Number(d.price_strike) || 0,
+          sku_group: resolveSkuGroup(d),
           stock: Number(d.stock) || 0,
           seq: i,
           is_active: !!d.is_active,
@@ -732,7 +831,15 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-slate-400">{g.publisher || "-"}</td>
-                    <td className="px-4 py-3.5 text-slate-400">{(g.fields || []).map((f) => f.label || f.key).join(" · ") || "-"}</td>
+                    <td className="px-4 py-3.5 text-slate-400">
+                      <div>{(g.fields || []).map((f) => f.label || f.key).join(" · ") || "-"}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        SKU Cek ID:{" "}
+                        <span className={g.cek_id_sku ? "text-neon font-bold" : "text-slate-600"}>
+                          {g.cek_id_sku || "Belum diatur"}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3.5 text-slate-200 font-semibold tabular-nums">{(g.denominations || []).length} paket</td>
                     <td className="px-4 py-3.5 tabular-nums">
                       <span className={g.products_synced ? "text-lime font-bold" : "text-coral font-bold"}>{g.product_count ?? 0}</span>
@@ -1127,8 +1234,22 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                 </div>
                 <div>
                   <label htmlFor="g-vprefix" className={labelCls}>Prefix Pencocokan Digiflazz</label>
-                  <input id="g-vprefix" data-testid="game-vendor-prefix" value={form.vendor_prefix} onChange={(e) => patch({ vendor_prefix: e.target.value })} className={inputCls} placeholder="ML" />
+                  <input id="g-vprefix" data-testid="game-vendor-prefix" value={form.vendor_prefix || ""} onChange={(e) => patch({ vendor_prefix: e.target.value.toUpperCase() })} className={inputCls} placeholder="ML" />
                   <p className="mt-1 text-[10px] font-mono text-slate-600">Dipakai untuk mencocokkan produk saat menarik pricelist dari API Digiflazz.</p>
+                </div>
+                <div>
+                  <label htmlFor="g-cekid" className={labelCls}>Kode SKU Cek ID Digiflazz (buyer_sku_code)</label>
+                  <input
+                    id="g-cekid"
+                    data-testid="game-cek-id-sku"
+                    value={form.cek_id_sku || ""}
+                    onChange={(e) => patch({ cek_id_sku: e.target.value.toUpperCase() })}
+                    className={inputCls}
+                    placeholder="Contoh: CEKML, CEKFF, CEKGI, CEKZZZ"
+                  />
+                  <p className="mt-1 text-[10px] font-mono text-slate-600">
+                    Kode SKU Digiflazz untuk fitur tombol Cek ID / Nickname pada game ini (tersimpan di PostgreSQL).
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="g-seq" className={labelCls}>Urutan</label>
@@ -1156,62 +1277,78 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                 </label>
               </div>
 
-              {/* destination fields */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="font-display font-bold uppercase text-xs text-slate-200">Field Tujuan (User ID / Server)</p>
-                  <button onClick={() => patch({ fields: [...form.fields, { ...EMPTY_FIELD }] })} data-testid="add-field" className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest border border-line text-slate-400 hover:text-neon px-2.5 py-1.5 transition-colors">
-                    <Plus size={11} /> Tambah Field
-                  </button>
+              {/* destination fields (Built-in Digiflazz Read-Only Preset) */}
+              <div
+                data-testid="admin-builtin-destination-fields"
+                className="rounded-xl border border-line bg-void/60 p-4 space-y-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-display font-bold uppercase text-xs text-slate-100">
+                        Field Tujuan Bawaan Digiflazz
+                      </p>
+                      <span className="text-[10px] font-mono text-lime uppercase tracking-wider">
+                        &bull; Otomatis &amp; Terintegrasi
+                      </span>
+                    </div>
+                    <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+                      Struktur input tujuan pengguna disesuaikan otomatis dengan standar H2H Digiflazz berdasarkan katalog game &amp; prefix.
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-300 bg-panel border border-line rounded-lg px-2.5 py-1.5">
+                    Format <span className="text-neon">customer_no</span>:{" "}
+                    <strong className="text-slate-100">
+                      {resolveCustomerNoFormatLabel(builtInFieldsForForm)}
+                    </strong>
+                  </div>
                 </div>
-                {formErrors.fields && <p className="mb-2 text-[10px] font-mono text-coral">{formErrors.fields}</p>}
-                <div className="space-y-3">
-                  {form.fields.map((f, i) => (
-                    <div key={i} data-testid={`field-row-${i}`} className="border border-line p-3">
-                      <div className="grid sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className={labelCls}>Key</label>
-                          <input value={f.key} onChange={(e) => patchField(i, { key: e.target.value })} data-testid={`field-key-${i}`} className={inputCls} placeholder="user_id" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Label</label>
-                          <input value={f.label} onChange={(e) => patchField(i, { label: e.target.value })} className={inputCls} placeholder="User ID" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Placeholder</label>
-                          <input value={f.placeholder} onChange={(e) => patchField(i, { placeholder: e.target.value })} className={inputCls} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Min Panjang</label>
-                          <input type="number" value={f.min_len} onChange={(e) => patchField(i, { min_len: e.target.value })} className={inputCls} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Max Panjang</label>
-                          <input type="number" value={f.max_len} onChange={(e) => patchField(i, { max_len: e.target.value })} className={inputCls} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Input Mode</label>
-                          <select value={f.inputmode} onChange={(e) => patchField(i, { inputmode: e.target.value })} className={inputCls}>
-                            <option value="numeric">numeric</option>
-                            <option value="text">text</option>
-                          </select>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className={labelCls}>Pattern (regex)</label>
-                          <input value={f.pattern} onChange={(e) => patchField(i, { pattern: e.target.value })} data-testid={`field-pattern-${i}`} className={inputCls} placeholder="^[0-9]{6,15}$" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Teks Bantuan</label>
-                          <input value={f.help} onChange={(e) => patchField(i, { help: e.target.value })} className={inputCls} />
-                        </div>
+
+                <div
+                  className={`grid gap-2.5 ${
+                    builtInFieldsForForm.length > 1 ? "sm:grid-cols-2" : "grid-cols-1"
+                  }`}
+                >
+                  {builtInFieldsForForm.map((f, i) => (
+                    <div
+                      key={f.key || i}
+                      data-testid={`builtin-field-row-${f.key || i}`}
+                      className="rounded-lg border border-line/80 bg-panel/80 p-3 space-y-1.5 text-xs font-mono"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-display font-bold text-slate-100">
+                          {f.label}
+                          {f.required !== false && <span className="text-neon ml-1">*</span>}
+                        </span>
+                        <span className="text-[10px] text-neon">
+                          key: <strong>{f.key}</strong>
+                        </span>
                       </div>
-                      <div className="mt-3 flex items-center justify-between gap-4">
-                        <label className="flex items-center gap-2 text-[11px] font-mono text-slate-300 cursor-pointer">
-                          <input type="checkbox" checked={!!f.required} onChange={(e) => patchField(i, { required: e.target.checked })} /> Wajib
-                        </label>
-                        {formErrors[`field-${i}`] && <p className="text-[10px] font-mono text-coral">{formErrors[`field-${i}`]}</p>}
-                        <button onClick={() => patch({ fields: form.fields.filter((_, n) => n !== i) })} data-testid={`remove-field-${i}`} className="text-[10px] uppercase tracking-widest text-coral hover:underline">Hapus Field</button>
+                      <div className="text-[10px] text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span>
+                          Tipe: <strong className="text-slate-300">{Array.isArray(f.options) && f.options.length ? "Pilihan Server" : f.inputmode || "text"}</strong>
+                        </span>
+                        <span>&middot;</span>
+                        <span>
+                          Contoh: <strong className="text-slate-300">{f.placeholder || "-"}</strong>
+                        </span>
+                        {(f.min_len || f.max_len) ? (
+                          <>
+                            <span>&middot;</span>
+                            <span className="tabular-nums">
+                              Panjang: <strong className="text-slate-300">{f.min_len || 1}–{f.max_len || 32}</strong> karakter
+                            </span>
+                          </>
+                        ) : null}
                       </div>
+                      {Array.isArray(f.options) && f.options.length > 0 && (
+                        <p className="text-[10px] text-lime/90">
+                          Opsi Server: {f.options.join(" · ")}
+                        </p>
+                      )}
+                      {f.help && (
+                        <p className="text-[10px] text-slate-500">{f.help}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1275,89 +1412,144 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {form.denominations.map((d, i) => (
-                      <div key={d.vendor_sku || d.code || i} data-testid={`denom-row-${i}`} className="border border-line bg-void/30 p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-line/60">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] font-mono font-bold text-neon border border-neon/40 bg-neon/10 px-2 py-0.5" data-testid={`denom-sku-${i}`}>
-                              SKU: {d.vendor_sku}
-                            </span>
-                            <span className="text-[10px] font-mono text-slate-400 border border-line bg-void px-2 py-0.5" data-testid={`denom-code-${i}`}>
-                              Kode: {d.code}
-                            </span>
-                            <span className="text-xs font-display font-bold text-slate-100">
-                              {d.label}
-                            </span>
-                          </div>
-                          <span className="text-[11px] font-mono text-slate-400" data-testid={`denom-modal-${i}`}>
-                            Modal Digiflazz: <strong className="text-slate-200">{formatIDR(d.modal_price || 0)}</strong>
-                          </span>
-                        </div>
-
-                        <div className="grid sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className={labelCls}>Harga Jual (IDR) *</label>
-                            <input
-                              type="number"
-                              value={d.price}
-                              onChange={(e) => patchDenom(i, { price: e.target.value })}
-                              data-testid={`denom-price-${i}`}
-                              className={inputCls}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Harga Coret (Opsional)</label>
-                            <input
-                              type="number"
-                              value={d.price_strike}
-                              onChange={(e) => patchDenom(i, { price_strike: e.target.value })}
-                              className={inputCls}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-4">
-                            <label className="flex items-center gap-2 text-[11px] font-mono text-slate-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={!!d.is_active}
-                                onChange={(e) => patchDenom(i, { is_active: e.target.checked })}
-                                data-testid={`denom-active-${i}`}
-                              />{" "}
-                              Aktif Ditampilkan
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => moveDenom(i, -1)}
-                              disabled={i === 0}
-                              aria-label="Naik"
-                              className="grid place-items-center w-6 h-6 border border-line text-slate-400 hover:text-neon disabled:opacity-30"
-                            >
-                              <ArrowUp size={11} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => moveDenom(i, 1)}
-                              disabled={i === form.denominations.length - 1}
-                              aria-label="Turun"
-                              className="grid place-items-center w-6 h-6 border border-line text-slate-400 hover:text-neon disabled:opacity-30"
-                            >
-                              <ArrowDown size={11} />
-                            </button>
-                          </div>
-                          {formErrors[`denom-${i}`] && <p className="text-[10px] font-mono text-coral">{formErrors[`denom-${i}`]}</p>}
+                    <div className="flex flex-wrap items-center justify-between gap-2 bg-void/60 border border-line p-2.5">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                        Menu Kategori SKU Digiflazz:
+                      </span>
+                      <div className="inline-flex items-center gap-1 bg-void border border-line p-1">
+                        {[
+                          { id: "all", label: `Semua (${form.denominations.length})` },
+                          {
+                            id: "currency",
+                            label: `${form.currency || "Item"} (${form.denominations.filter((x) => resolveSkuGroup(x) === "currency").length})`,
+                          },
+                          {
+                            id: "membership",
+                            label: `Membership (${form.denominations.filter((x) => resolveSkuGroup(x) === "membership").length})`,
+                          },
+                        ].map((t) => (
                           <button
+                            key={t.id}
                             type="button"
-                            onClick={() => patch({ denominations: form.denominations.filter((_, n) => n !== i) })}
-                            data-testid={`remove-denom-${i}`}
-                            className="text-[10px] uppercase tracking-widest text-coral hover:underline cursor-pointer"
+                            onClick={() => setAdminDenomTab(t.id)}
+                            data-testid={`admin-denom-tab-${t.id}`}
+                            className={`px-2.5 py-1 text-[10px] font-mono font-bold transition-colors cursor-pointer ${
+                              adminDenomTab === t.id
+                                ? "bg-neon text-void"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
                           >
-                            Hapus Produk
+                            {t.label}
                           </button>
-                        </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+
+                    {form.denominations.map((d, i) => {
+                      const currentGroup = resolveSkuGroup(d);
+                      if (adminDenomTab !== "all" && currentGroup !== adminDenomTab) return null;
+                      return (
+                        <div key={d.vendor_sku || d.code || i} data-testid={`denom-row-${i}`} className="border border-line bg-void/30 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-line/60">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[10px] font-mono font-bold text-neon border border-neon/40 bg-neon/10 px-2 py-0.5" data-testid={`denom-sku-${i}`}>
+                                SKU: {d.vendor_sku}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 border ${
+                                  currentGroup === "membership"
+                                    ? "text-lime border-lime/40 bg-lime/10"
+                                    : "text-slate-300 border-line bg-void"
+                                }`}
+                              >
+                                {currentGroup === "membership" ? "Membership" : form.currency || "Item"}
+                              </span>
+                              <span className="text-xs font-display font-bold text-slate-100">
+                                {d.label}
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-mono text-slate-400" data-testid={`denom-modal-${i}`}>
+                              Modal Digiflazz: <strong className="text-slate-200">{formatIDR(d.modal_price || 0)}</strong>
+                            </span>
+                          </div>
+
+                          <div className="grid sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className={labelCls}>Harga Jual (IDR) *</label>
+                              <input
+                                type="number"
+                                value={d.price}
+                                onChange={(e) => patchDenom(i, { price: e.target.value })}
+                                data-testid={`denom-price-${i}`}
+                                className={inputCls}
+                              />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Harga Coret (Opsional)</label>
+                              <input
+                                type="number"
+                                value={d.price_strike}
+                                onChange={(e) => patchDenom(i, { price_strike: e.target.value })}
+                                className={inputCls}
+                              />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Menu Kategori SKU</label>
+                              <select
+                                value={currentGroup}
+                                onChange={(e) => patchDenom(i, { sku_group: e.target.value })}
+                                data-testid={`denom-group-${i}`}
+                                className={inputCls}
+                              >
+                                <option value="currency">{form.currency || "Item"} (Currency Game)</option>
+                                <option value="membership">Membership</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-4">
+                              <label className="flex items-center gap-2 text-[11px] font-mono text-slate-300 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={!!d.is_active}
+                                  onChange={(e) => patchDenom(i, { is_active: e.target.checked })}
+                                  data-testid={`denom-active-${i}`}
+                                />{" "}
+                                Aktif Ditampilkan
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => moveDenom(i, -1)}
+                                disabled={i === 0}
+                                aria-label="Naik"
+                                className="grid place-items-center w-6 h-6 border border-line text-slate-400 hover:text-neon disabled:opacity-30"
+                              >
+                                <ArrowUp size={11} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveDenom(i, 1)}
+                                disabled={i === form.denominations.length - 1}
+                                aria-label="Turun"
+                                className="grid place-items-center w-6 h-6 border border-line text-slate-400 hover:text-neon disabled:opacity-30"
+                              >
+                                <ArrowDown size={11} />
+                              </button>
+                            </div>
+                            {formErrors[`denom-${i}`] && <p className="text-[10px] font-mono text-coral">{formErrors[`denom-${i}`]}</p>}
+                            <button
+                              type="button"
+                              onClick={() => patch({ denominations: form.denominations.filter((_, n) => n !== i) })}
+                              data-testid={`remove-denom-${i}`}
+                              className="text-[10px] uppercase tracking-widest text-coral hover:underline cursor-pointer"
+                            >
+                              Hapus Produk
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1832,6 +2024,7 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
                         <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
                           {(g.denominations || []).map((d) => {
                             const skuChecked = gameSkus.includes(d.sku);
+                            const isMembership = resolveSkuGroup(d) === "membership";
                             return (
                               <label
                                 key={d.sku}
@@ -1848,6 +2041,15 @@ const MerchantPullDialog = ({ initialVendorKind = "digiflazz", initialMargin = 1
                                     onChange={() => toggleSkuForGame(g.slug, d.sku)}
                                   />
                                   <span className="text-neon font-bold">{d.sku}</span>
+                                  <span
+                                    className={`text-[9px] px-1.5 py-0.5 border ${
+                                      isMembership
+                                        ? "text-lime border-lime/40 bg-lime/10"
+                                        : "text-slate-300 border-line bg-void"
+                                    }`}
+                                  >
+                                    {isMembership ? "Membership" : g.currency || "Item"}
+                                  </span>
                                   <span className="text-slate-200">{d.label}</span>
                                 </div>
                                 <div className="text-right">
@@ -2148,6 +2350,7 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
                 {rows.map((r) => {
                   const checked = selectedProductSkus.includes(r.sku);
                   const sellPrice = calcSellPrice(r.price, r.retail_price);
+                  const isMembership = resolveSkuGroup(r) === "membership";
                   return (
                     <label
                       key={r.sku}
@@ -2165,7 +2368,18 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
                           className="mt-0.5"
                         />
                         <div className="min-w-0">
-                          <p className="text-neon font-bold truncate">{r.sku}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-neon font-bold truncate">{r.sku}</p>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.5 border shrink-0 ${
+                                isMembership
+                                  ? "text-lime border-lime/40 bg-lime/10"
+                                  : "text-slate-300 border-line bg-void"
+                              }`}
+                            >
+                              {isMembership ? "Membership" : game.currency || "Item"}
+                            </span>
+                          </div>
                           <p className="text-[10px] text-slate-200 truncate">{r.label || r.name}</p>
                         </div>
                       </div>

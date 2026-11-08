@@ -1003,13 +1003,69 @@ function findDenomination(game: any, code: string) {
   return (game?.denominations || []).find((d: any) => String(d.code) === String(code)) || null;
 }
 
+function detectDigiflazzSkuGroup(
+  skuStr: string,
+  labelOrNameStr = "",
+  typeOrCategoryStr = ""
+): "membership" | "currency" {
+  const sku = String(skuStr || "").trim().toUpperCase();
+  const label = String(labelOrNameStr || "").trim().toLowerCase();
+  const typeNorm = String(typeOrCategoryStr || "").trim().toLowerCase();
+
+  if (
+    typeNorm === "membership" ||
+    typeNorm.includes("membership") ||
+    typeNorm.includes("subscription") ||
+    typeNorm.includes("member") ||
+    typeNorm.includes("pass")
+  ) {
+    return "membership";
+  }
+
+  // Check explicit Digiflazz membership SKU codes & prefixes/suffixes
+  if (
+    /^(WDP|MLWDP|GIWELKIN|WELKIN|HSRESP|ZZZIKM|IKM|SLM|MLSL|TWILIGHT|FFBP|PUBGRP)/i.test(sku) ||
+    /(WDP|WELKIN|MEMBER|PASS|STARLIGHT|TWILIGHT|SUBS|WEEKLY|MONTHLY)/i.test(sku)
+  ) {
+    return "membership";
+  }
+
+  // Check product name / label keywords for Membership / Pass / Subscription items
+  const membershipPattern =
+    /\b(membership|member|welkin|blessing|inter-knot|interknot|wdp|weekly\s*diamond\s*pass|twilight\s*pass|starlight|supply\s*pass|express\s*supply|lunite\s*subscription|royale\s*pass|booyah\s*pass|elite\s*pass|battle\s*pass|season\s*pass|star\s*pass|premium\s*pass|monthly\s*card|weekly\s*card|monthly\s*pass|weekly\s*pass|vip\s*card|kartu\s*bulanan|kartu\s*mingguan|berkah|langganan|subscription|pass|paket\s*mingguan|paket\s*bulanan|level\s*up\s*pass)\b/i;
+
+  if (membershipPattern.test(label)) {
+    return "membership";
+  }
+
+  return "currency";
+}
+
+function normalizeSkuGroup(
+  explicitGroup: any,
+  skuStr: string,
+  labelOrNameStr = "",
+  typeOrCategoryStr = ""
+): "membership" | "currency" {
+  const g = String(explicitGroup || "").trim().toLowerCase();
+  if (g === "membership" || g === "currency") {
+    return g;
+  }
+  return detectDigiflazzSkuGroup(skuStr, labelOrNameStr, typeOrCategoryStr);
+}
+
 function denominationProduct(game: any, denom: any) {
   const slug = game.slug || game.id;
   const code = String(denom.code);
   const stock = denom.stock != null ? Number(denom.stock) : 999;
+  const skuGroup = normalizeSkuGroup(denom.sku_group, denom.vendor_sku || code, denom.label, denom.type);
   const badges: string[] = [];
   if (denom.badge) badges.push(denom.badge);
-  if (game.currency) badges.push(`${game.currency} Instan`);
+  if (skuGroup === "membership") {
+    badges.push("Membership");
+  } else if (game.currency) {
+    badges.push(`${game.currency} Instan`);
+  }
   return {
     id: productIdFor(slug, code),
     game: game.name,
@@ -1018,11 +1074,13 @@ function denominationProduct(game: any, denom: any) {
     slug,
     game_id: game.id,
     denomination_code: code,
+    sku_group: skuGroup,
     denomination: {
       code,
       label: denom.label,
       amount: denom.amount,
       price_strike: denom.price_strike,
+      sku_group: skuGroup,
     },
     title: `${game.name} — ${denom.label || code}`,
     price: Number(denom.price || 0),
@@ -1091,19 +1149,222 @@ function syncAllGames(replace = true): number {
   return total;
 }
 
+function resolveBuiltInDigiflazzFields(gameOrMeta: any): any[] {
+  const slug = String(gameOrMeta?.slug || "").trim().toLowerCase();
+  const prefix = String(gameOrMeta?.vendor_prefix || "").trim().toUpperCase();
+  const name = String(gameOrMeta?.name || "").trim().toLowerCase();
+
+  // 1. Direct match from MERCHANT_MASTER_GAMES (21 official games)
+  if (typeof MERCHANT_MASTER_GAMES !== "undefined" && Array.isArray(MERCHANT_MASTER_GAMES)) {
+    const master = MERCHANT_MASTER_GAMES.find(
+      (mg) =>
+        mg.slug === slug ||
+        (prefix && String(mg.vendor_prefix || "").toUpperCase() === prefix) ||
+        (name && String(mg.name || "").toLowerCase() === name)
+    );
+    if (master && Array.isArray(master.fields) && master.fields.length > 0) {
+      return master.fields.map((f) => ({ ...f }));
+    }
+  }
+
+  // 2. Fallback heuristic by Digiflazz prefix / game slug / name
+  if (
+    slug.includes("mobile-legends") ||
+    slug.includes("magic-chess") ||
+    prefix === "ML" ||
+    prefix === "MCGG"
+  ) {
+    return [
+      {
+        key: "user_id",
+        label: "User ID",
+        placeholder: "123456789",
+        type: "text",
+        inputmode: "numeric",
+        required: true,
+        min_len: 5,
+        max_len: 15,
+        pattern: "^[0-9]{5,15}$",
+        help: "Masukkan angka User ID sesuai profil game Anda",
+      },
+      {
+        key: "zone_id",
+        label: "Zone ID",
+        placeholder: "1234",
+        type: "text",
+        inputmode: "numeric",
+        required: true,
+        min_len: 3,
+        max_len: 6,
+        pattern: "^[0-9]{3,6}$",
+        help: "Masukkan angka Zone ID (di dalam tanda kurung)",
+      },
+    ];
+  }
+
+  if (
+    slug.includes("genshin") ||
+    slug.includes("zenless") ||
+    slug.includes("honkai-star-rail") ||
+    prefix === "GI" ||
+    prefix === "ZZZ" ||
+    prefix === "HSR"
+  ) {
+    return [
+      {
+        key: "user_id",
+        label: "UID",
+        placeholder: "800123456",
+        type: "text",
+        inputmode: "numeric",
+        required: true,
+        min_len: 8,
+        max_len: 12,
+        pattern: "^[0-9]{8,12}$",
+        help: "Masukkan UID angka akun HoYoverse Anda",
+      },
+      {
+        key: "server",
+        label: "Server",
+        placeholder: "Pilih Server",
+        type: "select",
+        inputmode: "text",
+        required: true,
+        min_len: 2,
+        max_len: 20,
+        pattern: "",
+        options: ["Asia", "America", "Europe", "TW, HK, MO"],
+        help: "Pilih server akun HoYoverse Anda",
+      },
+    ];
+  }
+
+  if (slug.includes("wuthering") || prefix === "WW") {
+    return [
+      {
+        key: "user_id",
+        label: "UID",
+        placeholder: "900123456",
+        type: "text",
+        inputmode: "numeric",
+        required: true,
+        min_len: 8,
+        max_len: 12,
+        pattern: "^[0-9]{8,12}$",
+        help: "Masukkan 9 digit UID Wuthering Waves",
+      },
+      {
+        key: "server",
+        label: "Server",
+        placeholder: "Pilih Server",
+        type: "select",
+        inputmode: "text",
+        required: true,
+        min_len: 2,
+        max_len: 20,
+        pattern: "",
+        options: ["SEA", "Asia", "America", "Europe", "HMT (HK, MO, TW)"],
+        help: "Pilih server Wuthering Waves Anda",
+      },
+    ];
+  }
+
+  if (slug.includes("ragnarok") || prefix === "ROM" || prefix === "ROO") {
+    return [
+      {
+        key: "user_id",
+        label: "Role ID / Character ID",
+        placeholder: "4300123456",
+        type: "text",
+        inputmode: "numeric",
+        required: true,
+        min_len: 5,
+        max_len: 16,
+        pattern: "^[0-9]{5,16}$",
+        help: "Masukkan angka Role ID / Character ID karakter Anda",
+      },
+      {
+        key: "server",
+        label: "Server",
+        placeholder: "Nama Server",
+        type: "text",
+        inputmode: "text",
+        required: true,
+        min_len: 2,
+        max_len: 30,
+        pattern: "",
+        help: "Masukkan nama Server karakter Anda",
+      },
+    ];
+  }
+
+  if (slug.includes("valorant") || slug.includes("wild-rift") || prefix === "VAL" || prefix === "WR") {
+    return [
+      {
+        key: "riot_id",
+        label: "Riot ID#Tag",
+        placeholder: "Player#IDN",
+        type: "text",
+        inputmode: "text",
+        required: true,
+        min_len: 4,
+        max_len: 32,
+        pattern: "",
+        help: "Format wajib: Nickname#Tag (Contoh: Player#IDN)",
+      },
+    ];
+  }
+
+  return [
+    {
+      key: "user_id",
+      label: "User ID / Player ID",
+      placeholder: "Masukkan ID Akun Game",
+      type: "text",
+      inputmode: "numeric",
+      required: true,
+      min_len: 4,
+      max_len: 24,
+      pattern: "",
+      help: "Masukkan User ID / Player ID sesuai profil di dalam game",
+    },
+  ];
+}
+
+function resolveDigiflazzCustomerNoFormat(gameOrMeta: any): string {
+  const fields = resolveBuiltInDigiflazzFields(gameOrMeta);
+  const keys = fields.map((f) => f.key);
+  if (keys.includes("user_id") && keys.includes("zone_id")) {
+    return "{user_id}{zone_id} (Digabung otomatis untuk Digiflazz)";
+  }
+  if (keys.includes("riot_id")) {
+    return "{riot_id} (Nickname#Tag)";
+  }
+  if (keys.includes("user_id") && keys.includes("server")) {
+    return "{user_id} + {server}";
+  }
+  return "{user_id}";
+}
+
 function publicGame(game: any) {
+  const builtInFields = resolveBuiltInDigiflazzFields(game);
   const denominations = activeDenominations(game)
     .filter((d) => Number(d.price || 0) > 0)
-    .map((d) => ({
-      code: String(d.code),
-      label: d.label,
-      amount: d.amount,
-      price: Number(d.price || 0),
-      price_strike: d.price_strike,
-      stock: d.stock != null ? Number(d.stock) : 999,
-      badge: d.badge || "",
-      seq: d.seq || 0,
-    }));
+    .map((d) => {
+      const skuGroup = normalizeSkuGroup(d.sku_group, d.vendor_sku || d.code, d.label, d.type);
+      return {
+        code: String(d.code),
+        vendor_sku: String(d.vendor_sku || ""),
+        label: d.label,
+        amount: d.amount,
+        price: Number(d.price || 0),
+        price_strike: d.price_strike,
+        stock: d.stock != null ? Number(d.stock) : 999,
+        badge: d.badge || "",
+        sku_group: skuGroup,
+        seq: d.seq || 0,
+      };
+    });
   const prices = denominations.map((d) => d.price);
   return {
     id: game.id,
@@ -1117,7 +1378,10 @@ function publicGame(game: any) {
     delivery_info: game.delivery_info || "",
     seq: game.seq || 0,
     featured: Boolean(game.featured),
-    fields: Array.isArray(game.fields) ? game.fields : [],
+    cek_id_sku: String(game.cek_id_sku || "").trim(),
+    has_cek_id: Boolean(String(game.cek_id_sku || "").trim()),
+    customer_no_format: resolveDigiflazzCustomerNoFormat(game),
+    fields: builtInFields,
     denominations,
     min_price: prices.length ? Math.min(...prices) : 0,
     max_price: prices.length ? Math.max(...prices) : 0,
@@ -1126,7 +1390,8 @@ function publicGame(game: any) {
 
 function validateDestination(game: any, values: Record<string, any>): [boolean, Record<string, string>, string] {
   const cleaned: Record<string, string> = {};
-  for (const field of game.fields || []) {
+  const builtInFields = resolveBuiltInDigiflazzFields(game);
+  for (const field of builtInFields) {
     const key = field.key;
     if (!key) continue;
     const raw = String(values?.[key] ?? "").trim();
@@ -1167,7 +1432,7 @@ function validateDestination(game: any, values: Record<string, any>): [boolean, 
 function destinationLabel(game: any, destination: Record<string, any> | null) {
   if (!destination) return "";
   const labels: Record<string, string> = {};
-  for (const f of game?.fields || []) {
+  for (const f of resolveBuiltInDigiflazzFields(game)) {
     if (f.key) labels[f.key] = f.label || f.key;
   }
   return Object.entries(destination)
@@ -1255,19 +1520,37 @@ const MERCHANT_MASTER_GAMES = [
   },
   {
     slug: "genshin-impact",
-    name: "Genshin Impact & Zenless Zone Zero",
+    name: "Genshin Impact",
     publisher: "HoYoverse",
-    currency: "Genesis Crystal / Monochrome",
+    currency: "Genesis Crystal",
     vendor_prefix: "GI",
     cek_id_sku: "CEKGI",
     featured: true,
     icon: "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
     banner: "/src/assets/images/icon_game_genshin_impact_1794083003322.jpg",
-    notes: "Masukkan UID Genshin Impact / Zenless Zone Zero Anda dan pilih Server.",
-    delivery_info: "Genesis Crystal / Monochrome / Membership masuk otomatis via Digiflazz ke UID Anda.",
+    notes: "Masukkan UID Genshin Impact Anda dan pilih Server (Contoh: Asia).",
+    delivery_info: "Genesis Crystal / Blessing of the Welkin Moon masuk otomatis via Digiflazz ke UID Genshin Impact Anda.",
     fields: [
-      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "UID 8-10 digit angka" },
-      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun HoYoverse Anda" },
+      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "UID 8-10 digit angka Genshin Impact" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Genshin Impact Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "zenless-zone-zero",
+    name: "Zenless Zone Zero",
+    publisher: "HoYoverse",
+    currency: "Monochrome",
+    vendor_prefix: "ZZZ",
+    cek_id_sku: "CEKZZZ",
+    featured: true,
+    icon: "/src/assets/images/icon_game_zzz_1794127110082.jpg",
+    banner: "/src/assets/images/icon_game_zzz_1794127110082.jpg",
+    notes: "Masukkan UID Zenless Zone Zero Anda dan pilih Server (Contoh: Asia).",
+    delivery_info: "Monochrome / Inter-Knot Membership masuk otomatis via Digiflazz ke UID Zenless Zone Zero Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "1300123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "UID 8-10 digit angka Zenless Zone Zero" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun Zenless Zone Zero Anda" },
     ],
     denominations: [] as any[],
   },
@@ -1377,20 +1660,38 @@ const MERCHANT_MASTER_GAMES = [
     denominations: [] as any[],
   },
   {
-    slug: "ragnarok",
-    name: "Ragnarok M: Eternal Love & Ragnarok Origin",
-    publisher: "Gravity/Gravity Games",
-    currency: "Big Cat Coin / Nyan Berry",
-    vendor_prefix: "RO",
-    cek_id_sku: "CEKRO",
+    slug: "ragnarok-m-eternal-love",
+    name: "Ragnarok M: Eternal Love",
+    publisher: "Gravity",
+    currency: "Big Cat Coin",
+    vendor_prefix: "ROM",
+    cek_id_sku: "CEKROM",
     featured: false,
     icon: "/src/assets/images/icon_game_ragnarok_1794091157042.jpg",
     banner: "/src/assets/images/icon_game_ragnarok_1794091157042.jpg",
-    notes: "Masukkan Character ID / Role ID Ragnarok Anda beserta Server.",
-    delivery_info: "Big Cat Coin / Nyan Berry masuk otomatis via Digiflazz ke karakter Ragnarok Anda.",
+    notes: "Masukkan Character ID / Role ID Ragnarok M: Eternal Love Anda beserta Server.",
+    delivery_info: "Big Cat Coin / Premium Membership masuk otomatis via Digiflazz ke karakter Ragnarok M: Eternal Love Anda.",
     fields: [
-      { key: "user_id", label: "Role ID / Character ID", placeholder: "4300123456", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 16, pattern: "^[0-9]{5,16}$", help: "Masukkan angka Role ID / Character ID Ragnarok" },
-      { key: "server", label: "Server", placeholder: "Eternal Love / Prontera", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 30, pattern: "", help: "Masukkan nama Server karakter Anda" },
+      { key: "user_id", label: "Role ID / Character ID", placeholder: "4300123456", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 16, pattern: "^[0-9]{5,16}$", help: "Masukkan angka Role ID / Character ID Ragnarok M" },
+      { key: "server", label: "Server", placeholder: "Eternal Love", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 30, pattern: "", help: "Masukkan nama Server karakter Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "ragnarok-origin",
+    name: "Ragnarok Origin",
+    publisher: "Gravity Game Hub",
+    currency: "Nyan Berry",
+    vendor_prefix: "ROO",
+    cek_id_sku: "CEKROO",
+    featured: false,
+    icon: "/src/assets/images/icon_game_ragnarok_origin_1794127110328.jpg",
+    banner: "/src/assets/images/icon_game_ragnarok_origin_1794127110328.jpg",
+    notes: "Masukkan Role ID / Secret Code Ragnarok Origin Anda beserta Server.",
+    delivery_info: "Nyan Berry / VIP Membership masuk otomatis via Digiflazz ke karakter Ragnarok Origin Anda.",
+    fields: [
+      { key: "user_id", label: "Role ID / Secret Code", placeholder: "1234567890", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 16, pattern: "^[0-9]{5,16}$", help: "Masukkan Role ID / Secret Code Ragnarok Origin" },
+      { key: "server", label: "Server", placeholder: "Prontera / Morroc", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 30, pattern: "", help: "Masukkan nama Server karakter Ragnarok Origin Anda" },
     ],
     denominations: [] as any[],
   },
@@ -1398,7 +1699,7 @@ const MERCHANT_MASTER_GAMES = [
     slug: "fc-mobile",
     name: "EA Sports FC Mobile",
     publisher: "EA Sports",
-    currency: "FC Points / Silver",
+    currency: "FC Points",
     vendor_prefix: "FCM",
     cek_id_sku: "CEKFCM",
     featured: false,
@@ -1500,7 +1801,7 @@ const MERCHANT_MASTER_GAMES = [
     slug: "roblox",
     name: "Roblox (Voucher Code)",
     publisher: "Roblox Corporation",
-    currency: "Robux / Voucher",
+    currency: "Robux",
     vendor_prefix: "RBX",
     cek_id_sku: "CEKRBX",
     featured: false,
@@ -1666,6 +1967,91 @@ function ensureDefaultTopupClearedOnce() {
     db.games = nextGames;
 
     db.settings.topup_master_games_19_v3 = {
+      migrated_at: nowIso(),
+      games_count: db.games.length,
+    };
+    changed = true;
+  }
+
+  // Separate Genshin Impact & Zenless Zone Zero + Ragnarok M: Eternal Love & Ragnarok Origin into 21 standalone catalogs & normalize sku_group
+  if (!db.settings.topup_master_games_21_v4) {
+    const masterSlugs = new Set(MERCHANT_MASTER_GAMES.map((mg) => mg.slug));
+    // Remove obsolete combined slug 'ragnarok' and 'steam-wallet'
+    const oldRagnarok = (db.games || []).find((g) => g.slug === "ragnarok");
+    db.games = (db.games || []).filter((g) => g.slug !== "ragnarok" && (g.slug !== "steam-wallet" || masterSlugs.has(g.slug)));
+    db.products = (db.products || []).filter(
+      (p) => !((p.slug === "ragnarok" || p.slug === "steam-wallet") && p.product_type === PRODUCT_TYPE)
+    );
+
+    const nextGames: any[] = [];
+    MERCHANT_MASTER_GAMES.forEach((mg, idx) => {
+      let existing = (db.games || []).find((g) => g.slug === mg.slug);
+      if (!existing && mg.slug === "ragnarok-m-eternal-love" && oldRagnarok) {
+        existing = { ...oldRagnarok, slug: mg.slug };
+      }
+      if (existing) {
+        existing.name = mg.name;
+        existing.publisher = mg.publisher;
+        existing.currency = mg.currency;
+        if (!String(existing.icon || "").trim()) existing.icon = mg.icon;
+        if (!String(existing.banner || "").trim()) existing.banner = mg.banner;
+        existing.notes = mg.notes;
+        existing.delivery_info = mg.delivery_info;
+        existing.vendor_prefix = mg.vendor_prefix;
+        existing.cek_id_sku = (mg as any).cek_id_sku || `CEK${mg.vendor_prefix}`;
+        existing.vendor_id = "vp-digiflazz";
+        existing.featured = Boolean(mg.featured);
+        existing.seq = idx;
+        existing.fields = mg.fields.map((f: any) => ({ ...f }));
+        existing.denominations = Array.isArray(existing.denominations)
+          ? existing.denominations.map((d: any) => ({
+              ...d,
+              sku_group: normalizeSkuGroup(d.sku_group, d.vendor_sku || d.code, d.label, d.type),
+            }))
+          : [];
+        existing.updated_at = nowIso();
+        nextGames.push(existing);
+      } else {
+        nextGames.push({
+          id: `gm-${mg.slug}-${uuidHex(4)}`,
+          name: mg.name,
+          slug: mg.slug,
+          publisher: mg.publisher,
+          currency: mg.currency,
+          icon: mg.icon,
+          banner: mg.banner,
+          notes: mg.notes,
+          delivery_info: mg.delivery_info,
+          vendor_prefix: mg.vendor_prefix,
+          cek_id_sku: (mg as any).cek_id_sku || `CEK${mg.vendor_prefix}`,
+          vendor_id: "vp-digiflazz",
+          is_active: true,
+          featured: Boolean(mg.featured),
+          seq: idx,
+          fields: mg.fields.map((f: any) => ({ ...f })),
+          denominations: [],
+          created_at: nowIso(),
+          updated_at: nowIso(),
+        });
+      }
+    });
+
+    // Preserve any custom games added by admin that aren't in MERCHANT_MASTER_GAMES
+    for (const g of db.games || []) {
+      if (!masterSlugs.has(g.slug)) {
+        g.seq = nextGames.length;
+        if (Array.isArray(g.denominations)) {
+          g.denominations = g.denominations.map((d: any) => ({
+            ...d,
+            sku_group: normalizeSkuGroup(d.sku_group, d.vendor_sku || d.code, d.label, d.type),
+          }));
+        }
+        nextGames.push(g);
+      }
+    }
+    db.games = nextGames;
+
+    db.settings.topup_master_games_21_v4 = {
       migrated_at: nowIso(),
       games_count: db.games.length,
     };
@@ -4002,14 +4388,16 @@ function matchDigiflazzItemToLocalGame(brandStr: string, skuStr: string, product
     { slug: "free-fire", prefixes: ["FF", "FFMAX"], keywords: ["free fire", "freefire", "garena ff"] },
     { slug: "pubg-mobile", prefixes: ["PUBG", "PUBGM"], keywords: ["pubg mobile", "pubgm", "pubg"] },
     { slug: "honor-of-kings", prefixes: ["HOK"], keywords: ["honor of kings", "honor of king", "hok"] },
-    { slug: "genshin-impact", prefixes: ["GI", "GENSHIN", "ZZZ"], keywords: ["genshin impact", "genshin", "zenless zone zero", "zenless"] },
+    { slug: "zenless-zone-zero", prefixes: ["ZZZ"], keywords: ["zenless zone zero", "zenless", "monochrome", "inter-knot"] },
+    { slug: "genshin-impact", prefixes: ["GI", "GENSHIN"], keywords: ["genshin impact", "genshin", "genesis crystal", "welkin"] },
     { slug: "honkai-star-rail", prefixes: ["HSR"], keywords: ["honkai: star rail", "honkai star rail", "star rail"] },
     { slug: "wuthering-waves", prefixes: ["WW", "WUTHERING"], keywords: ["wuthering waves", "wuthering wave", "lunites"] },
     { slug: "arena-of-valor", prefixes: ["AOV"], keywords: ["arena of valor", "aov", "garena aov"] },
     { slug: "marvel-rivals", prefixes: ["MR", "MARVEL"], keywords: ["marvel rivals", "marvel rival"] },
     { slug: "delta-force", prefixes: ["DF", "DELTA"], keywords: ["delta force", "garena delta force"] },
     { slug: "magic-chess-go-go", prefixes: ["MCGG", "MCG", "MC"], keywords: ["magic chess: go go", "magic chess go go", "magic chess"] },
-    { slug: "ragnarok", prefixes: ["RO", "ROM", "ROO"], keywords: ["ragnarok m", "ragnarok origin", "ragnarok eternal love", "ragnarok"] },
+    { slug: "ragnarok-origin", prefixes: ["ROO", "ROORIGIN"], keywords: ["ragnarok origin", "nyan berry"] },
+    { slug: "ragnarok-m-eternal-love", prefixes: ["ROM", "RO"], keywords: ["ragnarok m", "ragnarok eternal love", "big cat coin", "ragnarok"] },
     { slug: "fc-mobile", prefixes: ["FCM", "FIFA"], keywords: ["fc mobile", "ea sports fc", "fifa mobile"] },
     { slug: "wild-rift", prefixes: ["WR", "LOLWR"], keywords: ["wild rift", "league of legends: wild rift", "lol wild rift"] },
     { slug: "valorant", prefixes: ["VAL", "VP"], keywords: ["valorant", "riot valorant"] },
@@ -4184,6 +4572,20 @@ async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): 
           const prodName = String(row.product_name || sku).trim();
           const matchedSlug = matchDigiflazzItemToLocalGame(brand, sku, prodName);
           const localGame = matchedSlug ? (db.games || []).find((g) => g.slug === matchedSlug) : null;
+
+          // Detect Digiflazz Cek ID / Inquiry utility SKUs (e.g. CEKML, CEKFF, Cek ID / Cek Username)
+          const isCekIdSku =
+            /^(CEK|CHK|INQ)[A-Z0-9_-]*$/i.test(sku) ||
+            /\b(cek\s*id|cek\s*nama|cek\s*username|cek\s*akun|check\s*id|inquiry\s*id)\b/i.test(
+              `${prodName} ${category}`
+            );
+          if (isCekIdSku) {
+            if (localGame) {
+              localGame.cek_id_sku = sku.toUpperCase();
+            }
+            continue;
+          }
+
           const gPrefix = String(localGame?.vendor_prefix || "").toUpperCase();
           let code = sku.toUpperCase();
           if (gPrefix && code.startsWith(gPrefix) && code.length > gPrefix.length) {
@@ -4195,6 +4597,8 @@ async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): 
           const retailPrice = Math.max(modalPrice + 1000, Math.ceil((modalPrice * 1.1) / 100) * 100);
           const strikePrice = Math.max(retailPrice + 1500, Math.ceil((retailPrice * 1.12) / 500) * 500);
 
+          const skuGroup = detectDigiflazzSkuGroup(sku, `${prodName} ${label}`, String(row.type || category));
+
           liveItems.push({
             sku,
             code,
@@ -4203,11 +4607,12 @@ async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): 
             label,
             brand: brand || localGame?.name || "Digiflazz",
             category,
+            sku_group: skuGroup,
             price: modalPrice,
             retail_price: retailPrice,
             price_strike: strikePrice,
             amount,
-            badge: "",
+            badge: skuGroup === "membership" ? "Membership" : "",
             featured: false,
             status: "available",
             unlimited_stock: row.unlimited_stock !== false,
@@ -4410,6 +4815,8 @@ async function pullGamesFromMerchant(opts: {
           ? byCode.get(sku.toUpperCase().slice(gPrefix.length))
           : undefined);
 
+      const detectedGroup = normalizeSkuGroup(prod.sku_group, sku, prod.label || prod.name, prod.category);
+
       if (found) {
         found.vendor_sku = sku;
         found.modal_price = modalPrice;
@@ -4417,6 +4824,7 @@ async function pullGamesFromMerchant(opts: {
         found.price_strike = strikePrice;
         found.label = prod.label || found.label;
         found.amount = Number(prod.amount || found.amount || 0);
+        found.sku_group = normalizeSkuGroup(found.sku_group, sku, found.label, prod.category);
         found.is_active = true;
         if (!found.stock || found.stock < 10) found.stock = 999;
       } else {
@@ -4428,7 +4836,8 @@ async function pullGamesFromMerchant(opts: {
           price: sellingPrice,
           price_strike: strikePrice,
           stock: 999,
-          badge: prod.badge || "",
+          badge: prod.badge || (detectedGroup === "membership" ? "Membership" : ""),
+          sku_group: detectedGroup,
           featured: Boolean(prod.featured),
           is_active: true,
           vendor_sku: sku,
@@ -5122,36 +5531,31 @@ function buildDigiflazzCustomerNo(game: any, destination: Record<string, string>
   const zoneId = String(destination.zone_id || "").trim();
   const server = String(destination.server || "").trim();
   if (zoneId) return `${userId}${zoneId}`;
-  if (server) return `${userId}|${server}`;
+  if (server && !/^(asia|america|europe|tw|hk|mo|sea|global)$/i.test(server)) {
+    return `${userId}${server}`;
+  }
   return userId;
 }
 
-const DETERMINISTIC_GAMER_TAGS = [
-  "Kairi•ONI",
-  "Sanz•FNOC",
-  "Alberttt•RRQ",
-  "Skylar•99",
-  "Xinnn•Hyper",
-  "Lemon•Alien",
-  "Kiboy•Tank",
-  "CW•GoldLane",
-  "JessNoLimit",
-  "Oura•Ekoo",
-  "Ryzen•BTR",
-  "Zuxxy•Indo",
-  "Luxxy•Clutch",
-  "Mind•Vanguard",
-  "f0rsakeN•PRX",
-  "mindfreak•ID",
-  "FrostNova•EX",
-  "Aether•Archon",
-  "Raiden•Shogun",
-  "Kazuha•Ronin",
-  "Kafka•Stellaron",
-  "Firefly•SAM",
-  "Shadow•Slayer",
-  "Valkyrie•IDN",
-];
+function extractCleanDigiflazzNickname(rawSn: string): string {
+  let clean = String(rawSn || "").trim();
+  if (!clean) return "";
+  // Strip common Digiflazz SN prefixes like "Username: ", "Nickname : ", "Nama: ", "SN: "
+  clean = clean.replace(/^(username|nickname|nama|name|ign|sn)\s*[:=-]\s*/i, "").trim();
+  // If formatted like "Nickname / Zone : 1234" or "Nickname/Server", take the nickname segment
+  if (clean.includes("/")) {
+    const parts = clean
+      .split("/")
+      .map((p) => p.replace(/^(username|nickname|nama|name|ign)\s*[:=-]\s*/i, "").trim())
+      .filter(Boolean);
+    if (parts.length > 0) clean = parts[0];
+  }
+  if (clean.includes("|")) {
+    const parts = clean.split("|").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) clean = parts[0];
+  }
+  return clean.trim();
+}
 
 async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
   const slug = String(game.slug || "").toLowerCase();
@@ -5160,6 +5564,7 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
   const server = String(cleaned.server || "").trim();
   const riotId = String(cleaned.riot_id || "").trim();
   const customerNo = buildDigiflazzCustomerNo(game, cleaned);
+  const cekSku = String(game.cek_id_sku || "").trim().toUpperCase();
 
   // 1. Format-specific immediate validation rules
   if (slug.includes("valorant") || riotId) {
@@ -5167,9 +5572,14 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
     if (!rawRiot.includes("#")) {
       return {
         valid: false,
+        format_valid: false,
         checked: false,
+        code: "FORMAT_INVALID",
         nickname: "",
         customer_no: customerNo,
+        cek_id_sku: cekSku,
+        server_label: zoneId ? `Zone ${zoneId}` : server || "",
+        source: "format_validation",
         message: "Format Riot ID wajib menyertakan Tagline dengan tanda # (Contoh: Player#IDN)",
       };
     }
@@ -5177,12 +5587,33 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
     if (!rName || rName.trim().length < 2 || !rTag || rTag.trim().length < 2) {
       return {
         valid: false,
+        format_valid: false,
         checked: false,
+        code: "FORMAT_INVALID",
         nickname: "",
         customer_no: customerNo,
+        cek_id_sku: cekSku,
+        server_label: zoneId ? `Zone ${zoneId}` : server || "",
+        source: "format_validation",
         message: "Nickname dan Tagline Riot ID masing-masing minimal 2 karakter (Contoh: Player#IDN)",
       };
     }
+  }
+
+  // 2. Check if game has a configured Digiflazz Cek ID SKU
+  if (!cekSku) {
+    return {
+      valid: false,
+      format_valid: true,
+      checked: false,
+      code: "CEK_SKU_NOT_SET",
+      nickname: "",
+      customer_no: customerNo,
+      cek_id_sku: "",
+      server_label: zoneId ? `Zone ${zoneId}` : server || "",
+      source: "digiflazz_live",
+      message: `Kode SKU Cek ID Digiflazz belum diatur untuk ${game.name}. Admin dapat mengaturnya di menu Edit Game.`,
+    };
   }
 
   const dfProvider = db.topup_providers.find((v) => v.kind === "digiflazz") || db.topup_providers[0];
@@ -5193,16 +5624,36 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
       process.env.DIGIFLAZZ_API_KEY ||
       ""
   ).trim();
-  const isLiveDf = Boolean(dfUser && dfKey && !dfKey.startsWith("df_live_wjp") && !dfKey.startsWith("df_dev_wjp"));
+  const isLiveDf = Boolean(dfUser && dfKey && !isDemoDigiflazzCredential(dfUser, dfKey));
 
-  // 2. Try Digiflazz Inquiry / Cek ID SKU if live credentials are set
-  if (isLiveDf) {
-    try {
-      const cekSku = String(game.cek_id_sku || `CEK${game.vendor_prefix || "ML"}`).trim();
-      const refId = `CHK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      const sign = crypto.createHash("md5").update(dfUser + dfKey + refId).digest("hex");
+  if (!isLiveDf) {
+    return {
+      valid: false,
+      format_valid: true,
+      checked: false,
+      code: "DIGIFLAZZ_NOT_CONFIGURED",
+      nickname: "",
+      customer_no: customerNo,
+      cek_id_sku: cekSku,
+      server_label: zoneId ? `Zone ${zoneId}` : server || "",
+      source: "digiflazz_live",
+      message:
+        "Kredensial API Digiflazz (Username & API Key) belum dikonfigurasi di Panel Admin -> Integrasi & Supplier.",
+    };
+  }
+
+  // 3. Execute live Digiflazz Cek ID Inquiry via /v1/transaction (with short-polling if status is Pending)
+  const refId = `CHK-${slug.slice(0, 8).toUpperCase()}-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
+  const sign = crypto.createHash("md5").update(dfUser + dfKey + refId).digest("hex");
+
+  try {
+    let lastData: any = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, 1200));
+      }
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 3000);
+      const timer = setTimeout(() => ctrl.abort(), 5000);
       const resp = await fetch("https://api.digiflazz.com/v1/transaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -5217,104 +5668,79 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
       });
       clearTimeout(timer);
       const json: any = await resp.json().catch(() => null);
-      const sn = String(json?.data?.sn || json?.data?.customer_name || "").trim();
-      if (sn && json?.data?.status !== "Gagal") {
-        const cleanNick = sn.includes("/") ? sn.split("/")[0].trim() : sn;
-        return {
-          valid: true,
-          checked: true,
-          nickname: cleanNick,
-          customer_no: customerNo,
-          server_label: zoneId ? `Zone ${zoneId}` : server || "",
-          source: "digiflazz_live",
-          message: `ID Game Terverifikasi — Nickname: ${cleanNick}`,
-        };
-      }
-    } catch {
-      // Fallback to public API / deterministic resolver
-    }
-  }
+      lastData = json?.data || json || null;
+      const status = String(lastData?.status || "").trim();
+      const rc = String(lastData?.rc || "").trim();
+      const rawSn = String(lastData?.sn || lastData?.customer_name || "").trim();
 
-  // 3. Try Public Game Nickname API for Mobile Legends / Free Fire / PUBG / Genshin
-  try {
-    let publicApiCode = "";
-    if (slug.includes("mobile-legends")) publicApiCode = "mobile-legends";
-    else if (slug.includes("free-fire")) publicApiCode = "free-fire";
-    else if (slug.includes("genshin")) publicApiCode = "genshin-impact";
-    else if (slug.includes("honkai-star-rail")) publicApiCode = "honkai-star-rail";
-    else if (slug.includes("valorant")) publicApiCode = "valorant";
-
-    if (publicApiCode && userId) {
-      const qZone = zoneId ? `&zone=${encodeURIComponent(zoneId)}` : server ? `&zone=${encodeURIComponent(server)}` : "";
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 2200);
-      const resp = await fetch(
-        `https://api.isan.eu.org/nickname/${publicApiCode === "mobile-legends" ? "ml" : publicApiCode === "free-fire" ? "ff" : publicApiCode}?id=${encodeURIComponent(userId)}${qZone}`,
-        { signal: ctrl.signal }
-      );
-      clearTimeout(timer);
-      if (resp.ok) {
-        const json: any = await resp.json().catch(() => null);
-        const remoteName = String(json?.name || json?.nickname || json?.data?.username || "").trim();
-        if (remoteName && remoteName.length >= 2) {
+      if (rawSn && status !== "Gagal") {
+        const cleanNick = extractCleanDigiflazzNickname(rawSn);
+        if (cleanNick) {
           return {
             valid: true,
+            format_valid: true,
             checked: true,
-            nickname: remoteName,
+            code: "VERIFIED",
+            nickname: cleanNick,
+            sn: rawSn,
             customer_no: customerNo,
+            cek_id_sku: cekSku,
             server_label: zoneId ? `Zone ${zoneId}` : server || "",
-            source: "public_game_api",
-            message: `ID Game Terverifikasi — Nickname: ${remoteName}`,
+            source: "digiflazz_live",
+            message: `ID Game Terverifikasi via Digiflazz (${cekSku}) — Nickname: ${cleanNick}`,
           };
         }
       }
-    }
-  } catch {
-    // Fallback to deterministic game-aware verification below
-  }
 
-  // 4. Deterministic Game-Aware Nickname Verification (always consistent per Player ID)
-  let resolvedNick = "";
-  if (slug.includes("valorant") || riotId) {
-    const [rName, rTag] = (riotId || userId).split("#");
-    resolvedNick = `${rName.trim()} #${(rTag || "IDN").trim().toUpperCase()}`;
-  } else if (slug.includes("roblox")) {
-    resolvedNick = `@${userId.replace(/^@+/, "")}`;
-  } else if (slug.includes("steam")) {
-    resolvedNick = `SteamID•${userId.slice(-6)}`;
-  } else {
-    let hash = 0;
-    const seedStr = `${slug}:${userId}:${zoneId}:${server}`;
-    for (let i = 0; i < seedStr.length; i++) {
-      hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0;
-    }
-    const baseTag = DETERMINISTIC_GAMER_TAGS[hash % DETERMINISTIC_GAMER_TAGS.length];
-    const idSuffix = userId.slice(-4) || "9981";
-    if (slug.includes("genshin") || slug.includes("honkai")) {
-      const regionGuess = userId.startsWith("8")
-        ? "Asia"
-        : userId.startsWith("6")
-          ? "America"
-          : userId.startsWith("7")
-            ? "Europe"
-            : server || "Asia";
-      resolvedNick = `${baseTag}_${idSuffix} (${server || regionGuess})`;
-    } else if (zoneId) {
-      resolvedNick = `${baseTag}_${idSuffix}`;
-    } else {
-      resolvedNick = `${baseTag}_${idSuffix}`;
-    }
-  }
+      if (status === "Gagal" || (rc && rc !== "00" && rc !== "03" && rc !== "39")) {
+        const dfMsg = String(lastData?.message || "ID Akun tidak ditemukan atau SKU Cek ID tidak valid").trim();
+        return {
+          valid: false,
+          format_valid: true,
+          checked: true,
+          code: "DIGIFLAZZ_FAILED",
+          nickname: "",
+          customer_no: customerNo,
+          cek_id_sku: cekSku,
+          server_label: zoneId ? `Zone ${zoneId}` : server || "",
+          source: "digiflazz_live",
+          message: `Digiflazz (${cekSku}): ${dfMsg}`,
+        };
+      }
 
-  return {
-    valid: true,
-    checked: true,
-    nickname: resolvedNick,
-    customer_no: customerNo,
-    server_label: zoneId ? `Zone ${zoneId}` : server || "",
-    source: "digiflazz_verified",
-    message: `ID Game Terverifikasi (${resolvedNick})`,
-  };
+      // If not Pending, break out of polling loop
+      if (status !== "Pending" && rc !== "03" && rc !== "39") {
+        break;
+      }
+    }
+
+    const pendingMsg = String(lastData?.message || "Transaksi pengecekan ID sedang diproses oleh Digiflazz").trim();
+    return {
+      valid: false,
+      format_valid: true,
+      checked: false,
+      code: "DIGIFLAZZ_PENDING",
+      nickname: "",
+      customer_no: customerNo,
+      cek_id_sku: cekSku,
+      server_label: zoneId ? `Zone ${zoneId}` : server || "",
+      source: "digiflazz_live",
+      message: `Digiflazz (${cekSku}): ${pendingMsg}. Silakan klik Cek ID kembali dalam beberapa detik.`,
+    };
+  } catch (err: any) {
+    return {
+      valid: false,
+      format_valid: true,
+      checked: false,
+      code: "DIGIFLAZZ_NETWORK_ERROR",
+      nickname: "",
+      customer_no: customerNo,
+      cek_id_sku: cekSku,
+      server_label: zoneId ? `Zone ${zoneId}` : server || "",
+      source: "digiflazz_live",
+      message: `Gagal menghubungi API Digiflazz untuk SKU ${cekSku}: ${String(err?.message || "Timeout / koneksi gagal")}`,
+    };
+  }
 }
 
 api.post("/topup/validate", async (req, res) => {
@@ -5329,22 +5755,37 @@ api.post("/topup/validate", async (req, res) => {
       : Object.fromEntries(Object.entries(body).filter(([k]) => k !== "game" && k !== "slug"));
   const [ok, cleaned, error] = validateDestination(game, values);
   if (!ok) {
-    return res.json({ valid: false, checked: false, destination: cleaned, message: error });
+    return res.json({
+      valid: false,
+      format_valid: false,
+      checked: false,
+      code: "FORMAT_INVALID",
+      destination: cleaned,
+      message: error,
+    });
   }
   const verification = await verifyGameAccountId(game, cleaned);
   if (!verification.valid) {
     return res.json({
       valid: false,
-      checked: false,
+      format_valid: verification.format_valid !== false,
+      checked: Boolean(verification.checked),
+      code: verification.code || "UNVERIFIED",
+      cek_id_sku: verification.cek_id_sku || String(game.cek_id_sku || ""),
+      customer_no: verification.customer_no || "",
       destination: cleaned,
       message: verification.message,
     });
   }
   res.json({
     valid: true,
+    format_valid: true,
     checked: true,
+    code: "VERIFIED",
     nickname: verification.nickname,
+    sn: (verification as any).sn || verification.nickname,
     customer_no: verification.customer_no,
+    cek_id_sku: verification.cek_id_sku || String(game.cek_id_sku || ""),
     server_label: verification.server_label || "",
     game_name: game.name,
     provider: "digiflazz",
@@ -8499,15 +8940,17 @@ admin.get("/topup/merchant-catalog", async (req, res) => {
         margin > 0
           ? Math.max(1000, Math.ceil((modalPrice * (1 + margin / 100)) / 100) * 100)
           : recPrice;
+      const skuGroup = normalizeSkuGroup(d.sku_group, d.sku, d.label || d.name, d.category);
       return {
         code: String(d.code || d.sku),
         label: d.label || d.name || String(d.sku),
         amount: Number(d.amount || 0),
         sku: String(d.sku),
+        sku_group: skuGroup,
         modal_price: modalPrice,
         recommended_price: recPrice,
         selling_price: sellingPrice,
-        badge: d.badge || "",
+        badge: d.badge || (skuGroup === "membership" ? "Membership" : ""),
       };
     });
 
@@ -9384,6 +9827,13 @@ admin.post("/topup/games/:game_id/import", async (req, res) => {
           String(ed.code || "").toLowerCase() === code.toLowerCase()
       );
 
+      const skuGroup = normalizeSkuGroup(
+        rawProd?.sku_group ?? verifiedLive.sku_group,
+        sku,
+        cleanLabel,
+        verifiedLive.category
+      );
+
       if (existIdx >= 0) {
         existingDenoms[existIdx] = {
           ...existingDenoms[existIdx],
@@ -9393,6 +9843,12 @@ admin.post("/topup/games/:game_id/import", async (req, res) => {
           modal_price: modalPrice,
           price: sellingPrice,
           price_strike: strikePrice,
+          sku_group: normalizeSkuGroup(
+            rawProd?.sku_group ?? existingDenoms[existIdx].sku_group,
+            sku,
+            cleanLabel,
+            verifiedLive.category
+          ),
           vendor_sku: sku,
           is_active: true,
         };
@@ -9405,7 +9861,8 @@ admin.post("/topup/games/:game_id/import", async (req, res) => {
           price: sellingPrice,
           price_strike: strikePrice,
           stock: 999,
-          badge: String(verifiedLive.badge || ""),
+          badge: String(verifiedLive.badge || (skuGroup === "membership" ? "Membership" : "")),
+          sku_group: skuGroup,
           is_active: true,
           featured: Boolean(verifiedLive.featured),
           vendor_sku: sku,
@@ -9487,8 +9944,12 @@ admin.delete("/social-links/:link_id", (req, res) => {
 admin.get("/games", (_req, res) => {
   const rows = [...db.games].sort((a, b) => (a.seq || 0) - (b.seq || 0)).map((g) => {
     const mirrored = db.products.filter((p) => p.slug === g.slug && p.product_type === PRODUCT_TYPE);
+    const builtInFields = resolveBuiltInDigiflazzFields(g);
+    g.fields = builtInFields;
     return {
       ...g,
+      fields: builtInFields,
+      customer_no_format: resolveDigiflazzCustomerNoFormat(g),
       products_synced: mirrored.length > 0,
       product_count: mirrored.length,
     };
@@ -9506,6 +9967,9 @@ admin.post("/games", async (req, res) => {
   }
   const iconUrl = String(data.icon ?? "").trim();
   const bannerUrl = String(data.banner ?? "").trim();
+  const vendorPrefix = String(data.vendor_prefix ?? "").trim().toUpperCase();
+  const cekIdSku = String(data.cek_id_sku ?? (vendorPrefix ? `CEK${vendorPrefix}` : "")).trim().toUpperCase();
+  const builtInFields = resolveBuiltInDigiflazzFields({ slug, vendor_prefix: vendorPrefix, name });
   // New games start with empty denominations; products must be pulled from Digiflazz
   const game = {
     ...data,
@@ -9514,11 +9978,13 @@ admin.post("/games", async (req, res) => {
     slug,
     icon: iconUrl,
     banner: bannerUrl,
+    vendor_prefix: vendorPrefix,
+    cek_id_sku: cekIdSku,
     vendor_id: "vp-digiflazz",
     is_active: Boolean(data.is_active ?? true),
     featured: Boolean(data.featured ?? false),
     seq: Number(data.seq ?? db.games.length),
-    fields: Array.isArray(data.fields) ? data.fields : [],
+    fields: builtInFields,
     denominations: [],
     created_at: nowIso(),
     updated_at: nowIso(),
@@ -9529,7 +9995,10 @@ admin.post("/games", async (req, res) => {
   if (pgPool && pgRuntime.connected) {
     await pushToPostgres(pgPool);
   }
-  res.status(201).json(game);
+  res.status(201).json({
+    ...game,
+    customer_no_format: resolveDigiflazzCustomerNoFormat(game),
+  });
 });
 
 admin.put("/games/:game_id", async (req, res) => {
@@ -9554,6 +10023,12 @@ admin.put("/games/:game_id", async (req, res) => {
           const modalPrice = Math.max(500, Number(orig.modal_price || 0));
           const sellingPrice = Math.max(modalPrice, Number(incoming.price || orig.price || modalPrice));
           const strikePrice = Math.max(0, Number(incoming.price_strike ?? orig.price_strike ?? 0));
+          const skuGroup = normalizeSkuGroup(
+            incoming.sku_group ?? orig.sku_group,
+            orig.vendor_sku || orig.code,
+            orig.label,
+            orig.type
+          );
           return {
             ...orig,
             code: orig.code,
@@ -9564,6 +10039,7 @@ admin.put("/games/:game_id", async (req, res) => {
             price: sellingPrice,
             price_strike: strikePrice,
             badge: String(incoming.badge ?? orig.badge ?? ""),
+            sku_group: skuGroup,
             featured: Boolean(incoming.featured ?? orig.featured),
             is_active: incoming.is_active !== undefined ? Boolean(incoming.is_active) : Boolean(orig.is_active),
           };
@@ -9574,15 +10050,34 @@ admin.put("/games/:game_id", async (req, res) => {
 
   const iconUrl = data.icon !== undefined ? String(data.icon || "").trim() : String(existing.icon || "").trim();
   const bannerUrl = data.banner !== undefined ? String(data.banner || "").trim() : String(existing.banner || "").trim();
+  const vendorPrefix =
+    data.vendor_prefix !== undefined
+      ? String(data.vendor_prefix || "").trim().toUpperCase()
+      : String(existing.vendor_prefix || "").trim().toUpperCase();
+  const cekIdSku =
+    data.cek_id_sku !== undefined
+      ? String(data.cek_id_sku || "").trim().toUpperCase()
+      : String(existing.cek_id_sku || "").trim().toUpperCase();
+  const nextSlug = slugify(data.slug || existing.slug || data.name || existing.name);
+  const nextName = String(data.name || existing.name || "").trim();
+  const builtInFields = resolveBuiltInDigiflazzFields({
+    slug: nextSlug,
+    vendor_prefix: vendorPrefix,
+    name: nextName,
+  });
 
   const updated = {
     ...existing,
     ...data,
     id: existing.id,
-    slug: slugify(data.slug || existing.slug || data.name || existing.name),
+    name: nextName,
+    slug: nextSlug,
     icon: iconUrl,
     banner: bannerUrl,
+    vendor_prefix: vendorPrefix,
+    cek_id_sku: cekIdSku,
     vendor_id: "vp-digiflazz",
+    fields: builtInFields,
     denominations: sanitizedDenominations,
     updated_at: nowIso(),
   };
@@ -9592,7 +10087,10 @@ admin.put("/games/:game_id", async (req, res) => {
   if (pgPool && pgRuntime.connected) {
     await pushToPostgres(pgPool);
   }
-  res.json(updated);
+  res.json({
+    ...updated,
+    customer_no_format: resolveDigiflazzCustomerNoFormat(updated),
+  });
 });
 
 admin.post("/games/:game_id/toggle-active", (req, res) => {

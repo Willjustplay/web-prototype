@@ -37,9 +37,13 @@ export const validateTopupDestination = async (gameSlug, destination) => {
     });
     return {
       ok: !!data.valid,
+      format_valid: data.format_valid !== false,
       checked: !!data.checked,
+      code: data.code || (data.valid ? "VERIFIED" : "UNVERIFIED"),
       nickname: data.nickname || "",
+      sn: data.sn || "",
       customer_no: data.customer_no || "",
+      cek_id_sku: data.cek_id_sku || "",
       server_label: data.server_label || "",
       provider: data.provider || "digiflazz",
       verified_at: data.verified_at || null,
@@ -49,12 +53,20 @@ export const validateTopupDestination = async (gameSlug, destination) => {
   } catch (err) {
     const status = err.response?.status;
     if (status === 400 || status === 404) {
-      return { ok: false, checked: false, message: err.response?.data?.detail || "Data tidak valid" };
+      return {
+        ok: false,
+        format_valid: false,
+        checked: false,
+        code: "FORMAT_INVALID",
+        message: err.response?.data?.detail || "Data tidak valid",
+      };
     }
     return {
-      ok: true,
+      ok: false,
+      format_valid: true,
       checked: false,
-      message: "Validasi otomatis tidak tersedia. Lanjutkan, sistem akan memverifikasi.",
+      code: "NETWORK_ERROR",
+      message: "Tidak dapat terhubung ke layanan Cek ID Digiflazz.",
     };
   }
 };
