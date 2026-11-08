@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Plus, Pencil, Trash2, X, Loader2, Gamepad2, RefreshCw, Zap, Save,
-  ArrowUp, ArrowDown, Plug, FlaskConical, Wallet, Download, CheckCircle2, AlertCircle, Search,
+  ArrowUp, ArrowDown, Plug, FlaskConical, Wallet, Download, CheckCircle2, AlertCircle, Search, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatIDR, formatApiError, imgSrc } from "@/lib/api";
@@ -177,6 +177,28 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
     return errs;
   }, [form]);
 
+  const [uploadingField, setUploadingField] = useState("");
+
+  const uploadGameImage = async (fieldKey, file) => {
+    if (!file) return;
+    setUploadingField(fieldKey);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post("/admin/upload", fd, {
+        headers: { ...headers, "Content-Type": "multipart/form-data" },
+      });
+      if (data?.url) {
+        patch({ [fieldKey]: data.url });
+        toast.success(`Gambar ${fieldKey === "icon" ? "Icon" : "Banner"} berhasil diunggah`);
+      }
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal mengunggah gambar");
+    } finally {
+      setUploadingField("");
+    }
+  };
+
   const saveGame = async () => {
     if (Object.keys(formErrors).length) {
       toast.error(Object.values(formErrors)[0]);
@@ -187,6 +209,8 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
       const payload = {
         ...form,
         slug: slugify(form.slug || form.name),
+        icon: String(form.icon || "").trim(),
+        banner: String(form.banner || "").trim(),
         seq: Number(form.seq) || 0,
         fields: form.fields.map((f, i) => ({
           ...f,
@@ -210,7 +234,11 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
       };
       if (form.id) await api.put(`/admin/games/${form.id}`, payload, { headers });
       else await api.post("/admin/games", payload, { headers });
-      toast.success(form.id ? "Game diperbarui & produk disinkronkan" : "Game ditambahkan & produk dibuat");
+      toast.success(
+        form.id
+          ? "Game (termasuk URL Icon & URL Banner) berhasil disimpan ke database PostgreSQL"
+          : "Game baru berhasil ditambahkan & disimpan ke database PostgreSQL"
+      );
       setForm(null);
       load();
       onReload?.();
@@ -1026,12 +1054,76 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                   <input id="g-cur" value={form.currency} onChange={(e) => patch({ currency: e.target.value })} className={inputCls} placeholder="Diamond" />
                 </div>
                 <div>
-                  <label htmlFor="g-icon" className={labelCls}>URL Icon</label>
-                  <input id="g-icon" value={form.icon} onChange={(e) => patch({ icon: e.target.value })} className={inputCls} placeholder="https://..." />
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="g-icon" className={labelCls}>URL Icon (PostgreSQL: wjp_games.icon)</label>
+                    <label className="inline-flex items-center gap-1 text-[10px] font-mono text-neon hover:text-lime cursor-pointer">
+                      {uploadingField === "icon" ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                      <span>Upload Icon</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => uploadGameImage("icon", e.target.files?.[0])}
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2.5">
+                    {form.icon ? (
+                      <img
+                        src={imgSrc(form.icon)}
+                        alt="Preview Icon"
+                        className="w-10 h-10 rounded-lg object-cover border border-line bg-void shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg border border-dashed border-line bg-void flex items-center justify-center text-[9px] font-mono text-slate-600 shrink-0">
+                        ICON
+                      </div>
+                    )}
+                    <input
+                      id="g-icon"
+                      data-testid="game-icon-url"
+                      value={form.icon || ""}
+                      onChange={(e) => patch({ icon: e.target.value })}
+                      className={`${inputCls} !mt-0`}
+                      placeholder="https://... atau /uploads/..."
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="g-banner" className={labelCls}>URL Banner</label>
-                  <input id="g-banner" value={form.banner} onChange={(e) => patch({ banner: e.target.value })} className={inputCls} placeholder="https://..." />
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="g-banner" className={labelCls}>URL Banner (PostgreSQL: wjp_games.banner)</label>
+                    <label className="inline-flex items-center gap-1 text-[10px] font-mono text-neon hover:text-lime cursor-pointer">
+                      {uploadingField === "banner" ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                      <span>Upload Banner</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => uploadGameImage("banner", e.target.files?.[0])}
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2.5">
+                    {form.banner ? (
+                      <img
+                        src={imgSrc(form.banner)}
+                        alt="Preview Banner"
+                        className="w-16 h-10 rounded-lg object-cover border border-line bg-void shrink-0"
+                      />
+                    ) : (
+                      <div className="w-16 h-10 rounded-lg border border-dashed border-line bg-void flex items-center justify-center text-[9px] font-mono text-slate-600 shrink-0">
+                        BANNER
+                      </div>
+                    )}
+                    <input
+                      id="g-banner"
+                      data-testid="game-banner-url"
+                      value={form.banner || ""}
+                      onChange={(e) => patch({ banner: e.target.value })}
+                      className={`${inputCls} !mt-0`}
+                      placeholder="https://... atau /uploads/..."
+                    />
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="g-vprefix" className={labelCls}>Prefix Pencocokan Digiflazz</label>

@@ -293,10 +293,14 @@ const POSTGRES_DDL_STATEMENTS = [
     name TEXT NOT NULL,
     publisher TEXT,
     currency TEXT,
+    icon TEXT DEFAULT '',
+    banner TEXT DEFAULT '',
     is_active BOOLEAN NOT NULL DEFAULT true,
     data JSONB NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );`,
+  `ALTER TABLE wjp_games ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '';`,
+  `ALTER TABLE wjp_games ADD COLUMN IF NOT EXISTS banner TEXT DEFAULT '';`,
   `CREATE TABLE IF NOT EXISTS wjp_transactions (
     id TEXT PRIMARY KEY,
     product_id TEXT,
@@ -439,17 +443,31 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
     await client.query("DELETE FROM wjp_games");
     for (const g of db.games || []) {
       const id = String(g.id || g.slug || uuidHex(12));
+      const iconUrl = String(g.icon || "").trim();
+      const bannerUrl = String(g.banner || "").trim();
       await client.query(
-        `INSERT INTO wjp_games (id, slug, name, publisher, currency, is_active, data, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
+        `INSERT INTO wjp_games (id, slug, name, publisher, currency, icon, banner, is_active, data, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, NOW())
+         ON CONFLICT (id) DO UPDATE SET
+           slug = EXCLUDED.slug,
+           name = EXCLUDED.name,
+           publisher = EXCLUDED.publisher,
+           currency = EXCLUDED.currency,
+           icon = EXCLUDED.icon,
+           banner = EXCLUDED.banner,
+           is_active = EXCLUDED.is_active,
+           data = EXCLUDED.data,
+           updated_at = NOW()`,
         [
           id,
           String(g.slug || id),
           String(g.name || "Game"),
           String(g.publisher || ""),
           String(g.currency || "Item"),
+          iconUrl,
+          bannerUrl,
           g.is_active !== false,
-          JSON.stringify({ ...g, id }),
+          JSON.stringify({ ...g, id, icon: iconUrl, banner: bannerUrl }),
         ]
       );
     }
@@ -626,6 +644,31 @@ async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPoo
       return res.rows.map((r) => r.data).filter(Boolean);
     };
 
+    const qGames = async () => {
+      const res = await pool.query(
+        `SELECT id, slug, name, publisher, currency, icon, banner, is_active, data FROM wjp_games`
+      );
+      loadedRows += res.rows.length;
+      return res.rows
+        .map((r) => {
+          const base = r.data && typeof r.data === "object" ? r.data : {};
+          const iconUrl = String(r.icon || base.icon || "").trim();
+          const bannerUrl = String(r.banner || base.banner || "").trim();
+          return {
+            ...base,
+            id: String(r.id || base.id || ""),
+            slug: String(r.slug || base.slug || ""),
+            name: String(r.name || base.name || ""),
+            publisher: String(r.publisher ?? base.publisher ?? ""),
+            currency: String(r.currency ?? base.currency ?? "Item"),
+            icon: iconUrl,
+            banner: bannerUrl,
+            is_active: typeof r.is_active === "boolean" ? r.is_active : base.is_active !== false,
+          };
+        })
+        .filter((g) => g.id || g.slug);
+    };
+
     const [
       users,
       products,
@@ -643,7 +686,7 @@ async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPoo
     ] = await Promise.all([
       qData("wjp_users"),
       qData("wjp_products"),
-      qData("wjp_games"),
+      qGames(),
       qData("wjp_transactions"),
       qData("wjp_testimonials"),
       qData("wjp_manual_destinations"),
@@ -809,8 +852,10 @@ function generatePostgresSqlDump(): string {
 
   for (const g of db.games || []) {
     const id = String(g.id || g.slug || uuidHex(12));
+    const iconUrl = String(g.icon || "").trim();
+    const bannerUrl = String(g.banner || "").trim();
     lines.push(
-      `INSERT INTO wjp_games (id, slug, name, publisher, currency, is_active, data, updated_at) VALUES (${sqlLiteral(id)}, ${sqlLiteral(g.slug || id)}, ${sqlLiteral(g.name || "Game")}, ${sqlLiteral(g.publisher || "")}, ${sqlLiteral(g.currency || "Item")}, ${sqlLiteral(g.is_active !== false)}, ${sqlLiteral(JSON.stringify({ ...g, id }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET slug = EXCLUDED.slug, name = EXCLUDED.name, publisher = EXCLUDED.publisher, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, data = EXCLUDED.data, updated_at = NOW();`
+      `INSERT INTO wjp_games (id, slug, name, publisher, currency, icon, banner, is_active, data, updated_at) VALUES (${sqlLiteral(id)}, ${sqlLiteral(g.slug || id)}, ${sqlLiteral(g.name || "Game")}, ${sqlLiteral(g.publisher || "")}, ${sqlLiteral(g.currency || "Item")}, ${sqlLiteral(iconUrl)}, ${sqlLiteral(bannerUrl)}, ${sqlLiteral(g.is_active !== false)}, ${sqlLiteral(JSON.stringify({ ...g, id, icon: iconUrl, banner: bannerUrl }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET slug = EXCLUDED.slug, name = EXCLUDED.name, publisher = EXCLUDED.publisher, currency = EXCLUDED.currency, icon = EXCLUDED.icon, banner = EXCLUDED.banner, is_active = EXCLUDED.is_active, data = EXCLUDED.data, updated_at = NOW();`
     );
   }
   lines.push("");
@@ -1637,11 +1682,11 @@ function upgradeLocalGameIcons() {
       (g) => g.slug === mg.slug || String(g.name || "").toLowerCase() === mg.name.toLowerCase()
     );
     if (!existing) continue;
-    existing.name = mg.name;
-    existing.publisher = mg.publisher;
-    existing.currency = mg.currency;
-    existing.icon = mg.icon;
-    existing.banner = mg.banner;
+    if (!String(existing.name || "").trim()) existing.name = mg.name;
+    if (!String(existing.publisher || "").trim()) existing.publisher = mg.publisher;
+    if (!String(existing.currency || "").trim()) existing.currency = mg.currency;
+    if (!String(existing.icon || "").trim()) existing.icon = mg.icon;
+    if (!String(existing.banner || "").trim()) existing.banner = mg.banner;
     existing.seq = typeof existing.seq === "number" ? existing.seq : idx;
   }
 }
@@ -9451,7 +9496,7 @@ admin.get("/games", (_req, res) => {
   res.json(rows);
 });
 
-admin.post("/games", (req, res) => {
+admin.post("/games", async (req, res) => {
   const data = req.body || {};
   const name = String(data.name || "").trim();
   if (!name) return res.status(400).json({ detail: "Nama game wajib diisi" });
@@ -9459,12 +9504,16 @@ admin.post("/games", (req, res) => {
   if (db.games.some((g) => g.slug === slug)) {
     return res.status(400).json({ detail: "Game dengan slug tersebut sudah ada" });
   }
+  const iconUrl = String(data.icon ?? "").trim();
+  const bannerUrl = String(data.banner ?? "").trim();
   // New games start with empty denominations; products must be pulled from Digiflazz
   const game = {
     ...data,
     id: `gm-${slug}-${uuidHex(4)}`,
     name,
     slug,
+    icon: iconUrl,
+    banner: bannerUrl,
     vendor_id: "vp-digiflazz",
     is_active: Boolean(data.is_active ?? true),
     featured: Boolean(data.featured ?? false),
@@ -9477,10 +9526,13 @@ admin.post("/games", (req, res) => {
   db.games.push(game);
   syncGameProducts(game);
   saveDb();
+  if (pgPool && pgRuntime.connected) {
+    await pushToPostgres(pgPool);
+  }
   res.status(201).json(game);
 });
 
-admin.put("/games/:game_id", (req, res) => {
+admin.put("/games/:game_id", async (req, res) => {
   const idx = db.games.findIndex((g) => g.id === req.params.game_id);
   if (idx === -1) return res.status(404).json({ detail: "Game tidak ditemukan" });
   const existing = db.games[idx];
@@ -9520,11 +9572,16 @@ admin.put("/games/:game_id", (req, res) => {
         .map((d: any, i: number) => ({ ...d, seq: i }))
     : existing.denominations || [];
 
+  const iconUrl = data.icon !== undefined ? String(data.icon || "").trim() : String(existing.icon || "").trim();
+  const bannerUrl = data.banner !== undefined ? String(data.banner || "").trim() : String(existing.banner || "").trim();
+
   const updated = {
     ...existing,
     ...data,
     id: existing.id,
     slug: slugify(data.slug || existing.slug || data.name || existing.name),
+    icon: iconUrl,
+    banner: bannerUrl,
     vendor_id: "vp-digiflazz",
     denominations: sanitizedDenominations,
     updated_at: nowIso(),
@@ -9532,6 +9589,9 @@ admin.put("/games/:game_id", (req, res) => {
   db.games[idx] = updated;
   syncGameProducts(updated);
   saveDb();
+  if (pgPool && pgRuntime.connected) {
+    await pushToPostgres(pgPool);
+  }
   res.json(updated);
 });
 
