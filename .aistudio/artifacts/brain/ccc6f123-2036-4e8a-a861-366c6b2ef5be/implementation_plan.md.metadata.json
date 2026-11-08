@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana penyederhanaan UI halaman katalog Top Up dan halaman detail Top Up Game agar lebih ringkas, dinamis, dan interaktif, disertai perbaikan menyeluruh terjemahan Bahasa Inggris (EN) pada seluruh elemen halaman Top Up.",
-  "updatedAt":  "2026-11-08T10:51:58.471221692Z",
+  "summary":  "Rencana penghapusan tombol manual Cek ID Digiflazz pada Langkah 1 halaman detail Top Up Game dan pengalihan verifikasi ID otomatis dengan pop-up konfirmasi Nickname saat pembeli menekan tombol Beli Sekarang (Checkout).",
+  "updatedAt":  "2026-11-08T16:10:10.130058498Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

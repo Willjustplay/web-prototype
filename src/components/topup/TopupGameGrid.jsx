@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Gamepad2, X, ArrowUpRight, Flame, SlidersHorizontal, Sparkles } from "lucide-react";
+import { Search, Gamepad2, X, ArrowUpRight, Sparkles } from "lucide-react";
 import { formatIDR, imgSrc } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -8,14 +8,6 @@ import { useLanguage } from "@/context/LanguageContext";
 export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry }) => {
   const { t } = useLanguage();
   const [q, setQ] = useState("");
-  const [filterMode, setFilterMode] = useState("all");
-
-  const FILTER_MODES = [
-    { id: "all", label: t("Semua Game", "All Games") },
-    { id: "featured", label: t("Populer", "Popular") },
-    { id: "cheapest", label: t("Termurah", "Lowest Price") },
-    { id: "az", label: "A - Z" },
-  ];
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -30,17 +22,8 @@ export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry 
       );
     }
 
-    if (filterMode === "featured") {
-      const pop = list.filter((g) => g.featured);
-      if (pop.length > 0) list = pop;
-    } else if (filterMode === "cheapest") {
-      list.sort((a, b) => (a.min_price || 999999999) - (b.min_price || 999999999));
-    } else if (filterMode === "az") {
-      list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
-    }
-
     return list;
-  }, [games, q, filterMode]);
+  }, [games, q]);
 
   if (loading) {
     return (
@@ -99,7 +82,7 @@ export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry 
   return (
     <div className="space-y-4 sm:space-y-5 w-full min-w-0">
       {/* Compact Dynamic Search & Filter Control Bar (Android-First) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3 rounded-2xl border border-line/90 bg-panel/75 backdrop-blur-md p-2.5 sm:p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.3)] w-full min-w-0 overflow-hidden">
+      <div className="flex items-center justify-between gap-2.5 sm:gap-3 rounded-2xl border border-line/90 bg-panel/75 backdrop-blur-md p-2.5 sm:p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.3)] w-full min-w-0 overflow-hidden">
         <div className="relative flex-1 group min-w-0">
           <label htmlFor="topup-game-search" className="sr-only">
             {t("Cari game", "Search games")}
@@ -131,37 +114,8 @@ export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry 
           )}
         </div>
 
-        <div className="flex items-center justify-between md:justify-end gap-2 min-w-0">
-          <div className="grid grid-cols-4 sm:inline-flex items-center gap-1 rounded-xl bg-void/90 border border-line p-1 w-full md:w-auto min-w-0">
-            {FILTER_MODES.map((m) => {
-              const active = filterMode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setFilterMode(m.id)}
-                  className={`relative px-1 sm:px-3 py-1.5 rounded-lg text-[9px] min-[380px]:text-[10px] sm:text-[11px] font-display font-semibold transition-colors min-w-0 overflow-hidden text-center cursor-pointer ${
-                    active ? "text-void font-bold" : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="topupGameFilterPill"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                      className="absolute inset-0 rounded-lg bg-neon shadow-[0_0_12px_rgba(0,240,255,0.3)]"
-                    />
-                  )}
-                  <span className="relative z-10 inline-flex items-center justify-center gap-1 min-w-0 max-w-full">
-                    {m.id === "featured" && <Flame size={10} className="hidden sm:inline shrink-0" />}
-                    {m.id === "cheapest" && <SlidersHorizontal size={10} className="hidden sm:inline shrink-0" />}
-                    <span className="truncate">{m.label}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <span className="hidden lg:inline-block text-[11px] font-mono text-slate-400 px-1.5 tabular-nums shrink-0">
+        <div className="flex items-center justify-end gap-2 min-w-0 shrink-0">
+          <span className="text-[11px] font-mono text-slate-400 px-1.5 tabular-nums shrink-0">
             {filtered.length} {t("game", filtered.length === 1 ? "game" : "games")}
           </span>
         </div>
@@ -180,10 +134,7 @@ export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry 
           </p>
           <button
             type="button"
-            onClick={() => {
-              setQ("");
-              setFilterMode("all");
-            }}
+            onClick={() => setQ("")}
             className="mt-4 inline-flex items-center gap-1.5 text-xs font-mono text-neon hover:text-lime transition-colors cursor-pointer"
           >
             {t("Reset pencarian", "Reset search")}

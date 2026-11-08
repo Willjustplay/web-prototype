@@ -23,6 +23,7 @@ import {
   PackageOpen,
   Gem,
   Crown,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
@@ -144,6 +145,7 @@ export default function TopupGameDetail() {
   const [duitkuChannels, setDuitkuChannels] = useState(DEFAULT_DUITKU_CHANNELS);
   const [duitkuChannel, setDuitkuChannel] = useState("SP");
   const [submitting, setSubmitting] = useState(false);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [summaryError, setSummaryError] = useState("");
 
   const game = useMemo(
@@ -162,6 +164,7 @@ export default function TopupGameDetail() {
     setDenomination(null);
     setDenomFilter("currency");
     setPaymentFilter("qris");
+    setConfirmModalOpen(false);
     setSummaryError("");
   }, [slug]);
 
@@ -342,41 +345,8 @@ export default function TopupGameDetail() {
     setValues((v) => ({ ...v, [key]: value }));
     setErrors((e) => ({ ...e, [key]: "" }));
     setValidation(null);
-  };
-
-  const runValidate = async () => {
-    const found = accountErrors();
-    setErrors(found);
-    if (Object.keys(found).length) {
-      setValidation({
-        ok: false,
-        checked: false,
-        message: Object.values(found)[0],
-      });
-      toast.error(Object.values(found)[0]);
-      return false;
-    }
-    setChecking(true);
-    try {
-      const result = await validateTopupDestination(game.slug, values);
-      setValidation(result);
-      if (!result.ok) {
-        toast.error(
-          result.message || t("Data akun tujuan tidak valid", "Invalid target account ID")
-        );
-        return false;
-      }
-      if (result.checked) {
-        toast.success(
-          `${t("Akun ditemukan", "Account found")}: ${
-            result.nickname || t("Terverifikasi", "Verified")
-          }`
-        );
-      }
-      return true;
-    } finally {
-      setChecking(false);
-    }
+    setConfirmModalOpen(false);
+    setSummaryError("");
   };
 
   const destinationLabel = useMemo(
@@ -453,30 +423,55 @@ export default function TopupGameDetail() {
       return;
     }
 
-    setSubmitting(true);
+    // 5. Verify Game ID only when buyer clicks Checkout, then open Nickname Confirmation Modal
+    setChecking(true);
     try {
-      // Auto-verify ID via Digiflazz if not verified yet
-      let verifiedNick = validation?.nickname || "";
-      if (!validation?.ok) {
-        const vRes = await validateTopupDestination(game.slug, values);
-        setValidation(vRes);
-        if (vRes.format_valid === false || vRes.code === "DIGIFLAZZ_FAILED") {
-          const errMsg =
-            vRes.message || t("Data ID tujuan tidak valid", "Invalid target account ID");
-          setSummaryError(errMsg);
-          toast.error(errMsg);
-          setSubmitting(false);
-          return;
-        }
-        verifiedNick = vRes.nickname || "";
+      let currentValidation = validation;
+      if (!currentValidation || (!currentValidation.ok && currentValidation.code !== "DIGIFLAZZ_PENDING")) {
+        currentValidation = await validateTopupDestination(game.slug, values);
+        setValidation(currentValidation);
       }
 
+      if (
+        currentValidation?.format_valid === false ||
+        currentValidation?.code === "DIGIFLAZZ_FAILED"
+      ) {
+        const errMsg =
+          currentValidation.message ||
+          t("Data ID tujuan tidak ditemukan atau tidak valid.", "Target account ID not found or invalid.");
+        setSummaryError(errMsg);
+        toast.error(errMsg);
+        scrollToStep("codashop-step-1");
+        return;
+      }
+
+      setConfirmModalOpen(true);
+    } catch (e) {
+      const errMsg =
+        formatApiError(e.response?.data?.detail) ||
+        t(
+          "Gagal memverifikasi ID tujuan. Silakan coba lagi.",
+          "Failed to verify target ID. Please try again."
+        );
+      setSummaryError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const confirmAndPay = async () => {
+    if (!game || !denomination) return;
+    const cleanEmail = email.trim().toLowerCase();
+    setSubmitting(true);
+    setSummaryError("");
+    try {
       const payload = {
         game: game.slug,
         denomination_code: denomination.code,
         product_id: productId,
         destination: values,
-        verified_nickname: verifiedNick,
+        verified_nickname: validation?.nickname || "",
         buyer_email: cleanEmail,
         buyer_whatsapp: wa.trim(),
         method: "duitku",
@@ -849,25 +844,6 @@ export default function TopupGameDetail() {
                       </p>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={runValidate}
-                    disabled={checking}
-                    data-testid="topup-validate-button"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-neon/60 bg-neon/15 text-neon font-display font-bold text-[11px] uppercase tracking-wider px-3.5 py-2.5 sm:py-2 hover:bg-neon hover:text-void hover:shadow-[0_0_20px_rgba(0,240,255,0.35)] transition-all duration-200 disabled:opacity-50 cursor-pointer active:scale-95 shrink-0"
-                  >
-                    {checking ? (
-                      <Loader2 size={13} className="animate-spin shrink-0" />
-                    ) : (
-                      <UserCheck size={13} className="shrink-0" />
-                    )}
-                    <span className="truncate">
-                      {checking
-                        ? t("Mengecek ID...", "Checking ID...")
-                        : t("Cek ID Digiflazz", "Verify Game ID")}
-                    </span>
-                  </button>
                 </div>
 
                 <div
@@ -1579,14 +1555,23 @@ export default function TopupGameDetail() {
                   <button
                     type="button"
                     onClick={submitCheckout}
-                    disabled={submitting || denoms.length === 0}
+                    disabled={checking || submitting || denoms.length === 0}
                     data-testid="topup-submit-checkout"
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-neon to-lime hover:from-lime hover:to-neon text-void font-display font-black text-xs sm:text-sm uppercase tracking-wider px-5 sm:px-6 py-3.5 shadow-[0_0_25px_rgba(0,240,255,0.3)] transition-all disabled:opacity-50 cursor-pointer active:scale-95 shrink-0"
                   >
-                    {submitting ? (
+                    {checking ? (
                       <>
                         <Loader2 size={15} className="animate-spin shrink-0" />
-                        <span className="truncate">{t("Memproses Pesanan...", "Processing Order...")}</span>
+                        <span className="truncate">
+                          {t("Mengecek ID Akun...", "Verifying Account ID...")}
+                        </span>
+                      </>
+                    ) : submitting ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin shrink-0" />
+                        <span className="truncate">
+                          {t("Memproses Pesanan...", "Processing Order...")}
+                        </span>
                       </>
                     ) : (
                       <>
@@ -1602,6 +1587,188 @@ export default function TopupGameDetail() {
           </div>
         )}
       </div>
+
+      {/* ==================== MODAL KONFIRMASI NICKNAME & PESANAN ==================== */}
+      <AnimatePresence>
+        {confirmModalOpen && game && denomination && (
+          <motion.div
+            key="topup-confirm-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            onClick={() => {
+              if (!submitting) setConfirmModalOpen(false);
+            }}
+            data-testid="topup-confirm-modal"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.18 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-2xl border border-line bg-panel p-4 sm:p-5 shadow-[0_24px_64px_rgba(0,0,0,0.75)] space-y-4 overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-line/80">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-8 h-8 rounded-xl bg-neon/15 border border-neon/40 text-neon grid place-items-center shrink-0">
+                    <UserCheck size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-display font-bold text-sm sm:text-base text-slate-100 leading-tight">
+                      {t("Konfirmasi Detail Pesanan", "Confirm Order Details")}
+                    </h3>
+                    <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                      {t(
+                        "Pastikan Nickname & ID tujuan sudah benar sebelum membayar",
+                        "Make sure your Nickname & Target ID are correct before paying"
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setConfirmModalOpen(false)}
+                  aria-label={t("Tutup", "Close")}
+                  className="w-7 h-7 rounded-lg border border-line bg-void/70 text-slate-400 hover:text-slate-100 hover:border-neon/50 grid place-items-center transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Nickname / Account Verification Highlight */}
+              <div
+                className={`rounded-xl border p-3.5 space-y-1.5 ${
+                  validation?.ok && validation?.checked
+                    ? "bg-lime/10 border-lime/40"
+                    : "bg-neon/8 border-neon/35"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
+                    {t("Nickname Akun Game", "In-Game Nickname")}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider ${
+                      validation?.ok && validation?.checked ? "text-lime" : "text-neon"
+                    }`}
+                  >
+                    <ShieldCheck size={12} />
+                    {validation?.ok && validation?.checked
+                      ? t("Terverifikasi", "Verified")
+                      : validation?.code === "DIGIFLAZZ_PENDING"
+                        ? t("Antrean Cek ID", "Verification Queued")
+                        : t("Format ID Sesuai", "Valid ID Format")}
+                  </span>
+                </div>
+
+                <p
+                  data-testid="topup-confirm-nickname"
+                  className={`font-display font-extrabold text-sm sm:text-base break-words ${
+                    validation?.ok && validation?.checked ? "text-lime" : "text-slate-100"
+                  }`}
+                >
+                  {validation?.nickname
+                    ? validation.nickname
+                    : validation?.code === "DIGIFLAZZ_PENDING"
+                      ? t(
+                          "Sedang diverifikasi otomatis (Bisa lanjut bayar)",
+                          "Verifying automatically (Safe to proceed)"
+                        )
+                      : t("Siap Diproses ke ID Tujuan", "Ready to Deliver to Target ID")}
+                </p>
+
+                <p className="text-[11px] font-mono text-slate-300 break-all">
+                  {t("Tujuan", "Target")}:{" "}
+                  <strong className="text-slate-100">
+                    {validation?.customer_no || destinationLabel}
+                  </strong>
+                </p>
+              </div>
+
+              {/* Order Breakdown */}
+              <div className="rounded-xl border border-line bg-void/80 p-3.5 space-y-2.5 text-xs font-mono">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-slate-400 shrink-0">{t("Game", "Game")}</span>
+                  <span className="text-slate-100 font-bold text-right break-words">
+                    {game.name}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-slate-400 shrink-0">
+                    {t("Item Top Up", "Top Up Item")}
+                  </span>
+                  <span className="text-neon font-bold text-right break-words">
+                    {denomination.label}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-slate-400 shrink-0">
+                    {t("Pembayaran", "Payment")}
+                  </span>
+                  <span className="text-slate-200 text-right break-words">
+                    {selectedChannelObj?.short_name || selectedChannelObj?.name}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-slate-400 shrink-0">
+                    {t("Email Bukti", "Receipt Email")}
+                  </span>
+                  <span className="text-slate-300 text-right break-all">
+                    {email.trim().toLowerCase()}
+                  </span>
+                </div>
+                <div className="pt-2.5 border-t border-line/80 flex items-center justify-between gap-3">
+                  <span className="text-slate-300 font-bold">
+                    {t("Total Bayar", "Total Price")}
+                  </span>
+                  <span className="font-mono font-black text-base text-lime tabular-nums">
+                    {formatIDR(denomination.price)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setConfirmModalOpen(false)}
+                  data-testid="topup-confirm-cancel"
+                  className="w-full inline-flex items-center justify-center rounded-xl border border-line bg-void hover:border-slate-500 text-slate-300 hover:text-slate-100 font-display font-bold text-xs py-3 px-3 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {t("Periksa Lagi", "Edit Details")}
+                </button>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={confirmAndPay}
+                  data-testid="topup-confirm-proceed"
+                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-neon to-lime hover:from-lime hover:to-neon text-void font-display font-black text-xs uppercase tracking-wider py-3 px-3 shadow-[0_0_20px_rgba(0,240,255,0.28)] transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin shrink-0" />
+                      <span className="truncate">{t("Memproses...", "Processing...")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="truncate">
+                        {t("Lanjut Bayar", "Pay Now")}
+                      </span>
+                      <ArrowRight size={14} className="shrink-0" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Footer />
     </main>
