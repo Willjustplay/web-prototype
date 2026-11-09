@@ -550,7 +550,7 @@ export const TopupPaymentStep = ({
               <p className="font-display font-bold text-sm uppercase tracking-wider text-slate-100">
                 Ringkasan Checkout
               </p>
-              <span className="text-[10px] font-mono text-neon">Digiflazz &middot; Otomatis 24/7</span>
+              <span className="text-[10px] font-mono text-neon">Otomatis 24/7</span>
             </div>
 
             {/* Selected Game & Nominal Mini Card */}

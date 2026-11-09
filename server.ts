@@ -5600,19 +5600,19 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
     }
   }
 
-  // 2. Check if game has a configured Digiflazz Cek ID SKU
+  // 2. Check if game has a configured Cek ID SKU; if not, allow direct checkout when format is valid
   if (!cekSku) {
     return {
-      valid: false,
+      valid: true,
       format_valid: true,
       checked: false,
-      code: "CEK_SKU_NOT_SET",
+      code: "DIRECT_ID_OK",
       nickname: "",
       customer_no: customerNo,
       cek_id_sku: "",
       server_label: zoneId ? `Zone ${zoneId}` : server || "",
-      source: "digiflazz_live",
-      message: `Kode SKU Cek ID Digiflazz belum diatur untuk ${game.name}. Admin dapat mengaturnya di menu Edit Game.`,
+      source: "direct_format",
+      message: "Format ID tujuan sesuai dan siap diproses.",
     };
   }
 
@@ -5628,21 +5628,20 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
 
   if (!isLiveDf) {
     return {
-      valid: false,
+      valid: true,
       format_valid: true,
       checked: false,
-      code: "DIGIFLAZZ_NOT_CONFIGURED",
+      code: "DIRECT_ID_OK",
       nickname: "",
       customer_no: customerNo,
       cek_id_sku: cekSku,
       server_label: zoneId ? `Zone ${zoneId}` : server || "",
-      source: "digiflazz_live",
-      message:
-        "Kredensial API Digiflazz (Username & API Key) belum dikonfigurasi di Panel Admin -> Integrasi & Supplier.",
+      source: "direct_format",
+      message: "Format ID tujuan sesuai dan siap diproses.",
     };
   }
 
-  // 3. Execute live Digiflazz Cek ID Inquiry via /v1/transaction (with short-polling if status is Pending)
+  // 3. Execute live Cek ID Inquiry (with short-polling if status is Pending)
   const refId = `CHK-${slug.slice(0, 8).toUpperCase()}-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
   const sign = crypto.createHash("md5").update(dfUser + dfKey + refId).digest("hex");
 
@@ -5686,25 +5685,52 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
             customer_no: customerNo,
             cek_id_sku: cekSku,
             server_label: zoneId ? `Zone ${zoneId}` : server || "",
-            source: "digiflazz_live",
-            message: `ID Game Terverifikasi via Digiflazz (${cekSku}) — Nickname: ${cleanNick}`,
+            source: "live_verified",
+            message: `ID Akun Terverifikasi — Nickname: ${cleanNick}`,
           };
         }
       }
 
       if (status === "Gagal" || (rc && rc !== "00" && rc !== "03" && rc !== "39")) {
-        const dfMsg = String(lastData?.message || "ID Akun tidak ditemukan atau SKU Cek ID tidak valid").trim();
+        const rawErrMsg = String(lastData?.message || "").trim();
+        const isSkuOrServiceUnintegrated =
+          /sku|produk|layanan|gangguan|cut\s*off|saldo|ip|sign|signature|seller|vendor|tidak\s+aktif|belum\s+tersedia/i.test(
+            rawErrMsg
+          );
+        const isInvalidAccountId =
+          !isSkuOrServiceUnintegrated &&
+          (rc === "14" ||
+            /tujuan\s+salah|id\s*(?:akun\s*)?tidak\s+ditemukan|nomor\s+tujuan|user\s*(?:id)?\s*not\s*found|invalid\s*(?:user|player|zone|customer)|character\s*not\s*found|akun\s+tidak\s+ditemukan/i.test(
+              rawErrMsg
+            ));
+
+        if (isInvalidAccountId) {
+          return {
+            valid: false,
+            format_valid: true,
+            checked: true,
+            code: "ACCOUNT_NOT_FOUND",
+            nickname: "",
+            customer_no: customerNo,
+            cek_id_sku: cekSku,
+            server_label: zoneId ? `Zone ${zoneId}` : server || "",
+            source: "live_verified",
+            message: "ID Akun tidak ditemukan. Pastikan User ID dan Zone/Server sudah sesuai dengan profil di dalam game.",
+          };
+        }
+
+        // If Cek ID cannot be integrated or the check SKU itself is unavailable, allow direct checkout
         return {
-          valid: false,
+          valid: true,
           format_valid: true,
-          checked: true,
-          code: "DIGIFLAZZ_FAILED",
+          checked: false,
+          code: "DIRECT_ID_OK",
           nickname: "",
           customer_no: customerNo,
           cek_id_sku: cekSku,
           server_label: zoneId ? `Zone ${zoneId}` : server || "",
-          source: "digiflazz_live",
-          message: `Digiflazz (${cekSku}): ${dfMsg}`,
+          source: "direct_format",
+          message: "Format ID tujuan sesuai dan siap diproses.",
         };
       }
 
@@ -5714,31 +5740,30 @@ async function verifyGameAccountId(game: any, cleaned: Record<string, string>) {
       }
     }
 
-    const pendingMsg = String(lastData?.message || "Transaksi pengecekan ID sedang diproses oleh Digiflazz").trim();
     return {
-      valid: false,
+      valid: true,
       format_valid: true,
       checked: false,
-      code: "DIGIFLAZZ_PENDING",
+      code: "DIRECT_ID_OK",
       nickname: "",
       customer_no: customerNo,
       cek_id_sku: cekSku,
       server_label: zoneId ? `Zone ${zoneId}` : server || "",
-      source: "digiflazz_live",
-      message: `Digiflazz (${cekSku}): ${pendingMsg}. Silakan klik Cek ID kembali dalam beberapa detik.`,
+      source: "direct_format",
+      message: "Format ID tujuan sesuai dan siap diproses.",
     };
-  } catch (err: any) {
+  } catch (_err: any) {
     return {
-      valid: false,
+      valid: true,
       format_valid: true,
       checked: false,
-      code: "DIGIFLAZZ_NETWORK_ERROR",
+      code: "DIRECT_ID_OK",
       nickname: "",
       customer_no: customerNo,
       cek_id_sku: cekSku,
       server_label: zoneId ? `Zone ${zoneId}` : server || "",
-      source: "digiflazz_live",
-      message: `Gagal menghubungi API Digiflazz untuk SKU ${cekSku}: ${String(err?.message || "Timeout / koneksi gagal")}`,
+      source: "direct_format",
+      message: "Format ID tujuan sesuai dan siap diproses.",
     };
   }
 }
@@ -5770,7 +5795,7 @@ api.post("/topup/validate", async (req, res) => {
       valid: false,
       format_valid: verification.format_valid !== false,
       checked: Boolean(verification.checked),
-      code: verification.code || "UNVERIFIED",
+      code: verification.code || "ACCOUNT_NOT_FOUND",
       cek_id_sku: verification.cek_id_sku || String(game.cek_id_sku || ""),
       customer_no: verification.customer_no || "",
       destination: cleaned,
@@ -5780,15 +5805,14 @@ api.post("/topup/validate", async (req, res) => {
   res.json({
     valid: true,
     format_valid: true,
-    checked: true,
-    code: "VERIFIED",
-    nickname: verification.nickname,
-    sn: (verification as any).sn || verification.nickname,
+    checked: Boolean(verification.checked),
+    code: verification.code || (verification.checked ? "VERIFIED" : "DIRECT_ID_OK"),
+    nickname: verification.nickname || "",
+    sn: (verification as any).sn || verification.nickname || "",
     customer_no: verification.customer_no,
     cek_id_sku: verification.cek_id_sku || String(game.cek_id_sku || ""),
     server_label: verification.server_label || "",
     game_name: game.name,
-    provider: "digiflazz",
     verification_source: verification.source,
     verified_at: nowIso(),
     destination: cleaned,
@@ -8042,7 +8066,7 @@ api.post("/payments/topup/checkout", async (req, res) => {
         : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
 
     const verification = await verifyGameAccountId(game, destination);
-    if (!verification.valid) {
+    if (verification.format_valid === false || verification.code === "ACCOUNT_NOT_FOUND") {
       return res.status(400).json({ detail: verification.message || "ID Akun Game tidak valid" });
     }
     const verifiedNickname = String(body.verified_nickname || verification.nickname || "").trim();

@@ -144,7 +144,7 @@ export const TopupAccountForm = ({
                   <span>Nickname: {validation.nickname || "Akun ditemukan"}</span>
                 </div>
                 <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-void/70 border border-lime/40 text-lime">
-                  <ShieldCheck size={11} /> ID Terverifikasi Digiflazz
+                  <ShieldCheck size={11} /> ID Terverifikasi
                 </span>
               </div>
               {validation.customer_no && (

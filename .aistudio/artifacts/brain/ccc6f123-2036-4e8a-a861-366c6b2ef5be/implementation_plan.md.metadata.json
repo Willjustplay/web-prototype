@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana penghapusan tombol manual Cek ID Digiflazz pada Langkah 1 halaman detail Top Up Game dan pengalihan verifikasi ID otomatis dengan pop-up konfirmasi Nickname saat pembeli menekan tombol Beli Sekarang (Checkout).",
-  "updatedAt":  "2026-11-08T16:10:10.130058498Z",
+  "summary":  "Rencana agar seluruh produk Top Up yang tidak memiliki integrasi Cek ID tetap selalu dapat dibeli hingga tahap pembayaran, penyederhanaan pop-up konfirmasi tanpa baris Nickname untuk game tanpa Cek ID, serta penghapusan seluruh kata Digiflazz dari halaman dan notifikasi Top Up sisi pembeli.",
+  "updatedAt":  "2026-11-09T02:25:28.269037420Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

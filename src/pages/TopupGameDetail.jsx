@@ -423,22 +423,25 @@ export default function TopupGameDetail() {
       return;
     }
 
-    // 5. Verify Game ID only when buyer clicks Checkout, then open Nickname Confirmation Modal
+    // 5. Verify Game ID when buyer clicks Checkout, then open Confirmation Modal
     setChecking(true);
     try {
       let currentValidation = validation;
-      if (!currentValidation || (!currentValidation.ok && currentValidation.code !== "DIGIFLAZZ_PENDING")) {
+      if (!currentValidation) {
         currentValidation = await validateTopupDestination(game.slug, values);
         setValidation(currentValidation);
       }
 
       if (
         currentValidation?.format_valid === false ||
-        currentValidation?.code === "DIGIFLAZZ_FAILED"
+        currentValidation?.code === "ACCOUNT_NOT_FOUND"
       ) {
         const errMsg =
           currentValidation.message ||
-          t("Data ID tujuan tidak ditemukan atau tidak valid.", "Target account ID not found or invalid.");
+          t(
+            "Data ID tujuan tidak ditemukan atau tidak valid.",
+            "Target account ID not found or invalid."
+          );
         setSummaryError(errMsg);
         toast.error(errMsg);
         scrollToStep("codashop-step-1");
@@ -446,15 +449,16 @@ export default function TopupGameDetail() {
       }
 
       setConfirmModalOpen(true);
-    } catch (e) {
-      const errMsg =
-        formatApiError(e.response?.data?.detail) ||
-        t(
-          "Gagal memverifikasi ID tujuan. Silakan coba lagi.",
-          "Failed to verify target ID. Please try again."
-        );
-      setSummaryError(errMsg);
-      toast.error(errMsg);
+    } catch (_e) {
+      // Fallback: if ID check service is unreachable, still allow checkout when local format is valid
+      setValidation({
+        ok: true,
+        format_valid: true,
+        checked: false,
+        code: "DIRECT_ID_OK",
+        nickname: "",
+      });
+      setConfirmModalOpen(true);
     } finally {
       setChecking(false);
     }
@@ -925,9 +929,9 @@ export default function TopupGameDetail() {
                   })}
                 </div>
 
-                {/* Nickname Verification Status (Real Digiflazz Response) */}
+                {/* Account Verification Status */}
                 <AnimatePresence mode="wait">
-                  {validation?.ok && validation.checked && (
+                  {validation?.ok && validation.checked && validation.nickname && (
                     <motion.div
                       key="ok"
                       initial={{ opacity: 0, y: -4 }}
@@ -942,62 +946,51 @@ export default function TopupGameDetail() {
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="break-words">
-                            Nickname:{" "}
-                            {validation.nickname ||
-                              t("Akun Terverifikasi", "Verified Account")}
+                            Nickname: {validation.nickname}
                           </p>
                           {validation.customer_no && (
                             <p className="text-[10px] font-normal text-lime/80 break-all">
                               {t("ID Tujuan", "Target ID")}: {validation.customer_no}
-                              {validation.cek_id_sku
-                                ? ` • SKU: ${validation.cek_id_sku}`
-                                : ""}
                             </p>
                           )}
                         </div>
                       </div>
                       <span className="text-[9px] sm:text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-lg bg-void/80 border border-lime/40 shrink-0">
-                        {t("Terverifikasi Digiflazz", "Digiflazz Verified")}
+                        {t("Terverifikasi", "Verified")}
                       </span>
                     </motion.div>
                   )}
-                  {validation && !validation.ok && (
-                    <motion.div
-                      key="fail"
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      data-testid="topup-validate-fail"
-                      className={`mt-3.5 flex items-start gap-2 rounded-xl px-3 sm:px-3.5 py-2.5 text-xs font-mono border min-w-0 ${
-                        validation.code === "DIGIFLAZZ_PENDING"
-                          ? "bg-neon/10 border-neon/40 text-neon"
-                          : "bg-coral/10 border-coral/40 text-coral"
-                      }`}
-                    >
-                      <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <p className="font-bold text-[11px] sm:text-xs break-words">
-                          {validation.code === "DIGIFLAZZ_FAILED"
-                            ? t(
-                                "ID Akun Tidak Ditemukan di Digiflazz",
-                                "Account ID Not Found on Digiflazz"
-                              )
-                            : validation.code === "DIGIFLAZZ_PENDING"
+                  {validation &&
+                    (!validation.ok ||
+                      validation.format_valid === false ||
+                      validation.code === "ACCOUNT_NOT_FOUND") && (
+                      <motion.div
+                        key="fail"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        data-testid="topup-validate-fail"
+                        className="mt-3.5 flex items-start gap-2 rounded-xl px-3 sm:px-3.5 py-2.5 text-xs font-mono border bg-coral/10 border-coral/40 text-coral min-w-0"
+                      >
+                        <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <p className="font-bold text-[11px] sm:text-xs break-words">
+                            {validation.code === "ACCOUNT_NOT_FOUND"
                               ? t(
-                                  "Pengecekan ID Sedang Diproses Digiflazz",
-                                  "ID Verification in Progress on Digiflazz"
+                                  "ID Akun Tidak Ditemukan",
+                                  "Account ID Not Found"
                                 )
                               : t(
-                                  "Verifikasi Cek ID Digiflazz",
-                                  "Digiflazz ID Verification"
+                                  "Periksa Kembali Data ID Tujuan",
+                                  "Please Check Your Target ID"
                                 )}
-                        </p>
-                        <p className="text-[10px] sm:text-[11px] opacity-90 break-words">
-                          {validation.message}
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
+                          </p>
+                          <p className="text-[10px] sm:text-[11px] opacity-90 break-words">
+                            {validation.message}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
                 </AnimatePresence>
               </section>
 
@@ -1115,8 +1108,8 @@ export default function TopupGameDetail() {
                     </h3>
                     <p className="text-[11px] sm:text-xs font-mono text-slate-400 max-w-md mx-auto leading-relaxed break-words">
                       {t(
-                        `Produk SKU ${currencyLabel} & Membership untuk ${game.name} sedang disinkronkan dari Digiflazz.`,
-                        `${currencyLabel} & Membership SKUs for ${game.name} are currently being synced from Digiflazz.`
+                        `Paket ${currencyLabel} & Membership untuk ${game.name} sedang diperbarui di katalog.`,
+                        `${currencyLabel} & Membership packages for ${game.name} are currently being updated in the catalog.`
                       )}
                     </p>
                   </div>
@@ -1540,8 +1533,8 @@ export default function TopupGameDetail() {
                         <p className="text-[10px] sm:text-[11px] font-mono text-slate-400 mt-0.5 break-words">
                           {denoms.length === 0
                             ? t(
-                                "Silakan pilih game lain atau tunggu Admin menarik SKU dari Digiflazz.",
-                                "Please select another game or wait while Admin syncs SKUs from Digiflazz."
+                                "Silakan pilih game lain atau tunggu pembaruan paket nominal.",
+                                "Please select another game or wait for package updates."
                               )
                             : t(
                                 "Lengkapi ID akun pada Langkah 1 & pilih nominal pada Langkah 2.",
@@ -1563,7 +1556,7 @@ export default function TopupGameDetail() {
                       <>
                         <Loader2 size={15} className="animate-spin shrink-0" />
                         <span className="truncate">
-                          {t("Mengecek ID Akun...", "Verifying Account ID...")}
+                          {t("Memeriksa Data...", "Checking Details...")}
                         </span>
                       </>
                     ) : submitting ? (
@@ -1588,7 +1581,7 @@ export default function TopupGameDetail() {
         )}
       </div>
 
-      {/* ==================== MODAL KONFIRMASI NICKNAME & PESANAN ==================== */}
+      {/* ==================== MODAL KONFIRMASI PESANAN ==================== */}
       <AnimatePresence>
         {confirmModalOpen && game && denomination && (
           <motion.div
@@ -1622,10 +1615,15 @@ export default function TopupGameDetail() {
                       {t("Konfirmasi Detail Pesanan", "Confirm Order Details")}
                     </h3>
                     <p className="text-[11px] font-mono text-slate-400 mt-0.5">
-                      {t(
-                        "Pastikan Nickname & ID tujuan sudah benar sebelum membayar",
-                        "Make sure your Nickname & Target ID are correct before paying"
-                      )}
+                      {validation?.checked && validation?.nickname
+                        ? t(
+                            "Pastikan Nickname & ID tujuan sudah benar sebelum membayar",
+                            "Make sure your Nickname & Target ID are correct before paying"
+                          )
+                        : t(
+                            "Pastikan ID tujuan sudah benar sebelum membayar",
+                            "Make sure your Target ID is correct before paying"
+                          )}
                     </p>
                   </div>
                 </div>
@@ -1640,55 +1638,53 @@ export default function TopupGameDetail() {
                 </button>
               </div>
 
-              {/* Nickname / Account Verification Highlight */}
-              <div
-                className={`rounded-xl border p-3.5 space-y-1.5 ${
-                  validation?.ok && validation?.checked
-                    ? "bg-lime/10 border-lime/40"
-                    : "bg-neon/8 border-neon/35"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
-                    {t("Nickname Akun Game", "In-Game Nickname")}
-                  </span>
-                  <span
-                    className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider ${
-                      validation?.ok && validation?.checked ? "text-lime" : "text-neon"
-                    }`}
+              {/* Account Destination Highlight: Show Nickname + Target ID if verified, or Target ID directly if no ID check */}
+              {validation?.checked && validation?.nickname ? (
+                <div className="rounded-xl border bg-lime/10 border-lime/40 p-3.5 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
+                      {t("Nickname Akun Game", "In-Game Nickname")}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-lime">
+                      <ShieldCheck size={12} />
+                      {t("Terverifikasi", "Verified")}
+                    </span>
+                  </div>
+
+                  <p
+                    data-testid="topup-confirm-nickname"
+                    className="font-display font-extrabold text-sm sm:text-base text-lime break-words"
                   >
-                    <ShieldCheck size={12} />
-                    {validation?.ok && validation?.checked
-                      ? t("Terverifikasi", "Verified")
-                      : validation?.code === "DIGIFLAZZ_PENDING"
-                        ? t("Antrean Cek ID", "Verification Queued")
-                        : t("Format ID Sesuai", "Valid ID Format")}
-                  </span>
+                    {validation.nickname}
+                  </p>
+
+                  <p className="text-[11px] font-mono text-slate-300 break-all">
+                    {t("ID Tujuan", "Target ID")}:{" "}
+                    <strong className="text-slate-100">
+                      {destinationLabel || validation.customer_no}
+                    </strong>
+                  </p>
                 </div>
+              ) : (
+                <div className="rounded-xl border bg-neon/8 border-neon/35 p-3.5 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
+                      {t("ID Tujuan", "Target ID")}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-neon">
+                      <ShieldCheck size={12} />
+                      {t("Siap Diproses", "Ready")}
+                    </span>
+                  </div>
 
-                <p
-                  data-testid="topup-confirm-nickname"
-                  className={`font-display font-extrabold text-sm sm:text-base break-words ${
-                    validation?.ok && validation?.checked ? "text-lime" : "text-slate-100"
-                  }`}
-                >
-                  {validation?.nickname
-                    ? validation.nickname
-                    : validation?.code === "DIGIFLAZZ_PENDING"
-                      ? t(
-                          "Sedang diverifikasi otomatis (Bisa lanjut bayar)",
-                          "Verifying automatically (Safe to proceed)"
-                        )
-                      : t("Siap Diproses ke ID Tujuan", "Ready to Deliver to Target ID")}
-                </p>
-
-                <p className="text-[11px] font-mono text-slate-300 break-all">
-                  {t("Tujuan", "Target")}:{" "}
-                  <strong className="text-slate-100">
-                    {validation?.customer_no || destinationLabel}
-                  </strong>
-                </p>
-              </div>
+                  <p
+                    data-testid="topup-confirm-destination"
+                    className="font-mono font-extrabold text-sm sm:text-base text-slate-100 break-all"
+                  >
+                    {destinationLabel || validation?.customer_no}
+                  </p>
+                </div>
+              )}
 
               {/* Order Breakdown */}
               <div className="rounded-xl border border-line bg-void/80 p-3.5 space-y-2.5 text-xs font-mono">

@@ -45,7 +45,6 @@ export const validateTopupDestination = async (gameSlug, destination) => {
       customer_no: data.customer_no || "",
       cek_id_sku: data.cek_id_sku || "",
       server_label: data.server_label || "",
-      provider: data.provider || "digiflazz",
       verified_at: data.verified_at || null,
       message: data.message || "",
       destination: data.destination || destination,
@@ -62,11 +61,11 @@ export const validateTopupDestination = async (gameSlug, destination) => {
       };
     }
     return {
-      ok: false,
+      ok: true,
       format_valid: true,
       checked: false,
-      code: "NETWORK_ERROR",
-      message: "Tidak dapat terhubung ke layanan Cek ID Digiflazz.",
+      code: "DIRECT_ID_OK",
+      message: "Format ID tujuan sesuai dan siap diproses.",
     };
   }
 };
