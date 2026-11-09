@@ -259,6 +259,10 @@ export default function PaymentSuccess() {
         setPaymentType(data.payment_type || "");
         return true;
       }
+      if (data.status === "cancelled_out_of_stock") {
+        setStatus("out_of_stock");
+        return true;
+      }
       if (data.provider === "manual") {
         if (data.status === "rejected" || data.payment_status === "failed") {
           setStatus("rejected");
@@ -431,6 +435,8 @@ export default function PaymentSuccess() {
       ) {
         setStatus("paid");
         setDelivery(r.data.delivery_info || "");
+      } else if (r.data.status === "cancelled_out_of_stock") {
+        setStatus("out_of_stock");
       } else if (r.data.payment_status === "failed") {
         setStatus(r.data.status === "expired" ? "expired" : "failed");
       } else {
@@ -1576,6 +1582,32 @@ export default function PaymentSuccess() {
             <p className="text-xs text-slate-300 mt-2 leading-relaxed">
               Bukti pembayaranmu sudah diterima. Admin kami sedang memverifikasi transaksi (estimasi 5–15 menit). Halaman ini akan otomatis diperbarui begitu pesanan selesai.
             </p>
+          </div>
+        )}
+
+        {/* STATE: OUT OF STOCK (CANCELLED BECAUSE PURCHASED BY ANOTHER BUYER) */}
+        {status === "out_of_stock" && (
+          <div className="py-6 text-center space-y-3" data-testid="payment-out-of-stock">
+            <XCircle
+              size={48}
+              className="mx-auto text-coral"
+              data-testid="payment-out-of-stock-icon"
+            />
+            <h1 className="font-display font-bold text-lg text-coral">
+              Produk Baru Saja Terjual Habis
+            </h1>
+            <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
+              {txData?.cancel_reason ||
+                "Produk ini telah dibeli terlebih dahulu oleh pembeli lain sehingga stoknya menjadi 0. Pembayaran pada sesi ini telah dibatalkan secara otomatis."}
+            </p>
+            <div className="rounded-xl border border-coral/40 bg-coral/10 p-3 text-left text-[11px] font-mono text-slate-200 space-y-1">
+              <p className="font-bold text-coral">
+                Kode pembayaran telah ditutup otomatis
+              </p>
+              <p className="text-slate-300 leading-relaxed">
+                Mohon jangan melakukan transfer untuk sesi ini. Apabila Anda sudah telanjur melakukan pembayaran tepat sebelum stok habis, silakan klik tombol Bantuan CS di bawah dengan menyertakan ID Sesi.
+              </p>
+            </div>
           </div>
         )}
 

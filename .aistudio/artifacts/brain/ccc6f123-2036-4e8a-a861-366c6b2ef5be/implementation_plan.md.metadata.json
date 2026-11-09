@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana agar seluruh produk Top Up yang tidak memiliki integrasi Cek ID tetap selalu dapat dibeli hingga tahap pembayaran, penyederhanaan pop-up konfirmasi tanpa baris Nickname untuk game tanpa Cek ID, serta penghapusan seluruh kata Digiflazz dari halaman dan notifikasi Top Up sisi pembeli.",
-  "updatedAt":  "2026-11-09T02:25:28.269037420Z",
+  "summary":  "Rencana implementasi pengamanan berlapis website dari serangan hacker, mencakup Anti-Brute Force & Rate Limiting dengan pemblokiran IP otomatis 15 menit, filter Anti-XSS/SQLi/Prototype Pollution, validasi magic-byte upload bukti bayar, pengamanan webhook & sesi, header keamanan HTTP, serta pencatatan ke Audit Log Keamanan.",
+  "updatedAt":  "2026-11-09T07:47:38.451903483Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

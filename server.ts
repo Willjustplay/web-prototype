@@ -2495,8 +2495,297 @@ initDatabase();
 void initMongoConnection();
 void initPostgresConnection();
 
-// ---------------- Rate Limiter, Token & Audit Helpers ----------------
+// ---------------- Rate Limiter, IP Firewall, Security WAF & Audit Helpers ----------------
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+const IP_BAN_DURATION_MS = 15 * 60 * 1000; // 15 minutes automatic IP ban
+
+interface BlockedIpRecord {
+  ip: string;
+  reason: string;
+  category: string;
+  blocked_at: string;
+  expires_at: number;
+  strikes: number;
+}
+
+const blockedIps = new Map<string, BlockedIpRecord>();
+const securityStrikes = new Map<string, { count: number; resetAt: number }>();
+
+function safeTimingCompare(a: string, b: string): boolean {
+  const strA = String(a || "");
+  const strB = String(b || "");
+  if (!strA || !strB) return false;
+  const hashA = crypto.createHash("sha256").update(strA).digest();
+  const hashB = crypto.createHash("sha256").update(strB).digest();
+  return crypto.timingSafeEqual(hashA, hashB) && strA.length === strB.length;
+}
+
+function getBlockedIpEntry(ip: string): BlockedIpRecord | null {
+  if (!ip) return null;
+  const entry = blockedIps.get(ip);
+  if (!entry) return null;
+  if (Date.now() >= entry.expires_at) {
+    blockedIps.delete(ip);
+    return null;
+  }
+  return entry;
+}
+
+function listActiveBlockedIps() {
+  const now = Date.now();
+  const out: Array<BlockedIpRecord & { remaining_seconds: number; expires_at_iso: string }> = [];
+  for (const [ip, rec] of blockedIps.entries()) {
+    if (now >= rec.expires_at) {
+      blockedIps.delete(ip);
+      continue;
+    }
+    out.push({
+      ...rec,
+      remaining_seconds: Math.max(1, Math.ceil((rec.expires_at - now) / 1000)),
+      expires_at_iso: new Date(rec.expires_at).toISOString(),
+    });
+  }
+  return out.sort((a, b) => b.expires_at - a.expires_at);
+}
+
+function blockClientIp(
+  ip: string,
+  reason: string,
+  category: string,
+  req?: Request,
+  metadata?: Record<string, any>
+): BlockedIpRecord {
+  const cleanIp = String(ip || "unknown").trim() || "unknown";
+  const now = Date.now();
+  const existing = blockedIps.get(cleanIp);
+  const strikes = (existing?.strikes || 0) + 1;
+  const record: BlockedIpRecord = {
+    ip: cleanIp,
+    reason,
+    category,
+    blocked_at: nowIso(),
+    expires_at: now + IP_BAN_DURATION_MS,
+    strikes,
+  };
+  blockedIps.set(cleanIp, record);
+  writeAuditLog({
+    actor: null,
+    action: "security.ip_blocked",
+    metadata: {
+      ip: cleanIp,
+      reason,
+      category,
+      duration_minutes: 15,
+      strikes,
+      ...(metadata || {}),
+    },
+    req,
+  });
+  return record;
+}
+
+function unblockClientIp(ip: string, actor?: any, req?: Request): boolean {
+  const cleanIp = String(ip || "").trim();
+  if (!cleanIp) return false;
+  const existed = blockedIps.delete(cleanIp);
+  for (const key of Array.from(securityStrikes.keys())) {
+    if (key.includes(cleanIp)) securityStrikes.delete(key);
+  }
+  for (const key of Array.from(rateBuckets.keys())) {
+    if (key.includes(cleanIp)) rateBuckets.delete(key);
+  }
+  if (existed) {
+    writeAuditLog({
+      actor: actor || null,
+      action: "security.ip_unblocked",
+      metadata: { ip: cleanIp },
+      req,
+    });
+  }
+  return existed;
+}
+
+function recordSecurityStrike(
+  ip: string,
+  category: string,
+  maxStrikes: number,
+  windowMs: number,
+  reason: string,
+  req?: Request,
+  metadata?: Record<string, any>
+): { blocked: boolean; strikes: number; remainingStrikes: number } {
+  const cleanIp = String(ip || "unknown").trim() || "unknown";
+  const key = `${category}:${cleanIp}`;
+  const now = Date.now();
+  const bucket = securityStrikes.get(key);
+  let count = 1;
+  if (!bucket || now >= bucket.resetAt) {
+    securityStrikes.set(key, { count: 1, resetAt: now + windowMs });
+  } else {
+    bucket.count += 1;
+    count = bucket.count;
+  }
+  if (count >= maxStrikes) {
+    securityStrikes.delete(key);
+    blockClientIp(cleanIp, reason, category, req, { strikes: count, ...(metadata || {}) });
+    return { blocked: true, strikes: count, remainingStrikes: 0 };
+  }
+  return { blocked: false, strikes: count, remainingStrikes: Math.max(0, maxStrikes - count) };
+}
+
+function validateUploadedImageMagicBytes(file?: Express.Multer.File): {
+  valid: boolean;
+  detectedMime?: string;
+  reason?: string;
+} {
+  if (!file || !file.buffer || file.buffer.length < 12) {
+    return { valid: false, reason: "File gambar kosong atau rusak" };
+  }
+  const buf = file.buffer;
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  const isPng =
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a;
+  // JPEG: FF D8 FF
+  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  // GIF: GIF87a or GIF89a
+  const isGif =
+    buf[0] === 0x47 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x38 &&
+    (buf[4] === 0x37 || buf[4] === 0x39) &&
+    buf[5] === 0x61;
+  // WEBP: RIFF....WEBP
+  const isWebp =
+    buf[0] === 0x52 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x46 &&
+    buf[8] === 0x57 &&
+    buf[9] === 0x45 &&
+    buf[10] === 0x42 &&
+    buf[11] === 0x50;
+
+  if (!isPng && !isJpeg && !isGif && !isWebp) {
+    return {
+      valid: false,
+      reason: "Header biner file tidak valid. Hanya gambar asli (JPG, PNG, WEBP, GIF) yang diizinkan.",
+    };
+  }
+
+  // Scan first 4KB and last 2KB for embedded web shells / scripts
+  const headText = buf.subarray(0, Math.min(buf.length, 4096)).toString("latin1").toLowerCase();
+  const tailText =
+    buf.length > 4096
+      ? buf.subarray(Math.max(0, buf.length - 2048)).toString("latin1").toLowerCase()
+      : "";
+  const combinedSample = `${headText}\n${tailText}`;
+  if (
+    combinedSample.includes("<?php") ||
+    combinedSample.includes("<script") ||
+    combinedSample.includes("<!doctype html") ||
+    combinedSample.includes("<svg")
+  ) {
+    return {
+      valid: false,
+      reason: "File ditolak karena mengandung kode skrip berbahaya.",
+    };
+  }
+
+  const detectedMime = isPng
+    ? "image/png"
+    : isJpeg
+      ? "image/jpeg"
+      : isWebp
+        ? "image/webp"
+        : "image/gif";
+  return { valid: true, detectedMime };
+}
+
+const DANGEROUS_KEYS = new Set([
+  "__proto__",
+  "prototype",
+  "constructor",
+  "$where",
+  "$gt",
+  "$gte",
+  "$lt",
+  "$lte",
+  "$ne",
+  "$nin",
+  "$in",
+  "$regex",
+  "$expr",
+]);
+
+const XSS_OR_INJECTION_PATTERNS: Array<{ name: string; regex: RegExp }> = [
+  { name: "xss_script_tag", regex: /<\s*\/?\s*script\b/i },
+  { name: "xss_javascript_uri", regex: /\b(?:javascript|vbscript)\s*:/i },
+  { name: "xss_data_html", regex: /\bdata\s*:\s*text\/html/i },
+  { name: "xss_event_handler", regex: /\bon(?:error|load|mouseover|focus|click|submit|animationstart|toggle)\s*=\s*['"\w]/i },
+  { name: "xss_iframe_object", regex: /<\s*(?:iframe|object|embed|applet)\b/i },
+  { name: "sqli_union_select", regex: /\bunion\s+(?:all\s+)?select\b/i },
+  { name: "sqli_drop_alter", regex: /\b(?:drop|alter|truncate)\s+table\b/i },
+  { name: "sqli_time_delay", regex: /\b(?:pg_sleep|waitfor\s+delay|benchmark\s*\()\b/i },
+];
+
+function sanitizeStringValue(val: string): { cleaned: string; threats: string[] } {
+  let cleaned = val.replace(/\0/g, "");
+  const threats: string[] = [];
+  for (const pat of XSS_OR_INJECTION_PATTERNS) {
+    if (pat.regex.test(cleaned)) {
+      threats.push(pat.name);
+    }
+  }
+  if (threats.length > 0) {
+    cleaned = cleaned
+      .replace(/<\s*\/?\s*script\b[^>]*>/gi, "")
+      .replace(/\b(?:javascript|vbscript)\s*:/gi, "blocked:")
+      .replace(/\bdata\s*:\s*text\/html/gi, "blocked:text/plain")
+      .replace(/\bon(error|load|mouseover|focus|click|submit|animationstart|toggle)\s*=/gi, "data-blocked-$1=")
+      .replace(/<\s*\/?\s*(?:iframe|object|embed|applet)\b[^>]*>/gi, "");
+  }
+  return { cleaned, threats };
+}
+
+function sanitizeInputRecursive(
+  input: any,
+  threatsFound: Set<string>,
+  depth = 0
+): any {
+  if (depth > 12 || input === null || input === undefined) return input;
+  if (typeof input === "string") {
+    // Skip base64 data URIs for legitimate image fields
+    if (input.startsWith("data:image/") && input.length > 128) {
+      return input;
+    }
+    const { cleaned, threats } = sanitizeStringValue(input);
+    for (const t of threats) threatsFound.add(t);
+    return cleaned;
+  }
+  if (Array.isArray(input)) {
+    return input.map((item) => sanitizeInputRecursive(item, threatsFound, depth + 1));
+  }
+  if (typeof input === "object") {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(input)) {
+      if (DANGEROUS_KEYS.has(k) || k.startsWith("$")) {
+        threatsFound.add(`forbidden_key:${k}`);
+        continue;
+      }
+      out[k] = sanitizeInputRecursive(v, threatsFound, depth + 1);
+    }
+    return out;
+  }
+  return input;
+}
 
 function checkRateLimit(key: string, maxAttempts: number, windowMs: number): [boolean, number] {
   const now = Date.now();
@@ -4192,9 +4481,20 @@ function requireUser(req: Request, res: Response): any | null {
   return u;
 }
 
+function matchesAdminKeyTimingSafe(candidate?: string): boolean {
+  if (!candidate) return false;
+  let matched = false;
+  for (const validKey of ADMIN_KEYS) {
+    if (safeTimingCompare(candidate, validKey)) {
+      matched = true;
+    }
+  }
+  return matched;
+}
+
 function requireAdminMiddleware(req: Request, res: Response, next: NextFunction) {
   const adminKey = req.headers["x-admin-key"] as string | undefined;
-  if (adminKey && ADMIN_KEYS.has(adminKey)) {
+  if (adminKey && matchesAdminKeyTimingSafe(adminKey)) {
     (req as any).adminUser = { id: "admin-key", email: ADMIN_EMAIL, role: "admin" };
     return next();
   }
@@ -4203,6 +4503,26 @@ function requireAdminMiddleware(req: Request, res: Response, next: NextFunction)
     (req as any).adminUser = user;
     return next();
   }
+  const ip = getClientIp(req);
+  const strikeRes = recordSecurityStrike(
+    ip,
+    "admin_unauth",
+    8,
+    10 * 60 * 1000,
+    "Percobaan akses endpoint Admin tanpa otorisasi berulang (Brute Force Admin API)",
+    req,
+    { path: req.originalUrl || req.url }
+  );
+  writeAuditLog({
+    actor: user || null,
+    action: "security.admin_unauthorized_attempt",
+    metadata: {
+      path: req.originalUrl || req.url,
+      strikes: strikeRes.strikes,
+      blocked: strikeRes.blocked,
+    },
+    req,
+  });
   return res.status(401).json({ detail: "Akses admin ditolak" });
 }
 
@@ -4898,6 +5218,21 @@ async function pullGamesFromMerchant(opts: {
 
 // ---------------- Express App & Router ----------------
 const app = express();
+app.disable("x-powered-by");
+
+// Layer 1: HTTP Security Headers
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+  );
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
+
 app.use(
   express.json({
     limit: "10mb",
@@ -4908,6 +5243,87 @@ app.use(
 );
 
 const api = express.Router();
+
+// Layer 2 & 3: Active 15-Minute IP Firewall & WAF Payload Sanitizer
+api.use((req, res, next) => {
+  const ip = getClientIp(req);
+  const ban = getBlockedIpEntry(ip);
+  if (ban) {
+    // Allow an already-authenticated admin to access admin security / audit endpoints to inspect or unblock IPs
+    const maybeUser = getUserOptional(req);
+    const adminKey = req.headers["x-admin-key"] as string | undefined;
+    const isAuthenticatedAdmin =
+      (maybeUser && maybeUser.role === "admin" && maybeUser.status !== "suspended") ||
+      matchesAdminKeyTimingSafe(adminKey);
+    const isAdminSecurityRoute =
+      req.path.startsWith("/admin/audit-logs") ||
+      req.path.startsWith("/admin/security") ||
+      req.path.startsWith("/admin/email-events") ||
+      req.path === "/auth/me";
+
+    if (!isAuthenticatedAdmin || !isAdminSecurityRoute) {
+      const remSec = Math.max(1, Math.ceil((ban.expires_at - Date.now()) / 1000));
+      const remMin = Math.floor(remSec / 60);
+      const secPart = remSec % 60;
+      res.setHeader("Retry-After", String(remSec));
+      return res.status(429).json({
+        detail: `IP Anda (${ip}) diblokir sementara selama 15 menit karena terdeteksi aktivitas berbahaya: ${ban.reason}. Silakan coba lagi dalam ${remMin} menit ${secPart} detik.`,
+        code: "IP_BLOCKED_SECURITY",
+        retry_after_seconds: remSec,
+      });
+    }
+  }
+
+  // Deep recursive sanitization against XSS, SQL/NoSQL Injection, Null-Byte & Prototype Pollution
+  const threats = new Set<string>();
+  if (req.body && typeof req.body === "object") {
+    req.body = sanitizeInputRecursive(req.body, threats);
+  }
+  if (req.query && typeof req.query === "object") {
+    const cleanQuery = sanitizeInputRecursive(req.query, threats);
+    for (const k of Object.keys(req.query)) {
+      delete (req.query as any)[k];
+    }
+    Object.assign(req.query, cleanQuery);
+  }
+  if (req.params && typeof req.params === "object") {
+    req.params = sanitizeInputRecursive(req.params, threats);
+  }
+
+  if (threats.size > 0) {
+    const threatList = Array.from(threats);
+    const strikeRes = recordSecurityStrike(
+      ip,
+      "waf_payload",
+      3,
+      15 * 60 * 1000,
+      `Terdeteksi pengiriman payload berbahaya (${threatList.join(", ")})`,
+      req,
+      { path: req.originalUrl || req.url, threats: threatList }
+    );
+    writeAuditLog({
+      actor: getUserOptional(req),
+      action: "security.payload_attack_detected",
+      metadata: {
+        path: req.originalUrl || req.url,
+        method: req.method,
+        threats: threatList,
+        strikes: strikeRes.strikes,
+        ip_blocked: strikeRes.blocked,
+      },
+      req,
+    });
+    if (strikeRes.blocked) {
+      return res.status(429).json({
+        detail:
+          "Sistem keamanan mendeteksi percobaan serangan berulang (XSS/Injection). IP Anda diblokir otomatis selama 15 menit.",
+        code: "IP_BLOCKED_SECURITY",
+      });
+    }
+  }
+
+  next();
+});
 
 api.get("/", (_req, res) => {
   res.json({ message: "WillJustPlay API online" });
@@ -5936,13 +6352,47 @@ api.post("/auth/login", async (req, res) => {
   if (!email || !password) return res.status(400).json({ detail: "Email dan sandi diperlukan" });
 
   const ip = getClientIp(req);
-  const [allowed, retrySec] = checkRateLimit(`login:${ip}:${email}`, 12, 5 * 60 * 1000);
+  const [allowed, retrySec] = checkRateLimit(`login:${ip}:${email}`, 8, 5 * 60 * 1000);
   if (!allowed) {
-    return res.status(429).json({ detail: `Terlalu banyak percobaan login. Tunggu ${retrySec} detik.` });
+    blockClientIp(
+      ip,
+      `Percobaan login gagal berulang kali (Brute Force) pada akun ${email}`,
+      "brute_force_login",
+      req,
+      { email }
+    );
+    return res.status(429).json({
+      detail: `Terlalu banyak percobaan login gagal. IP Anda diblokir sementara selama 15 menit demi keamanan akun.`,
+      code: "IP_BLOCKED_SECURITY",
+      retry_after_seconds: 900,
+    });
   }
 
   const user = db.users.find((u) => u.email === email);
   if (!user || !bcrypt.compareSync(String(password), user.password_hash)) {
+    const strikeRes = recordSecurityStrike(
+      ip,
+      "login_fail",
+      8,
+      10 * 60 * 1000,
+      `Brute force tebak password login (${email})`,
+      req,
+      { email }
+    );
+    writeAuditLog({
+      actor: user || null,
+      action: "security.login_failed",
+      targetUser: user || null,
+      metadata: { email, strikes: strikeRes.strikes, ip_blocked: strikeRes.blocked },
+      req,
+    });
+    if (strikeRes.blocked) {
+      return res.status(429).json({
+        detail:
+          "Terdeteksi percobaan tebak password berulang kali. IP Anda diblokir otomatis selama 15 menit.",
+        code: "IP_BLOCKED_SECURITY",
+      });
+    }
     return res.status(401).json({ detail: "Email atau password salah" });
   }
 
@@ -6000,10 +6450,55 @@ api.post("/auth/login", async (req, res) => {
 api.post("/auth/admin-login", (req, res) => {
   const { password } = req.body || {};
   if (!password) return res.status(400).json({ detail: "Password diperlukan" });
+  const ip = getClientIp(req);
+  const [allowed] = checkRateLimit(`admin_login:${ip}`, 5, 15 * 60 * 1000);
+  if (!allowed) {
+    blockClientIp(
+      ip,
+      "Percobaan Brute Force password Login Admin melebihi batas (5x gagal)",
+      "brute_force_admin",
+      req
+    );
+    return res.status(429).json({
+      detail:
+        "Terlalu banyak percobaan login Admin yang gagal! IP Anda telah diblokir otomatis selama 15 menit dan dicatat ke Audit Log Keamanan.",
+      code: "IP_BLOCKED_SECURITY",
+    });
+  }
+
   const user = db.users.find((u) => u.email === ADMIN_EMAIL && u.role === "admin");
   if (!user || !bcrypt.compareSync(String(password), user.password_hash)) {
-    return res.status(401).json({ detail: "Password admin salah" });
+    const strikeRes = recordSecurityStrike(
+      ip,
+      "admin_login_fail",
+      5,
+      15 * 60 * 1000,
+      "Percobaan Brute Force tebak password Admin (5x gagal)",
+      req
+    );
+    writeAuditLog({
+      actor: null,
+      action: "security.admin_login_failed",
+      metadata: {
+        strikes: strikeRes.strikes,
+        remaining_attempts: strikeRes.remainingStrikes,
+        ip_blocked: strikeRes.blocked,
+      },
+      req,
+    });
+    if (strikeRes.blocked) {
+      return res.status(429).json({
+        detail:
+          "Percobaan tebak password Admin terdeteksi! IP Anda diblokir otomatis selama 15 menit dan dicatat ke Audit Log Keamanan.",
+        code: "IP_BLOCKED_SECURITY",
+      });
+    }
+    return res.status(401).json({
+      detail: `Password admin salah (Sisa kesempatan sebelum blokir IP: ${strikeRes.remainingStrikes}x)`,
+    });
   }
+  securityStrikes.delete(`admin_login_fail:${ip}`);
+  rateBuckets.delete(`admin_login:${ip}`);
   user.last_login_at = nowIso();
   saveDb();
   const token = createSessionAndToken(user, req, res);
@@ -7254,8 +7749,42 @@ const ensurePaykitaTransactionQris = async (tx: any, origin: string, forceRefres
   }
 };
 
+function enforceCheckoutRateLimit(req: Request, res: Response, checkoutType: string): boolean {
+  const ip = getClientIp(req);
+  const [allowed, retrySec] = checkRateLimit(`checkout:${ip}`, 12, 5 * 60 * 1000);
+  if (!allowed) {
+    const strikeRes = recordSecurityStrike(
+      ip,
+      "checkout_spam",
+      3,
+      10 * 60 * 1000,
+      `Spam transaksi checkout berlebihan (${checkoutType})`,
+      req,
+      { checkout_type: checkoutType }
+    );
+    writeAuditLog({
+      actor: getUserOptional(req),
+      action: "security.checkout_rate_limited",
+      metadata: {
+        checkout_type: checkoutType,
+        strikes: strikeRes.strikes,
+        ip_blocked: strikeRes.blocked,
+      },
+      req,
+    });
+    res.status(429).json({
+      detail: strikeRes.blocked
+        ? "Terdeteksi spam pembuatan transaksi berulang! IP Anda diblokir otomatis selama 15 menit."
+        : `Terlalu banyak transaksi dibuat dalam waktu singkat. Silakan tunggu ${retrySec} detik.`,
+    });
+    return false;
+  }
+  return true;
+}
+
 api.post("/payments/paykita/checkout", async (req, res) => {
   try {
+    if (!enforceCheckoutRateLimit(req, res, "qris_auto")) return;
     const body = req.body || {};
     const product = findProductFlexible(body.product_id);
     if (!product) return res.status(404).json({ detail: "Produk tidak ditemukan" });
@@ -7365,11 +7894,86 @@ api.post("/payments/paykita/checkout", async (req, res) => {
   }
 });
 
+const cancelOngoingTransactionsForOutOfStockProduct = (
+  productId: string,
+  winningSessionId?: string
+): number => {
+  if (!productId) return 0;
+  const prod = findProductFlexible(productId);
+  if (!prod || prod.product_type === PRODUCT_TYPE || Number(prod.stock ?? 0) > 0) {
+    return 0;
+  }
+  let cancelledCount = 0;
+  const reason =
+    "Produk ini baru saja terjual habis karena telah dibeli terlebih dahulu oleh pembeli lain.";
+  for (const item of db.transactions || []) {
+    if (!item || item.product_id !== prod.id) continue;
+    if (winningSessionId && item.session_id === winningSessionId) continue;
+    const isAlreadyPaid =
+      item.payment_status === "paid" &&
+      (item.provider !== "paykita" || Boolean(item.paykita_confirmed));
+    if (isAlreadyPaid || item.status === "completed") continue;
+    if (
+      item.payment_status === "pending" ||
+      item.status === "pending" ||
+      item.status === "waiting_approval"
+    ) {
+      item.payment_status = "failed";
+      item.status = "cancelled_out_of_stock";
+      item.cancel_reason = reason;
+      item.qris_string = null;
+      item.qris_image = null;
+      item.va_number = null;
+      item.pay_url = null;
+      item.updated_at = nowIso();
+      cancelledCount += 1;
+    }
+  }
+  return cancelledCount;
+};
+
+const ensureOngoingHomeTransactionStockAvailable = (tx: any): boolean => {
+  if (!tx || tx.product_type === PRODUCT_TYPE) return true;
+  const isAlreadyPaid =
+    tx.payment_status === "paid" &&
+    (tx.provider !== "paykita" || Boolean(tx.paykita_confirmed));
+  if (isAlreadyPaid || tx.status === "completed") return true;
+  if (tx.status === "cancelled_out_of_stock") return false;
+
+  const prod = findProductFlexible(tx.product_id);
+  if (prod && prod.product_type !== PRODUCT_TYPE && Number(prod.stock ?? 0) <= 0) {
+    cancelOngoingTransactionsForOutOfStockProduct(prod.id);
+    tx.payment_status = "failed";
+    tx.status = "cancelled_out_of_stock";
+    tx.cancel_reason =
+      tx.cancel_reason ||
+      "Produk ini baru saja terjual habis karena telah dibeli terlebih dahulu oleh pembeli lain.";
+    tx.qris_string = null;
+    tx.qris_image = null;
+    tx.va_number = null;
+    tx.pay_url = null;
+    tx.updated_at = nowIso();
+    saveDb();
+    return false;
+  }
+  return true;
+};
+
 const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
   if (!tx) return;
   if (tx.payment_status !== "paid" && tx.payment_status !== "failed") {
+    const p = findProductFlexible(tx.product_id);
+    if (
+      p &&
+      p.product_type !== PRODUCT_TYPE &&
+      !tx.stock_deducted &&
+      Number(p.stock ?? 0) <= 0
+    ) {
+      cancelOngoingTransactionsForOutOfStockProduct(p.id);
+      saveDb();
+      return;
+    }
     if (!tx.stock_deducted) {
-      const p = findProductFlexible(tx.product_id);
       if (p) {
         p.stock = Math.max(0, (p.stock || 0) - 1);
         p.sold = (p.sold || 0) + 1;
@@ -7382,6 +7986,9 @@ const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
     tx.paykita_confirmed_by = confirmedBy;
     tx.paykita_confirmed_at = nowIso();
     tx.updated_at = nowIso();
+    if (p && p.product_type !== PRODUCT_TYPE && Number(p.stock ?? 0) <= 0) {
+      cancelOngoingTransactionsForOutOfStockProduct(p.id, tx.session_id);
+    }
     saveDb();
     void sendOrderFulfillmentEmail(tx);
   } else if (tx.payment_status === "paid" && !tx.fulfillment_email_sent_at) {
@@ -7405,11 +8012,31 @@ const verifyTransactionWithPaykitaServer = async (tx: any, origin?: string): Pro
       message: `Pembayaran telah terkonfirmasi lunas oleh ${gwLabel}.`,
     };
   }
+  if (!ensureOngoingHomeTransactionStockAvailable(tx)) {
+    return {
+      confirmed: false,
+      paykita_status: "cancelled_out_of_stock",
+      message:
+        tx.cancel_reason ||
+        "Pembayaran dibatalkan otomatis karena produk baru saja terjual habis dibeli oleh pembeli lain.",
+    };
+  }
   if (tx.payment_status === "failed") {
     return {
       confirmed: false,
-      paykita_status: tx.status === "expired" ? "expired" : "failed",
-      message: tx.status === "expired" ? "Waktu pembayaran QRIS sudah habis (kedaluwarsa)." : "Pembayaran gagal atau dibatalkan.",
+      paykita_status:
+        tx.status === "cancelled_out_of_stock"
+          ? "cancelled_out_of_stock"
+          : tx.status === "expired"
+            ? "expired"
+            : "failed",
+      message:
+        tx.status === "cancelled_out_of_stock"
+          ? tx.cancel_reason ||
+            "Pembayaran dibatalkan otomatis karena produk baru saja terjual habis dibeli oleh pembeli lain."
+          : tx.status === "expired"
+            ? "Waktu pembayaran QRIS sudah habis (kedaluwarsa)."
+            : "Pembayaran gagal atau dibatalkan.",
     };
   }
   if (tx.expired_at && new Date(tx.expired_at).getTime() <= Date.now()) {
@@ -7721,8 +8348,17 @@ api.post("/webhook/duitku", async (req, res) => {
     .digest("hex")
     .toLowerCase();
 
-  if (resultCode === "00" && signature && signature === expectedSig) {
-    markPaykitaTransactionPaid(tx, "duitku_webhook");
+  if (resultCode === "00") {
+    if (signature && safeTimingCompare(signature, expectedSig)) {
+      markPaykitaTransactionPaid(tx, "duitku_webhook");
+    } else {
+      writeAuditLog({
+        action: "security.webhook_invalid_signature",
+        metadata: { gateway: "duitku", session_id: tx.session_id },
+        req,
+      });
+      return res.status(401).json({ ok: false, detail: "Signature webhook Duitku tidak valid" });
+    }
   }
   return res.json({ ok: true, session_id: tx.session_id, payment_status: tx.payment_status });
 });
@@ -7742,8 +8378,17 @@ api.post("/webhook/tripay", async (req: any, res) => {
   const sig = String(req.headers["x-callback-signature"] || "").trim();
   const expectedSig = privateKey ? crypto.createHmac("sha256", privateKey).update(rawBodyStr).digest("hex") : "";
 
-  if (String(body.status || "").toUpperCase() === "PAID" && expectedSig && sig === expectedSig) {
-    markPaykitaTransactionPaid(tx, "tripay_webhook");
+  if (String(body.status || "").toUpperCase() === "PAID") {
+    if (expectedSig && safeTimingCompare(sig, expectedSig)) {
+      markPaykitaTransactionPaid(tx, "tripay_webhook");
+    } else {
+      writeAuditLog({
+        action: "security.webhook_invalid_signature",
+        metadata: { gateway: "tripay", session_id: tx.session_id },
+        req,
+      });
+      return res.status(401).json({ success: false, detail: "Signature webhook Tripay tidak valid" });
+    }
   }
   return res.json({ success: true });
 });
@@ -7765,8 +8410,17 @@ api.post("/webhook/midtrans", async (req, res) => {
     .digest("hex");
   const txStatus = String(body.transaction_status || "").toLowerCase();
 
-  if ((txStatus === "settlement" || txStatus === "capture") && body.signature_key === expectedSig) {
-    markPaykitaTransactionPaid(tx, "midtrans_webhook");
+  if (txStatus === "settlement" || txStatus === "capture") {
+    if (safeTimingCompare(String(body.signature_key || ""), expectedSig)) {
+      markPaykitaTransactionPaid(tx, "midtrans_webhook");
+    } else {
+      writeAuditLog({
+        action: "security.webhook_invalid_signature",
+        metadata: { gateway: "midtrans", session_id: tx.session_id },
+        req,
+      });
+      return res.status(401).json({ ok: false, detail: "Signature webhook Midtrans tidak valid" });
+    }
   }
   return res.json({ ok: true });
 });
@@ -7784,8 +8438,17 @@ api.post("/webhook/xendit", async (req, res) => {
   const token = String(req.headers["x-callback-token"] || "").trim();
   const status = String(body.data?.status || body.status || "").toUpperCase();
 
-  if ((status === "SUCCEEDED" || status === "PAID" || status === "COMPLETED") && token && token === gCfg.webhook_secret) {
-    markPaykitaTransactionPaid(tx, "xendit_webhook");
+  if (status === "SUCCEEDED" || status === "PAID" || status === "COMPLETED") {
+    if (token && safeTimingCompare(token, String(gCfg.webhook_secret || ""))) {
+      markPaykitaTransactionPaid(tx, "xendit_webhook");
+    } else {
+      writeAuditLog({
+        action: "security.webhook_invalid_signature",
+        metadata: { gateway: "xendit", session_id: tx.session_id },
+        req,
+      });
+      return res.status(401).json({ ok: false, detail: "Token callback Xendit tidak valid" });
+    }
   }
   return res.json({ ok: true });
 });
@@ -7892,10 +8555,12 @@ api.post("/webhook/paykita", async (req: any, res) => {
 
     if (
       cleanSig &&
-      (cleanSig === expectedTimestampHmac || cleanSig === expectedDirectHmac || cleanSig === expectedJsonHmac)
+      (safeTimingCompare(cleanSig, expectedTimestampHmac) ||
+        safeTimingCompare(cleanSig, expectedDirectHmac) ||
+        safeTimingCompare(cleanSig, expectedJsonHmac))
     ) {
       signatureVerified = true;
-    } else if (tokenHeader && tokenHeader === webhookSecret) {
+    } else if (tokenHeader && safeTimingCompare(tokenHeader, webhookSecret)) {
       signatureVerified = true;
     }
   }
@@ -7930,6 +8595,7 @@ api.post("/webhook/paykita", async (req: any, res) => {
 
 const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
   try {
+    if (!enforceCheckoutRateLimit(req, res, "manual_or_crypto")) return;
     const body = req.body || {};
     const product = findProductFlexible(body.product_id);
     if (!product) return res.status(404).json({ detail: "Produk tidak ditemukan" });
@@ -8004,6 +8670,7 @@ api.post("/payments/crypto/checkout", handleManualOrCryptoCheckout);
 
 api.post("/payments/topup/checkout", async (req, res) => {
   try {
+    if (!enforceCheckoutRateLimit(req, res, "topup")) return;
     const body = req.body || {};
     const slug = String(body.game || body.slug || "").trim();
     if (!slug) return res.status(400).json({ detail: "Game wajib dipilih untuk top up" });
@@ -8173,16 +8840,49 @@ api.post("/payments/manual/upload-proof/:session_id", upload.single("proof"), (r
   if (tx.payment_status === "paid") {
     return res.status(400).json({ detail: "Pesanan ini sudah lunas" });
   }
+  if (!ensureOngoingHomeTransactionStockAvailable(tx) || tx.payment_status === "failed") {
+    return res.status(400).json({
+      detail:
+        tx.cancel_reason ||
+        "Pembayaran dibatalkan karena produk ini telah terjual habis dibeli oleh pembeli lain.",
+    });
+  }
   const file = req.file;
   const txHash = String(req.body?.tx_hash || "").trim();
   if (!file && !txHash) {
     return res.status(400).json({ detail: "Unggah gambar bukti transfer atau masukkan TXID / Hash transaksi" });
   }
   if (file) {
-    if (!file.mimetype.startsWith("image/")) {
-      return res.status(400).json({ detail: "Bukti transfer harus berupa gambar (JPG/PNG/WEBP)" });
+    const magicCheck = validateUploadedImageMagicBytes(file);
+    if (!file.mimetype.startsWith("image/") || !magicCheck.valid) {
+      const ip = getClientIp(req);
+      const strikeRes = recordSecurityStrike(
+        ip,
+        "malicious_upload",
+        3,
+        15 * 60 * 1000,
+        "Percobaan upload file berbahaya / bukan gambar asli pada bukti pembayaran",
+        req,
+        { filename: file.originalname, mimetype: file.mimetype, reason: magicCheck.reason }
+      );
+      writeAuditLog({
+        actor: getUserOptional(req),
+        action: "security.malicious_upload_blocked",
+        metadata: {
+          session_id: tx.session_id,
+          filename: file.originalname,
+          mimetype: file.mimetype,
+          reason: magicCheck.reason,
+          ip_blocked: strikeRes.blocked,
+        },
+        req,
+      });
+      return res.status(400).json({
+        detail: magicCheck.reason || "Bukti transfer harus berupa gambar asli (JPG/PNG/WEBP)",
+      });
     }
-    tx.payment_proof = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+    const safeMime = magicCheck.detectedMime || file.mimetype;
+    tx.payment_proof = `data:${safeMime};base64,${file.buffer.toString("base64")}`;
     tx.has_proof = true;
   }
   if (txHash) {
@@ -8203,6 +8903,13 @@ api.post("/payments/crypto/submit-tx/:session_id", (req, res) => {
   if (tx.payment_status === "paid") {
     return res.status(400).json({ detail: "Pesanan ini sudah lunas" });
   }
+  if (!ensureOngoingHomeTransactionStockAvailable(tx) || tx.payment_status === "failed") {
+    return res.status(400).json({
+      detail:
+        tx.cancel_reason ||
+        "Pembayaran dibatalkan karena produk ini telah terjual habis dibeli oleh pembeli lain.",
+    });
+  }
   const txHash = String(req.body?.tx_hash || "").trim();
   if (!txHash || txHash.length < 6) {
     return res.status(400).json({ detail: "Masukkan TXID / Hash transaksi crypto yang valid" });
@@ -8218,6 +8925,7 @@ api.post("/payments/crypto/submit-tx/:session_id", (req, res) => {
 const handlePaymentStatus = async (req: Request, res: Response) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
   if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
+  ensureOngoingHomeTransactionStockAvailable(tx);
   if (
     tx.provider === "paykita" &&
     tx.payment_status === "pending" &&
@@ -8244,6 +8952,7 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
     tx.provider === "paykita" && tx.status === "completed" && !tx.paykita_confirmed
       ? "pending"
       : tx.status || "pending";
+  const isPendingActive = effectivePaymentStatus === "pending";
   let game = null;
   if (tx.product_type === PRODUCT_TYPE && tx.game_slug) {
     const g = db.games.find((x) => x.slug === tx.game_slug);
@@ -8273,14 +8982,15 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
     duitku_channel: tx.duitku_channel || null,
     duitku_channel_name: tx.duitku_channel_name || null,
     duitku_payment_flow: tx.duitku_payment_flow || "qris",
-    va_number: !paid ? tx.va_number || null : null,
+    va_number: isPendingActive ? tx.va_number || null : null,
     provider: tx.provider,
     status: effectiveStatus,
     payment_status: effectivePaymentStatus,
+    cancel_reason: tx.cancel_reason || null,
     paykita_confirmed: Boolean(tx.paykita_confirmed),
     paykita_mode: tx.paykita_mode || "demo",
-    paykita_error: !paid ? tx.paykita_error || null : null,
-    paykita_error_code: !paid ? tx.paykita_error_code || null : null,
+    paykita_error: isPendingActive ? tx.paykita_error || null : null,
+    paykita_error_code: isPendingActive ? tx.paykita_error_code || null : null,
     payment_type: tx.payment_type || (manualDest?.type === "crypto" ? "crypto" : tx.provider),
     amount: tx.amount,
     base_amount: tx.base_amount || tx.amount,
@@ -8292,9 +9002,9 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
     crypto_network: tx.crypto_network || manualDest?.network || null,
     crypto_symbol: tx.crypto_symbol || manualDest?.symbol || null,
     tx_hash: tx.tx_hash || null,
-    qris_string: !paid ? tx.qris_string || null : null,
-    qris_image: !paid ? tx.qris_image || null : null,
-    pay_url: !paid ? tx.pay_url || null : null,
+    qris_string: isPendingActive ? tx.qris_string || null : null,
+    qris_image: isPendingActive ? tx.qris_image || null : null,
+    pay_url: isPendingActive ? tx.pay_url || null : null,
     expired_at: tx.expired_at || null,
     delivery_info: paid ? tx.delivery_info || "" : "",
     structured_delivery: structuredDelivery,
@@ -8371,15 +9081,45 @@ api.post("/payments/resend-order-email/:session_id", async (req, res) => {
 // Allow image uploads from both buyers (ReviewModal) and admins
 api.post("/admin/upload", upload.single("file"), (req, res) => {
   const file = req.file;
-  if (!file || !file.mimetype.startsWith("image/")) {
-    return res.status(400).json({ detail: "Hanya file gambar (JPG, PNG, WEBP, GIF) yang diizinkan" });
+  const magicCheck = validateUploadedImageMagicBytes(file);
+  if (!file || !file.mimetype.startsWith("image/") || !magicCheck.valid) {
+    const ip = getClientIp(req);
+    recordSecurityStrike(
+      ip,
+      "malicious_upload",
+      3,
+      15 * 60 * 1000,
+      "Percobaan upload file berbahaya / bukan gambar asli",
+      req,
+      { filename: file?.originalname, mimetype: file?.mimetype, reason: magicCheck.reason }
+    );
+    writeAuditLog({
+      actor: getUserOptional(req),
+      action: "security.malicious_upload_blocked",
+      metadata: {
+        filename: file?.originalname,
+        mimetype: file?.mimetype,
+        reason: magicCheck.reason,
+      },
+      req,
+    });
+    return res.status(400).json({
+      detail: magicCheck.reason || "Hanya file gambar asli (JPG, PNG, WEBP, GIF) yang diizinkan",
+    });
   }
-  const ext = path.extname(file.originalname || "") || ".jpg";
+  const safeExtMap: Record<string, string> = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+  };
+  const safeMime = magicCheck.detectedMime || "image/jpeg";
+  const ext = safeExtMap[safeMime] || ".jpg";
   const filePath = `uploads/${uuidHex(16)}${ext}`;
   db.files[filePath] = {
     path: filePath,
     dataBase64: file.buffer.toString("base64"),
-    content_type: file.mimetype,
+    content_type: safeMime,
     filename: file.originalname || "image.jpg",
     created_at: nowIso(),
   };
@@ -8480,6 +9220,9 @@ admin.put("/products/:product_id", (req, res) => {
   };
   delete updated.paykita;
   db.products[idx] = updated;
+  if (Number(updated.stock ?? 0) <= 0) {
+    cancelOngoingTransactionsForOutOfStockProduct(updated.id);
+  }
   saveDb();
   res.json(adminProductView(updated));
 });
@@ -8551,6 +9294,19 @@ admin.post("/orders/:session_id/approve", async (req, res) => {
     }
     return res.json(tx);
   }
+  const prod = findProductFlexible(tx.product_id);
+  if (
+    prod &&
+    prod.product_type !== PRODUCT_TYPE &&
+    !tx.stock_deducted &&
+    Number(prod.stock ?? 0) <= 0
+  ) {
+    cancelOngoingTransactionsForOutOfStockProduct(prod.id);
+    saveDb();
+    return res.status(400).json({
+      detail: "Stok produk ini sudah habis (0) karena telah dibeli oleh pembeli lain.",
+    });
+  }
   tx.status = "completed";
   tx.payment_status = "paid";
   if (tx.provider === "paykita" || tx.payment_type === "paykita") {
@@ -8560,12 +9316,14 @@ admin.post("/orders/:session_id/approve", async (req, res) => {
   }
   tx.updated_at = nowIso();
   if (!tx.stock_deducted) {
-    const prod = findProductFlexible(tx.product_id);
     if (prod) {
       if ((prod.stock || 0) > 0) prod.stock -= 1;
       prod.sold = (prod.sold || 0) + 1;
     }
     tx.stock_deducted = true;
+  }
+  if (prod && prod.product_type !== PRODUCT_TYPE && Number(prod.stock ?? 0) <= 0) {
+    cancelOngoingTransactionsForOutOfStockProduct(prod.id, tx.session_id);
   }
   saveDb();
   await sendOrderFulfillmentEmail(tx, req);
@@ -10525,6 +11283,7 @@ admin.get("/audit-logs", (req, res) => {
         String(l.action || "").toLowerCase().includes(needle) ||
         String(l.actor_email || "").toLowerCase().includes(needle) ||
         String(l.target_email || "").toLowerCase().includes(needle) ||
+        String(l.ip || "").toLowerCase().includes(needle) ||
         JSON.stringify(l.metadata || {}).toLowerCase().includes(needle)
     );
   }
@@ -10532,6 +11291,37 @@ admin.get("/audit-logs", (req, res) => {
   res.json({
     actions: distinctActions,
     logs: rows.slice(0, max),
+    blocked_ips: listActiveBlockedIps(),
+  });
+});
+
+admin.post("/security/unblock-ip", (req, res) => {
+  const actor = (req as any).adminUser || getUserOptional(req);
+  const ip = String(req.body?.ip || "").trim();
+  if (!ip) return res.status(400).json({ detail: "Alamat IP wajib diisi" });
+  const unblocked = unblockClientIp(ip, actor, req);
+  res.json({
+    ok: true,
+    unblocked,
+    blocked_ips: listActiveBlockedIps(),
+    message: unblocked
+      ? `Blokir untuk IP ${ip} berhasil dicabut`
+      : `IP ${ip} sudah tidak berada dalam daftar blokir`,
+  });
+});
+
+admin.post("/security/block-ip", (req, res) => {
+  const actor = (req as any).adminUser || getUserOptional(req);
+  const ip = String(req.body?.ip || "").trim();
+  const reason = String(req.body?.reason || "Diblokir manual oleh Admin").trim();
+  if (!ip) return res.status(400).json({ detail: "Alamat IP wajib diisi" });
+  blockClientIp(ip, reason, "manual_admin_block", req, {
+    blocked_by: actor?.email || "admin",
+  });
+  res.json({
+    ok: true,
+    blocked_ips: listActiveBlockedIps(),
+    message: `IP ${ip} berhasil diblokir selama 15 menit`,
   });
 });
 
