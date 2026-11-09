@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi pengamanan berlapis website dari serangan hacker, mencakup Anti-Brute Force & Rate Limiting dengan pemblokiran IP otomatis 15 menit, filter Anti-XSS/SQLi/Prototype Pollution, validasi magic-byte upload bukti bayar, pengamanan webhook & sesi, header keamanan HTTP, serta pencatatan ke Audit Log Keamanan.",
-  "updatedAt":  "2026-11-09T07:47:38.451903483Z",
+  "summary":  "Rencana implementasi pembatasan pemesanan berulang pada produk yang sama (wajib batalkan pembayaran aktif terlebih dahulu beserta pintasan buka/batalkan transaksi) dan fitur hapus order yang belum dibayar pada kolom Aksi di panel Admin.",
+  "updatedAt":  "2026-11-09T08:50:47.184520328Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

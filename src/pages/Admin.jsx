@@ -530,6 +530,8 @@ export default function Admin() {
 
   const orderStatusLabel = (o) => {
     if (o.payment_status === "paid") return "Lunas";
+    if (o.status === "cancelled_by_buyer") return "Dibatalkan";
+    if (o.status === "cancelled_out_of_stock") return "Stok Habis";
     if (o.payment_status === "failed")
       return o.status === "rejected"
         ? "Ditolak"
@@ -538,6 +540,19 @@ export default function Admin() {
           : "Gagal";
     if (o.status === "waiting_approval") return "Perlu Verifikasi";
     return o.provider === "manual" ? "Belum Bayar" : "Menunggu QRIS";
+  };
+
+  const deleteUnpaidOrder = async (o) => {
+    if (!o?.session_id) return;
+    try {
+      const { data } = await api.delete(`/admin/orders/${o.session_id}`);
+      toast.success(data?.message || `Order ${o.session_id} berhasil dihapus`);
+      load(false);
+    } catch (e) {
+      toast.error(
+        formatApiError(e.response?.data?.detail) || "Gagal menghapus order"
+      );
+    }
   };
 
   const syncOrder = async (o) => {
@@ -2300,120 +2315,134 @@ export default function Admin() {
                                 </span>
                               </td>
                               <td className="px-4 py-3.5 text-right">
-                                {o.provider === "paykita" && o.payment_status === "pending" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => syncOrder(o)}
-                                    data-testid={`sync-order-${o.session_id.slice(-6)}`}
-                                    className="rounded-lg text-[10px] text-neon border border-neon/40 hover:bg-neon/10 px-2.5 py-1.5 uppercase tracking-wider transition-colors cursor-pointer"
-                                  >
-                                    Cek Status
-                                  </button>
-                                )}
-                                {o.provider === "manual" && (
-                                  <div className="flex flex-col items-end gap-1.5">
-                                    {o.payment_proof || (o.has_proof && !o.tx_hash) ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => viewProof(o)}
-                                        data-testid={`view-proof-${o.session_id.slice(-6)}`}
-                                        className="inline-flex items-center gap-1 rounded-lg text-[10px] text-neon border border-neon/40 hover:bg-neon/10 px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
-                                      >
-                                        <Eye size={11} /> Lihat Bukti
-                                      </button>
-                                    ) : o.tx_hash ? (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          navigator.clipboard
-                                            .writeText(o.tx_hash)
-                                            .then(() => toast.success("TXID disalin"))
+                                <div className="flex flex-col items-end gap-1.5">
+                                  {o.provider === "paykita" && o.payment_status === "pending" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => syncOrder(o)}
+                                      data-testid={`sync-order-${o.session_id.slice(-6)}`}
+                                      className="rounded-lg text-[10px] text-neon border border-neon/40 hover:bg-neon/10 px-2.5 py-1.5 uppercase tracking-wider transition-colors cursor-pointer"
+                                    >
+                                      Cek Status
+                                    </button>
+                                  )}
+                                  {o.provider === "manual" && (
+                                    <div className="flex flex-col items-end gap-1.5">
+                                      {o.payment_proof || (o.has_proof && !o.tx_hash) ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => viewProof(o)}
+                                          data-testid={`view-proof-${o.session_id.slice(-6)}`}
+                                          className="inline-flex items-center gap-1 rounded-lg text-[10px] text-neon border border-neon/40 hover:bg-neon/10 px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
+                                        >
+                                          <Eye size={11} /> Lihat Bukti
+                                        </button>
+                                      ) : o.tx_hash ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            navigator.clipboard
+                                              .writeText(o.tx_hash)
+                                              .then(() => toast.success("TXID disalin"))
+                                          }
+                                          className="rounded-lg text-[10px] text-lime border border-lime/40 hover:bg-lime/10 px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
+                                        >
+                                          Salin TXID
+                                        </button>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-500">
+                                          Menunggu Bukti
+                                        </span>
+                                      )}
+                                      {o.status === "waiting_approval" && (
+                                        <div className="flex gap-1.5">
+                                          <button
+                                            onClick={async () => {
+                                              try {
+                                                await api.post(
+                                                  `/admin/orders/${o.session_id}/approve`
+                                                );
+                                                toast.success(
+                                                  o.buyer_email
+                                                    ? `Pembayaran diterima & akses/invoice dikirim ke ${o.buyer_email}!`
+                                                    : "Pembayaran diterima!"
+                                                );
+                                                load();
+                                              } catch (e) {
+                                                toast.error(
+                                                  formatApiError(e.response?.data?.detail) ||
+                                                    "Gagal menerima pembayaran"
+                                                );
+                                              }
+                                            }}
+                                            data-testid={`approve-order-${o.session_id.slice(-6)}`}
+                                            className="rounded-md bg-lime text-void px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:opacity-85 cursor-pointer"
+                                          >
+                                            Terima
+                                          </button>
+                                          <button
+                                            onClick={async () => {
+                                              try {
+                                                await api.post(
+                                                  `/admin/orders/${o.session_id}/reject`
+                                                );
+                                                toast.success("Pembayaran ditolak");
+                                                load();
+                                              } catch (e) {
+                                                toast.error(
+                                                  formatApiError(e.response?.data?.detail) ||
+                                                    "Gagal menolak pembayaran"
+                                                );
+                                              }
+                                            }}
+                                            data-testid={`reject-order-${o.session_id.slice(-6)}`}
+                                            className="rounded-md bg-coral text-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:opacity-85 cursor-pointer"
+                                          >
+                                            Tolak
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  {o.payment_status === "paid" && o.buyer_email && (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        try {
+                                          const { data } = await api.post(
+                                            `/payments/resend-order-email/${o.session_id}`
+                                          );
+                                          toast.success(
+                                            data?.message ||
+                                              `Email berhasil dikirim ulang ke ${o.buyer_email}`
+                                          );
+                                          load(false);
+                                        } catch (e) {
+                                          toast.error(
+                                            formatApiError(e.response?.data?.detail) ||
+                                              "Gagal mengirim ulang email"
+                                          );
                                         }
-                                        className="rounded-lg text-[10px] text-lime border border-lime/40 hover:bg-lime/10 px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
-                                      >
-                                        Salin TXID
-                                      </button>
-                                    ) : (
-                                      <span className="text-[10px] text-slate-500">
-                                        Menunggu Bukti
-                                      </span>
-                                    )}
-                                    {o.status === "waiting_approval" && (
-                                      <div className="flex gap-1.5">
-                                        <button
-                                          onClick={async () => {
-                                            try {
-                                              await api.post(
-                                                `/admin/orders/${o.session_id}/approve`
-                                              );
-                                              toast.success(
-                                                o.buyer_email
-                                                  ? `Pembayaran diterima & akses/invoice dikirim ke ${o.buyer_email}!`
-                                                  : "Pembayaran diterima!"
-                                              );
-                                              load();
-                                            } catch (e) {
-                                              toast.error(
-                                                formatApiError(e.response?.data?.detail) ||
-                                                  "Gagal menerima pembayaran"
-                                              );
-                                            }
-                                          }}
-                                          data-testid={`approve-order-${o.session_id.slice(-6)}`}
-                                          className="rounded-md bg-lime text-void px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:opacity-85 cursor-pointer"
-                                        >
-                                          Terima
-                                        </button>
-                                        <button
-                                          onClick={async () => {
-                                            try {
-                                              await api.post(
-                                                `/admin/orders/${o.session_id}/reject`
-                                              );
-                                              toast.success("Pembayaran ditolak");
-                                              load();
-                                            } catch (e) {
-                                              toast.error(
-                                                formatApiError(e.response?.data?.detail) ||
-                                                  "Gagal menolak pembayaran"
-                                              );
-                                            }
-                                          }}
-                                          data-testid={`reject-order-${o.session_id.slice(-6)}`}
-                                          className="rounded-md bg-coral text-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:opacity-85 cursor-pointer"
-                                        >
-                                          Tolak
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                {o.payment_status === "paid" && o.buyer_email && (
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      try {
-                                        const { data } = await api.post(
-                                          `/payments/resend-order-email/${o.session_id}`
-                                        );
-                                        toast.success(
-                                          data?.message ||
-                                            `Email berhasil dikirim ulang ke ${o.buyer_email}`
-                                        );
-                                        load(false);
-                                      } catch (e) {
-                                        toast.error(
-                                          formatApiError(e.response?.data?.detail) ||
-                                            "Gagal mengirim ulang email"
-                                        );
-                                      }
-                                    }}
-                                    data-testid={`resend-email-${o.session_id.slice(-6)}`}
-                                    className="mt-1.5 inline-flex items-center gap-1 rounded-lg text-[10px] text-lime border border-lime/40 hover:bg-lime/10 px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
-                                  >
-                                    Kirim Ulang Email
-                                  </button>
-                                )}
+                                      }}
+                                      data-testid={`resend-email-${o.session_id.slice(-6)}`}
+                                      className="inline-flex items-center gap-1 rounded-lg text-[10px] text-lime border border-lime/40 hover:bg-lime/10 px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
+                                    >
+                                      Kirim Ulang Email
+                                    </button>
+                                  )}
+                                  {o.payment_status !== "paid" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteUnpaidOrder(o)}
+                                      data-testid={`delete-order-${o.session_id.slice(-6)}`}
+                                      title="Hapus order yang belum dibayar"
+                                      className="inline-flex items-center gap-1 rounded-lg text-[10px] font-bold text-coral border border-coral/40 bg-coral/10 hover:bg-coral hover:text-white px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 size={11} />
+                                      <span>Hapus</span>
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))}

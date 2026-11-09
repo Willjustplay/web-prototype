@@ -440,6 +440,10 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
       if (action === "reject") {
         await api.post(`/admin/orders/${o.session_id}/reject`, {}, { headers });
       }
+      if (action === "delete") {
+        const { data } = await api.delete(`/admin/orders/${o.session_id}`, { headers });
+        toast.success(data?.message || `Order ${o.session_id} berhasil dihapus`);
+      }
       if (action === "sync") {
         const { data } = await api.post(`/admin/orders/${o.session_id}/sync`, {}, { headers });
         toast.success(`Status PayKita: ${data.paykita_status || data.payment_status}`);
@@ -1036,6 +1040,17 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                               className="text-[10px] uppercase tracking-widest border border-line text-slate-400 hover:text-neon px-2 py-1.5 transition-colors disabled:opacity-50"
                             >
                               Cek
+                            </button>
+                          )}
+                          {o.payment_status !== "paid" && (
+                            <button
+                              onClick={() => orderAction(o, "delete")}
+                              disabled={busy === o.session_id}
+                              data-testid={`admin-topup-delete-${o.session_id}`}
+                              title="Hapus order yang belum dibayar"
+                              className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest border border-coral/50 bg-coral/10 text-coral hover:bg-coral hover:text-white px-2 py-1.5 transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 size={11} /> Hapus
                             </button>
                           )}
                         </div>

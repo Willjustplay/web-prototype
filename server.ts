@@ -7782,6 +7782,101 @@ function enforceCheckoutRateLimit(req: Request, res: Response, checkoutType: str
   return true;
 }
 
+function findActivePendingOrderForProduct(params: {
+  productId: string;
+  userId?: string | null;
+  buyerEmail?: string | null;
+  buyerWhatsapp?: string | null;
+  clientSessionIds?: string[];
+}): any | null {
+  const cleanProductId = String(params.productId || "").trim();
+  if (!cleanProductId) return null;
+  const cleanUserId = String(params.userId || "").trim();
+  const cleanEmail = String(params.buyerEmail || "").trim().toLowerCase();
+  const cleanWa = String(params.buyerWhatsapp || "").replace(/\D+/g, "");
+  const clientSessions = new Set(
+    (Array.isArray(params.clientSessionIds) ? params.clientSessionIds : [])
+      .map((s) => String(s || "").trim())
+      .filter(Boolean)
+  );
+  const now = Date.now();
+  let mutated = false;
+
+  for (let i = db.transactions.length - 1; i >= 0; i -= 1) {
+    const tx = db.transactions[i];
+    if (!tx || tx.product_id !== cleanProductId) continue;
+    if (tx.payment_status !== "pending" || tx.status !== "pending") continue;
+
+    // Auto-expire if past expired_at
+    if (tx.expired_at && new Date(tx.expired_at).getTime() <= now) {
+      tx.payment_status = "failed";
+      tx.status = "expired";
+      tx.updated_at = nowIso();
+      mutated = true;
+      continue;
+    }
+
+    // Check if Home product stock became 0
+    if (!ensureOngoingHomeTransactionStockAvailable(tx) || tx.payment_status !== "pending") {
+      continue;
+    }
+
+    const txUserId = String(tx.user_id || "").trim();
+    const txEmail = String(tx.buyer_email || "").trim().toLowerCase();
+    const txWa = String(tx.buyer_whatsapp || "").replace(/\D+/g, "");
+    const matchesBuyer =
+      (cleanUserId && txUserId && cleanUserId === txUserId) ||
+      (cleanEmail && txEmail && cleanEmail === txEmail) ||
+      (cleanWa && cleanWa.length >= 8 && txWa && cleanWa === txWa) ||
+      (tx.session_id && clientSessions.has(String(tx.session_id)));
+
+    if (matchesBuyer) {
+      if (mutated) saveDb();
+      return tx;
+    }
+  }
+
+  if (mutated) saveDb();
+  return null;
+}
+
+function enforceSingleActiveOrderPerProduct(
+  req: Request,
+  res: Response,
+  product: any,
+  buyer: { buyer_email?: string | null; buyer_whatsapp?: string | null },
+  user: any | null,
+  origin: string
+): boolean {
+  const rawActiveSessions = req.body?.active_session_ids;
+  const clientSessionIds = Array.isArray(rawActiveSessions) ? rawActiveSessions : [];
+  const existingTx = findActivePendingOrderForProduct({
+    productId: product.id,
+    userId: user?.id || null,
+    buyerEmail: buyer.buyer_email || "",
+    buyerWhatsapp: buyer.buyer_whatsapp || "",
+    clientSessionIds,
+  });
+
+  if (existingTx) {
+    const prodTitle = existingTx.product_title || product.title || "Produk ini";
+    res.status(409).json({
+      code: "ACTIVE_ORDER_EXISTS",
+      detail: `Anda masih memiliki pembayaran yang belum diselesaikan pada produk "${prodTitle}" (ID: ${existingTx.session_id}). Silakan batalkan pembayaran tersebut terlebih dahulu atau selesaikan pembayarannya sebelum memesan produk yang sama kembali.`,
+      active_order: {
+        session_id: existingTx.session_id,
+        product_id: existingTx.product_id,
+        product_title: prodTitle,
+        amount: existingTx.pay_amount || existingTx.amount || product.price,
+        created_at: existingTx.created_at,
+        checkout_url: `${origin}/payment/success?session_id=${existingTx.session_id}`,
+      },
+    });
+    return false;
+  }
+  return true;
+}
+
 api.post("/payments/paykita/checkout", async (req, res) => {
   try {
     if (!enforceCheckoutRateLimit(req, res, "qris_auto")) return;
@@ -7813,13 +7908,15 @@ api.post("/payments/paykita/checkout", async (req, res) => {
 
     const buyer = parseBuyer(body);
     const user = getUserOptional(req);
+    const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
+    if (!enforceSingleActiveOrderPerProduct(req, res, product, buyer, user, origin)) return;
+
     const orderId = genOrderId("NXG-Q");
     const priceIdr = Math.round(Number(product.price || 0));
     const priceUsd =
       product.price_usd && Number(product.price_usd) > 0
         ? Number(product.price_usd)
         : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
-    const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
 
     const remoteOrder = await tryCreateRemotePaykitaOrder({
       orderId,
@@ -8615,6 +8712,8 @@ const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
       return res.status(400).json({ detail: `Kanal pembayaran ${dest.name} dinonaktifkan untuk produk ini` });
     }
     const user = getUserOptional(req);
+    const origin = body.origin_url || req.headers.origin || FRONTEND_URL;
+    if (!enforceSingleActiveOrderPerProduct(req, res, product, buyer, user, origin)) return;
     const orderId = genOrderId(isCrypto ? "NXG-C" : "NXG-M");
     const priceIdr = Math.round(Number(product.price || 0));
     const priceUsd =
@@ -8654,7 +8753,6 @@ const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
     };
     db.transactions.push(tx);
     saveDb();
-    const origin = body.origin_url || req.headers.origin || FRONTEND_URL;
     res.json({
       order_id: orderId,
       session_id: orderId,
@@ -8724,6 +8822,8 @@ api.post("/payments/topup/checkout", async (req, res) => {
       getDuitkuChannelMeta(requestedChannel);
 
     const user = getUserOptional(req);
+    const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
+    if (!enforceSingleActiveOrderPerProduct(req, res, product, buyer, user, origin)) return;
     const orderId = genOrderId("NXG-T");
     const label = denom.label || denom.code;
     const priceIdr = Math.round(Number(product.price || 0));
@@ -8739,7 +8839,6 @@ api.post("/payments/topup/checkout", async (req, res) => {
     const verifiedNickname = String(body.verified_nickname || verification.nickname || "").trim();
     const customerNo = verification.customer_no || buildDigiflazzCustomerNo(game, destination);
 
-    const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
     const productTitle = product.title || `${game.name} — ${label}`;
     const remoteOrder = await tryCreateRemotePaykitaOrder({
       orderId,
@@ -9038,6 +9137,35 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
 
 api.get("/payments/status/:session_id", handlePaymentStatus);
 api.get("/payments/checkout/status/:session_id", handlePaymentStatus);
+
+api.post("/payments/cancel/:session_id", (req, res) => {
+  const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
+  if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
+  const isPaid =
+    tx.payment_status === "paid" &&
+    (tx.provider !== "paykita" || Boolean(tx.paykita_confirmed));
+  if (isPaid || tx.status === "completed") {
+    return res.status(400).json({
+      detail: "Pesanan yang sudah lunas tidak dapat dibatalkan.",
+    });
+  }
+  tx.payment_status = "failed";
+  tx.status = "cancelled_by_buyer";
+  tx.cancel_reason = "Pembayaran dibatalkan oleh pembeli.";
+  tx.qris_string = null;
+  tx.qris_image = null;
+  tx.va_number = null;
+  tx.pay_url = null;
+  tx.updated_at = nowIso();
+  saveDb();
+  res.json({
+    ok: true,
+    session_id: tx.session_id,
+    status: tx.status,
+    payment_status: tx.payment_status,
+    message: "Pembayaran berhasil dibatalkan. Anda kini dapat membuat pesanan baru.",
+  });
+});
 
 api.post("/payments/resend-order-email/:session_id", async (req, res) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
@@ -9341,6 +9469,40 @@ admin.post("/orders/:session_id/reject", (req, res) => {
   tx.updated_at = nowIso();
   saveDb();
   res.json(tx);
+});
+
+admin.delete("/orders/:session_id", (req, res) => {
+  const idx = db.transactions.findIndex((t) => t.session_id === req.params.session_id);
+  if (idx === -1) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
+  const tx = db.transactions[idx];
+  const isPaid =
+    tx.payment_status === "paid" &&
+    (tx.provider !== "paykita" || Boolean(tx.paykita_confirmed));
+  if (isPaid) {
+    return res.status(400).json({
+      detail: "Pesanan yang sudah lunas tidak dapat dihapus",
+    });
+  }
+  const [removed] = db.transactions.splice(idx, 1);
+  saveDb();
+  writeAuditLog({
+    actor: (req as any).adminUser || getUserOptional(req),
+    action: "order.deleted_unpaid",
+    metadata: {
+      session_id: removed.session_id,
+      product_id: removed.product_id,
+      product_title: removed.product_title,
+      buyer_email: removed.buyer_email,
+      status: removed.status,
+      payment_status: removed.payment_status,
+    },
+    req,
+  });
+  res.json({
+    ok: true,
+    session_id: removed.session_id,
+    message: `Order ${removed.session_id} berhasil dihapus`,
+  });
 });
 
 admin.get("/orders/:session_id", (req, res) => {

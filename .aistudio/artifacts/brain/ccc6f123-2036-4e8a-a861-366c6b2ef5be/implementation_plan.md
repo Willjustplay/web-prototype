@@ -1,99 +1,71 @@
-# Rencana Pengamanan Website Berlapis (Multi-Layer Security Hardening)
+# Rencana Implementasi Pembatasan Order Ganda pada Produk yang Sama & Hapus Order Belum Dibayar oleh Admin
 
-Rencana ini merancang sistem pertahanan berlapis untuk melindungi website dari berbagai serangan siber seperti *Brute Force*, *Spam/DDoS Checkout*, *Cross-Site Scripting (XSS)*, *SQL/NoSQL Injection*, *Prototype Pollution*, manipulasi *File Upload*, serta pemalsuan *Webhook* pembayaran.
+Rencana ini mengatur mekanisme agar setiap pembeli tidak dapat membuat pesanan berulang pada produk yang sama selama masih ada transaksi yang belum dibayar (*pending*), menyediakan fitur pembatalan pembayaran oleh pembeli, serta menambahkan tombol hapus pesanan belum lunas pada kolom **Aksi** di tabel pesanan Admin.
 
 ---
 
 ## Keputusan Desain yang Dikonfirmasi
 
-1. **Cakupan Lapisan Keamanan Utama**:
-   - **Anti-Brute Force & Rate Limiting Transaksi**: Perlindungan ketat pada endpoint login admin, login pengguna, registrasi, reset password, serta pembuatan transaksi checkout agar tidak dapat di-spam oleh bot.
-   - **Filter Anti-XSS, Anti-Injection & Validasi Ketat File Upload**: Pembersihan otomatis seluruh input dari skrip berbahaya, pencegahan injeksi query/objek, serta pemeriksaan *magic bytes* (header biner asli) pada gambar bukti pembayaran.
-   - **Pengamanan Webhook, Enkripsi Sesi & Header Keamanan HTTP**: Verifikasi tanda tangan kriptografis (*timing-safe comparison*) pada callback pembayaran, penguncian atribut cookie sesi, serta penyematan header keamanan standar industri.
-2. **Tindakan Otomatis terhadap Serangan Berulang**:
-   - **Blokir Sementara IP Selama 15 Menit & Pencatatan Audit Log**: Setiap IP yang melampaui ambang batas percobaan login gagal, melakukan spam checkout, atau mengirimkan muatan serangan (payload XSS/Injection) akan langsung diblokir otomatis selama **15 menit** dan dicatat secara rinci ke dalam **Audit Log Keamanan** (lengkap dengan fitur pantau dan buka blokir IP manual bagi Admin).
+1. **Perilaku Saat Pembeli Memesan Produk yang Sama (Masih Memiliki Pembayaran Aktif)**:
+   - Sistem menolak pembuatan transaksi baru untuk produk yang sama dan menampilkan **peringatan interaktif** beserta tombol pintasan untuk **Membuka Halaman Pembayaran Aktif** atau **Membatalkan Pembayaran Aktif** secara langsung agar pembeli dapat memesan ulang.
+   - Di halaman pembayaran aktif, pembeli juga memiliki tombol **Batalkan Pembayaran** untuk membatalkan pesanan yang sedang berjalan kapan saja sebelum dibayar.
+2. **Cakupan Fitur Hapus Order oleh Admin**:
+   - Pada kolom ke-7 (**Aksi**) di tabel daftar pesanan Admin, semua pesanan yang **belum lunas** (termasuk status *pending / menunggu pembayaran*, *gagal*, *ditolak*, dan *kedaluwarsa*) dilengkapi dengan tombol **Hapus** agar Admin dapat membersihkan data order yang tidak dibayar.
 
 ---
 
-## Arsitektur Pertahanan Berlapis (Security Pipeline)
+## Alur Arsitektur & Validasi Transaksi
 
 ```text
-[ Request Masuk dari Pengunjung / Bot ]
+[ Pembeli Klik Checkout pada Produk X ]
                   │
                   ▼
-┌─────────────────────────────────────────────────────────┐
-│ Lapis 1: Firewall IP & Pemblokiran Sementara (15 Menit) │
-│ • Cek apakah IP masuk daftar blokir aktif               │
-│ • Jika diblokir -> Tolak (HTTP 429) & blokir akses API  │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ Cek Transaksi Aktif Pembeli pada Produk X                   │
+│ (Berdasarkan Akun Login / Email / WhatsApp / Sesi Browser)  │
+└─────────────────┬───────────────────────────────────────────┘
+                  │
+        ┌─────────┴─────────┐
+        │                   │
+ [ Ada Order Pending ] [ Tidak Ada Order Pending ]
+        │                   │
+        ▼                   ▼
+┌───────────────────────┐ ┌───────────────────────────────────┐
+│ Tahan Order Baru      │ │ Buat Transaksi Baru & Arahkan ke  │
+│ (HTTP 409 Conflict)   │ │ Halaman Pembayaran                │
+│ Tampilkan Peringatan: │ └───────────────────────────────────┘
+│ • [Buka Pembayaran]   │
+│ • [Batalkan Order Ini]│
+└───────────────────────┘
+
+[ Tabel Pesanan Admin — Kolom Ke-7 (Aksi) ]
                   │
                   ▼
-┌─────────────────────────────────────────────────────────┐
-│ Lapis 2: Header Keamanan HTTP & Proteksi Server         │
-│ • Sembunyikan identitas server                          │
-│ • Pasang X-Content-Type-Options, Referrer-Policy,       │
-│   Permissions-Policy, dan X-XSS-Protection              │
-└─────────────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ Lapis 3: Inspeksi & Sanitasi Payload (WAF Ringan)       │
-│ • Cegah Prototype Pollution (__proto__, constructor)    │
-│ • Deteksi & bersihkan payload XSS (<script>, onerror=)  │
-│ • Deteksi pola SQL/NoSQL Injection & Null-Byte Attack   │
-│ • Pelanggaran berulang -> Blokir IP 15 Menit + Log      │
-└─────────────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ Lapis 4: Rate Limiting Spesifik Endpoint                │
-│ • Login Admin & Kunci Admin: Maks 5 gagal -> Blokir IP  │
-│ • Checkout & Buat Order: Batasi frekuensi per IP        │
-│ • Upload Bukti Bayar: Validasi Magic Bytes (PNG/JPG/WEBP│
-│ • Webhook Pembayaran: Verifikasi Signature Timing-Safe  │
-└─────────────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ Lapis 5: Audit Log Keamanan & Panel Kendali Admin       │
-│ • Catat otomatis kejadian serangan & IP yang diblokir   │
-│ • Admin dapat memantau daftar IP terblokir & Unblock IP │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ Cek Status Pembayaran Order (payment_status !== "paid")     │
+│ • Tampilkan tombol [Hapus] pada semua order belum lunas     │
+│ • Saat diklik -> Hapus transaksi dari database & segarkan   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Rincian Implementasi Fitur Keamanan
+## Rincian Fitur yang Akan Dibangun
 
-### 1. Sistem Blokir IP Otomatis 15 Menit & Deteksi Intrusi
-- **Manajemen Daftar Blokir IP**: Menyimpan daftar IP yang terindikasi melakukan serangan beserta waktu kedaluwarsa blokir (`15 menit` sejak pelanggaran terdeteksi) dan alasan pemblokiran.
-- **Pencegahan Bypass IP**: Membaca IP asli pengunjung secara akurat dengan memperhitungkan header proxy secara aman.
-- **Akumulasi Pelanggaran (Strike System)**: Jika satu IP berulang kali memicu *rate limit*, gagal autentikasi admin, atau mengirimkan payload berbahaya, sistem langsung mengaktifkan blokir 15 menit pada IP tersebut dan menulis catatan ke Audit Log.
+### 1. Pencegahan Pemesanan Berulang pada Produk yang Sama
+- **Deteksi Order Aktif (*Pending*) per Pembeli & Produk**:
+  - Saat pembeli menekan tombol bayar/checkout (baik melalui QRIS Otomatis, Transfer/QRIS Manual, Crypto, maupun Top Up), server memeriksa apakah pembeli tersebut (berdasarkan ID pengguna yang login, alamat email, nomor WhatsApp, atau ID sesi aktif dari perangkatnya) masih memiliki transaksi berstatus `pending` yang belum kedaluwarsa pada produk yang sama.
+  - Jika ditemukan transaksi aktif pada produk tersebut, server mengembalikan status konflik (`ACTIVE_ORDER_EXISTS`) beserta informasi `session_id`, judul produk, nominal, dan tautan pembayaran dari transaksi yang masih menggantung.
+- **Tampilan Peringatan & Pintasan Pembatalan untuk Pembeli**:
+  - Ketika sistem mendeteksi masih ada pembayaran yang belum diselesaikan pada produk tersebut, pembeli melihat pesan peringatan yang jelas beserta dua tombol tindakan langsung:
+    1. **Lanjutkan / Buka Pembayaran Aktif**: Mengarahkan pembeli ke halaman kode bayar dari pesanan yang masih berjalan.
+    2. **Batalkan Pembayaran Sebelumnya**: Membatalkan pesanan lama secara instan sehingga pembeli dapat langsung membuat pesanan baru pada produk yang sama.
+- **Tombol Batalkan Pembayaran di Halaman Pembayaran**:
+  - Menyediakan tombol **Batalkan Pembayaran** pada halaman instruksi pembayaran selama status transaksi masih `pending` agar pembeli dapat membatalkan sendiri pesanannya kapan saja.
 
-### 2. Perlindungan Anti-Brute Force Login Admin & Pembatasan Spam Transaksi
-- **Proteksi Login Admin & Verifikasi Kunci Admin**:
-  - Membatasi percobaan login admin maksimal **5 kali gagal** dalam rentang waktu pengawasan. Jika terlampaui, IP langsung diblokir selama **15 menit** dan dicatat sebagai insiden `security.brute_force_admin`.
-  - Menggunakan perbandingan kriptografis waktu konstan (*timing-safe comparison*) saat memeriksa kredensial/kunci admin untuk mencegah serangan *Timing Attack*.
-- **Rate Limiting Checkout & Pembayaran**:
-  - Membatasi pembuatan transaksi baru (otomatis, manual, kripto, dan top up) per IP agar pelaku tidak dapat melakukan spam order untuk menguras stok atau membebani gateway pembayaran.
-  - Pelanggaran berulang pada endpoint checkout akan memicu blokir IP 15 menit dan dicatat sebagai `security.checkout_spam_blocked`.
-
-### 3. Filter Anti-XSS, Anti-Injection & Validasi Ketat File Upload
-- **Sanitasi Input Rekursif & Proteksi Prototype Pollution**:
-  - Membersihkan seluruh data yang masuk (`body`, `query`, dan `params`) dari properti berbahaya seperti `__proto__`, `prototype`, dan `constructor`, serta menghapus karakter *null-byte*.
-  - Menyaring tag skrip berbahaya (`<script>`, `javascript:`, `vbscript:`, `data:text/html`, serta atribut event inline seperti `onerror=` dan `onload=`) agar tidak tersimpan ke database atau dieksekusi di browser pembeli/admin.
-- **Deteksi Payload SQL/NoSQL Injection**:
-  - Memeriksa pola serangan injeksi pada parameter input. Jika terdeteksi percobaan eksploitasi berbahaya, permintaan langsung ditolak, dicatat ke Audit Log (`security.payload_attack_detected`), dan dihitung sebagai pelanggaran keamanan IP.
-- **Validasi *Magic Bytes* File Upload Bukti Pembayaran**:
-  - Memeriksa byte pertama (*file signature / magic bytes*) dari file yang diunggah untuk memastikan file benar-benar gambar asli (`PNG`, `JPEG`, atau `WEBP`), bukan file skrip berbahaya (`.php`, `.html`, `.svg`, `.exe`, `.js`) yang disamarkan ekstensi atau tipe MIME-nya.
-
-### 4. Pengamanan Webhook Pembayaran, Sesi, dan Header HTTP
-- **Header Keamanan HTTP**:
-  - Menonaktifkan eksposur tanda pengenal server dan menyematkan header perlindungan `X-Content-Type-Options: nosniff`, `X-XSS-Protection: 1; mode=block`, `Referrer-Policy: strict-origin-when-cross-origin`, serta `Permissions-Policy` untuk membatasi akses fitur sensitif browser.
-- **Pengamanan Sesi & Webhook**:
-  - Memastikan token sesi dibuat dengan generator acak kriptografis (`crypto.randomBytes`), disimpan dengan cookie `HttpOnly` dan `SameSite=Lax`, serta memvalidasi signature webhook menggunakan perbandingan aman agar status pesanan tidak dapat dipalsukan dari luar.
-
-### 5. Pemantauan Blokir IP pada Panel Audit Log Admin
-- **visibilitas Insiden Keamanan**:
-  - Menampilkan daftar **IP yang Sedang Diblokir** secara langsung di halaman **Audit Log** pada dashboard Admin lengkap dengan alasan blokir, sisa waktu blokir, dan tombol **Buka Blokir (Unblock)** jika Admin ingin mencabut blokir lebih awal.
-  - Menambahkan penanda visual khusus untuk log bertipe keamanan (`security.*`) agar Admin dapat langsung mengenali riwayat serangan yang berhasil ditangkal sistem.
+### 2. Fitur Hapus Order Belum Dibayar oleh Admin (Kolom Ke-7 Tabel Pesanan)
+- **Endpoint Penghapusan Order Belum Lunas**:
+  - Menambahkan endpoint khusus Admin untuk menghapus transaksi yang belum lunas (`payment_status !== "paid"`), sekaligus mencatat tindakan penghapusan ke dalam Audit Log Admin.
+  - Pesanan yang sudah berstatus `paid` (Lunas) dilindungi agar riwayat transaksi yang sah tidak terhapus secara tidak sengaja.
+- **Tombol Hapus pada Kolom Aksi (`td` ke-7)**:
+  - Menambahkan tombol **Hapus** berwarna merah (*coral*) pada kolom ke-7 (**Aksi**) di tabel daftar pesanan Admin (baik pada daftar pesanan utama maupun tabel pesanan Top Up) untuk setiap baris order yang belum dibayar (*pending*, *gagal*, *ditolak*, atau *kedaluwarsa*).

@@ -24,12 +24,22 @@ import {
   Gem,
   Crown,
   X,
+  ExternalLink,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { DEFAULT_DUITKU_CHANNELS } from "@/components/topup/TopupPaymentStep";
-import { api, formatApiError, formatIDR, imgSrc } from "@/lib/api";
+import {
+  api,
+  formatApiError,
+  formatIDR,
+  imgSrc,
+  getActiveClientSessions,
+  rememberActiveClientSession,
+  removeActiveClientSession,
+} from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTopupGames, validateTopupDestination, localFieldError } from "@/hooks/useTopup";
@@ -147,6 +157,8 @@ export default function TopupGameDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [summaryError, setSummaryError] = useState("");
+  const [activeOrderConflict, setActiveOrderConflict] = useState(null);
+  const [cancellingConflict, setCancellingConflict] = useState(false);
 
   const game = useMemo(
     () =>
@@ -166,6 +178,8 @@ export default function TopupGameDetail() {
     setPaymentFilter("qris");
     setConfirmModalOpen(false);
     setSummaryError("");
+    setActiveOrderConflict(null);
+    setCancellingConflict(false);
   }, [slug]);
 
   useEffect(() => {
@@ -464,11 +478,42 @@ export default function TopupGameDetail() {
     }
   };
 
+  const handleCancelConflictOrder = async () => {
+    if (!activeOrderConflict?.session_id) return;
+    setCancellingConflict(true);
+    try {
+      const { data } = await api.post(
+        `/payments/cancel/${activeOrderConflict.session_id}`
+      );
+      removeActiveClientSession(activeOrderConflict.session_id);
+      setActiveOrderConflict(null);
+      setSummaryError("");
+      toast.success(
+        data?.message ||
+          t(
+            "Pembayaran sebelumnya berhasil dibatalkan! Silakan klik Lanjut Bayar untuk membuat pesanan baru.",
+            "Previous payment cancelled! Click Pay Now to create a new order."
+          )
+      );
+    } catch (err) {
+      toast.error(
+        formatApiError(err.response?.data?.detail) ||
+          t(
+            "Gagal membatalkan pembayaran sebelumnya",
+            "Failed to cancel previous payment"
+          )
+      );
+    } finally {
+      setCancellingConflict(false);
+    }
+  };
+
   const confirmAndPay = async () => {
     if (!game || !denomination) return;
     const cleanEmail = email.trim().toLowerCase();
     setSubmitting(true);
     setSummaryError("");
+    setActiveOrderConflict(null);
     try {
       const payload = {
         game: game.slug,
@@ -482,10 +527,22 @@ export default function TopupGameDetail() {
         duitku_channel: duitkuChannel,
         payment_method: duitkuChannel,
         origin_url: window.location.origin,
+        active_session_ids: getActiveClientSessions(),
       };
       const { data } = await api.post("/payments/topup/checkout", payload);
+      rememberActiveClientSession(data.session_id || data.order_id);
       window.location.href = data.checkout_url;
     } catch (e) {
+      if (
+        e.response?.status === 409 &&
+        e.response?.data?.code === "ACTIVE_ORDER_EXISTS" &&
+        e.response?.data?.active_order
+      ) {
+        setActiveOrderConflict({
+          ...e.response.data.active_order,
+          detail: e.response.data.detail,
+        });
+      }
       const message =
         formatApiError(e.response?.data?.detail) ||
         (e.response
@@ -1727,6 +1784,74 @@ export default function TopupGameDetail() {
                   </span>
                 </div>
               </div>
+
+              {/* Active Order Conflict Banner inside Confirmation Modal */}
+              {activeOrderConflict && (
+                <div
+                  data-testid="topup-active-order-conflict"
+                  className="rounded-xl border border-coral/50 bg-coral/10 p-3.5 space-y-2.5 text-left"
+                >
+                  <div className="flex items-start gap-2 text-xs text-slate-100 leading-relaxed">
+                    <AlertCircle
+                      size={15}
+                      className="text-coral shrink-0 mt-0.5"
+                    />
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-bold text-coral text-[11px] uppercase tracking-wider">
+                        {t(
+                          "Masih Ada Pembayaran Aktif di Produk Ini",
+                          "Active Payment Exists for This Product"
+                        )}
+                      </p>
+                      <p className="text-[11px] text-slate-200 leading-relaxed">
+                        {activeOrderConflict.detail ||
+                          t(
+                            "Batalkan pembayaran sebelumnya terlebih dahulu sebelum membuat pesanan baru pada nominal yang sama.",
+                            "Please cancel the previous payment first before creating a new order for the same item."
+                          )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.href =
+                          activeOrderConflict.checkout_url ||
+                          `/payment/success?session_id=${activeOrderConflict.session_id}`;
+                      }}
+                      data-testid="topup-conflict-open-payment"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-neon text-void hover:bg-lime font-display font-bold text-[11px] uppercase tracking-wider py-2 px-3 transition-colors cursor-pointer"
+                    >
+                      <ExternalLink size={12} />
+                      <span>
+                        {t("Buka Pembayaran Aktif", "Open Active Payment")}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cancellingConflict}
+                      onClick={handleCancelConflictOrder}
+                      data-testid="topup-conflict-cancel-payment"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-coral/60 bg-void/90 hover:bg-coral hover:text-white text-coral font-display font-bold text-[11px] uppercase tracking-wider py-2 px-3 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {cancellingConflict ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <XCircle size={12} />
+                      )}
+                      <span>
+                        {cancellingConflict
+                          ? t("Membatalkan...", "Cancelling...")
+                          : t(
+                              "Batalkan Pembayaran Aktif",
+                              "Cancel Active Payment"
+                            )}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-2.5 pt-1">

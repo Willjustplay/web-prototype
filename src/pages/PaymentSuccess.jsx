@@ -22,7 +22,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
-import { api, waLink, imgSrc, formatIDR, formatUSD } from "@/lib/api";
+import {
+  api,
+  waLink,
+  imgSrc,
+  formatIDR,
+  formatUSD,
+  removeActiveClientSession,
+} from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { ReviewModal } from "@/components/ReviewModal";
 
@@ -230,6 +237,7 @@ export default function PaymentSuccess() {
   const [syncing, setSyncing] = useState(false);
   const [refreshingQris, setRefreshingQris] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
+  const [cancellingPayment, setCancellingPayment] = useState(false);
   const [now, setNow] = useState(Date.now());
   void paymentType;
 
@@ -254,17 +262,25 @@ export default function PaymentSuccess() {
         : data.payment_status === "paid" || data.status === "completed";
 
       if (isConfirmedPaid) {
+        removeActiveClientSession(sessionId);
         setStatus("paid");
         setDelivery(data.delivery_info || "");
         setPaymentType(data.payment_type || "");
         return true;
       }
       if (data.status === "cancelled_out_of_stock") {
+        removeActiveClientSession(sessionId);
         setStatus("out_of_stock");
+        return true;
+      }
+      if (data.status === "cancelled_by_buyer") {
+        removeActiveClientSession(sessionId);
+        setStatus("cancelled_by_buyer");
         return true;
       }
       if (data.provider === "manual") {
         if (data.status === "rejected" || data.payment_status === "failed") {
+          removeActiveClientSession(sessionId);
           setStatus("rejected");
           return true;
         }
@@ -277,6 +293,7 @@ export default function PaymentSuccess() {
       }
       if (isPaykita) {
         if (data.payment_status === "failed") {
+          removeActiveClientSession(sessionId);
           setStatus(data.status === "expired" ? "expired" : "failed");
           return true;
         }
@@ -288,6 +305,7 @@ export default function PaymentSuccess() {
         return false;
       }
       if (data.payment_status === "failed") {
+        removeActiveClientSession(sessionId);
         setStatus("failed");
         return true;
       }
@@ -448,6 +466,39 @@ export default function PaymentSuccess() {
       );
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const cancelPaymentNow = async () => {
+    if (!sessionId || cancellingPayment) return;
+    setCancellingPayment(true);
+    try {
+      const { data } = await api.post(`/payments/cancel/${sessionId}`);
+      removeActiveClientSession(sessionId);
+      setStatus("cancelled_by_buyer");
+      setTxData((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "cancelled_by_buyer",
+              payment_status: "failed",
+              qris_string: null,
+              qris_image: null,
+              va_number: null,
+              pay_url: null,
+            }
+          : prev
+      );
+      toast.success(
+        data?.message ||
+          "Pembayaran berhasil dibatalkan. Anda kini dapat memesan produk ini kembali."
+      );
+    } catch (err) {
+      toast.error(
+        err.response?.data?.detail || "Gagal membatalkan pembayaran"
+      );
+    } finally {
+      setCancellingPayment(false);
     }
   };
 
@@ -1611,6 +1662,23 @@ export default function PaymentSuccess() {
           </div>
         )}
 
+        {/* STATE: CANCELLED BY BUYER */}
+        {status === "cancelled_by_buyer" && (
+          <div className="py-6 text-center space-y-3" data-testid="payment-cancelled-by-buyer">
+            <XCircle
+              size={48}
+              className="mx-auto text-coral"
+              data-testid="payment-cancelled-icon"
+            />
+            <h1 className="font-display font-bold text-lg text-coral">
+              Pembayaran Telah Dibatalkan
+            </h1>
+            <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
+              Sesi pembayaran untuk pesanan ini telah berhasil kamu batalkan. Kamu sekarang dapat kembali memesan produk ini atau memilih metode pembayaran lainnya.
+            </p>
+          </div>
+        )}
+
         {/* STATE: REJECTED / FAILED / EXPIRED */}
         {(status === "rejected" ||
           status === "failed" ||
@@ -1672,8 +1740,32 @@ export default function PaymentSuccess() {
           </div>
         )}
 
+        {/* Cancel Active Payment Button (Available while payment is still pending) */}
+        {(status === "paykita_pending" || status === "manual_pending") && (
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={cancellingPayment}
+              onClick={cancelPaymentNow}
+              data-testid="cancel-active-payment-button"
+              className="w-full flex items-center justify-center gap-1.5 border border-coral/50 bg-coral/10 hover:bg-coral hover:text-white text-coral font-display font-bold text-xs uppercase tracking-wider py-2.5 px-4 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {cancellingPayment ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <XCircle size={14} />
+              )}
+              <span>
+                {cancellingPayment
+                  ? "Membatalkan Pembayaran..."
+                  : "Batalkan Pembayaran Ini"}
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Bottom Navigation Bar */}
-        <div className="mt-6 pt-4 border-t border-line/60 grid grid-cols-2 gap-2.5">
+        <div className="mt-4 pt-4 border-t border-line/60 grid grid-cols-2 gap-2.5">
           <Link
             to="/"
             data-testid="payment-back-home-button"

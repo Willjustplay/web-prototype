@@ -18,9 +18,21 @@ import {
   Coins,
   Plus,
   Check,
+  AlertTriangle,
+  ExternalLink,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, formatIDR, formatUSD, waLink, imgSrc } from "@/lib/api";
+import {
+  api,
+  formatIDR,
+  formatUSD,
+  waLink,
+  imgSrc,
+  getActiveClientSessions,
+  rememberActiveClientSession,
+  removeActiveClientSession,
+} from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSwipeNav } from "@/hooks/useSwipeNav";
@@ -57,6 +69,8 @@ export const ProductModal = ({
   ]);
   const [method, setMethod] = useState("manual");
   const [imageFit, setImageFit] = useState("contain");
+  const [activeOrderConflict, setActiveOrderConflict] = useState(null);
+  const [cancellingConflict, setCancellingConflict] = useState(false);
 
   void selectedAutoGateway;
 
@@ -163,6 +177,8 @@ export const ProductModal = ({
   useEffect(() => {
     if (!product) return;
     setLoading(false);
+    setActiveOrderConflict(null);
+    setCancellingConflict(false);
     setActive(0);
     setZoom(false);
     setShowDescription(false);
@@ -266,6 +282,28 @@ export const ProductModal = ({
     };
   };
 
+  const handleCancelConflictOrder = async () => {
+    if (!activeOrderConflict?.session_id) return;
+    setCancellingConflict(true);
+    try {
+      const { data } = await api.post(
+        `/payments/cancel/${activeOrderConflict.session_id}`
+      );
+      removeActiveClientSession(activeOrderConflict.session_id);
+      setActiveOrderConflict(null);
+      toast.success(
+        data?.message ||
+          "Pembayaran sebelumnya berhasil dibatalkan. Silakan klik Beli Sekarang untuk membuat pesanan baru."
+      );
+    } catch (err) {
+      toast.error(
+        err.response?.data?.detail || "Gagal membatalkan pembayaran sebelumnya"
+      );
+    } finally {
+      setCancellingConflict(false);
+    }
+  };
+
   const handleBuy = async () => {
     const buyer = resolveBuyerPayload();
     if (!buyer.buyer_email) {
@@ -281,14 +319,18 @@ export const ProductModal = ({
       return;
     }
     setLoading(true);
+    setActiveOrderConflict(null);
     try {
+      const activeSessions = getActiveClientSessions();
       if (method === "paykita") {
         const { data } = await api.post("/payments/paykita/checkout", {
           ...buyer,
           product_id: product.id,
           gateway_id: "paykita",
           origin_url: window.location.origin,
+          active_session_ids: activeSessions,
         });
+        rememberActiveClientSession(data.session_id || data.order_id);
         window.location.href = data.checkout_url;
         return;
       }
@@ -302,9 +344,21 @@ export const ProductModal = ({
         product_id: product.id,
         destination_id: selectedDest,
         origin_url: window.location.origin,
+        active_session_ids: activeSessions,
       });
+      rememberActiveClientSession(data.session_id || data.order_id);
       window.location.href = data.checkout_url;
     } catch (e) {
+      if (
+        e.response?.status === 409 &&
+        e.response?.data?.code === "ACTIVE_ORDER_EXISTS" &&
+        e.response?.data?.active_order
+      ) {
+        setActiveOrderConflict({
+          ...e.response.data.active_order,
+          detail: e.response.data.detail,
+        });
+      }
       toast.error(
         e.response?.data?.detail ||
           (e.response
@@ -945,6 +999,74 @@ export const ProductModal = ({
                       )}
                     </AnimatePresence>
                   </div>
+
+                  {/* Active Unpaid Order Conflict Warning */}
+                  {activeOrderConflict && (
+                    <div
+                      data-testid="active-order-conflict-banner"
+                      className="border border-coral/50 bg-coral/10 p-3 space-y-2.5 text-left"
+                    >
+                      <div className="flex items-start gap-2 text-xs text-slate-100 leading-relaxed">
+                        <AlertTriangle
+                          size={15}
+                          className="text-coral shrink-0 mt-0.5"
+                        />
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="font-bold text-coral text-[11px] uppercase tracking-wider">
+                            {t(
+                              "Masih Ada Pembayaran Aktif di Produk Ini",
+                              "Active Payment Exists for This Product"
+                            )}
+                          </p>
+                          <p className="text-[11px] text-slate-200 leading-relaxed">
+                            {activeOrderConflict.detail ||
+                              t(
+                                "Anda harus membatalkan pembayaran sebelumnya terlebih dahulu sebelum membuka pembelian baru pada produk yang sama.",
+                                "You must cancel the previous payment first before opening a new purchase for the same product."
+                              )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.location.href =
+                              activeOrderConflict.checkout_url ||
+                              `/payment/success?session_id=${activeOrderConflict.session_id}`;
+                          }}
+                          data-testid="conflict-open-active-payment"
+                          className="inline-flex items-center justify-center gap-1.5 bg-neon text-void hover:bg-lime font-display font-bold text-[11px] uppercase tracking-wider py-2 px-3 transition-colors cursor-pointer"
+                        >
+                          <ExternalLink size={12} />
+                          <span>
+                            {t("Buka Pembayaran Aktif", "Open Active Payment")}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cancellingConflict}
+                          onClick={handleCancelConflictOrder}
+                          data-testid="conflict-cancel-active-payment"
+                          className="inline-flex items-center justify-center gap-1.5 border border-coral/60 bg-void/90 hover:bg-coral hover:text-white text-coral font-display font-bold text-[11px] uppercase tracking-wider py-2 px-3 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {cancellingConflict ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <XCircle size={12} />
+                          )}
+                          <span>
+                            {cancellingConflict
+                              ? t("Membatalkan...", "Cancelling...")
+                              : t(
+                                  "Batalkan Pembayaran Aktif",
+                                  "Cancel Active Payment"
+                                )}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Primary Action Bar */}
                   <div className="sticky bottom-0 z-20 -mx-3 px-3 py-2 bg-panel/95 backdrop-blur border-t border-line sm:static sm:mx-0 sm:px-0 sm:py-0 sm:pt-0.5 sm:bg-transparent sm:border-t-0">

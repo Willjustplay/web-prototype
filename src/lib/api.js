@@ -112,3 +112,41 @@ export const imgSrc = (url) => {
   if (url.startsWith("http") || url.startsWith("data:")) return url;
   return BACKEND_URL ? `${BACKEND_URL}${url}` : url;
 };
+
+const ACTIVE_SESSIONS_KEY = "wjp_active_order_sessions";
+
+export const getActiveClientSessions = () => {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(ACTIVE_SESSIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((s) => typeof s === "string" && s.trim()) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const rememberActiveClientSession = (sessionId) => {
+  if (typeof localStorage === "undefined" || !sessionId) return;
+  try {
+    const clean = String(sessionId).trim();
+    if (!clean) return;
+    const current = getActiveClientSessions().filter((s) => s !== clean);
+    current.unshift(clean);
+    localStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(current.slice(0, 30)));
+  } catch {
+    // ignore storage errors
+  }
+};
+
+export const removeActiveClientSession = (sessionId) => {
+  if (typeof localStorage === "undefined" || !sessionId) return;
+  try {
+    const clean = String(sessionId).trim();
+    const next = getActiveClientSessions().filter((s) => s !== clean);
+    localStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage errors
+  }
+};
+
