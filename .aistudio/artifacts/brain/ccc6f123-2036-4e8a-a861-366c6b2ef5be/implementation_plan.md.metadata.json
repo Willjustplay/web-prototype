@@ -1,6 +1,0 @@
-{
-  "summary":  "Rencana implementasi pembatasan pemesanan berulang pada produk yang sama (wajib batalkan pembayaran aktif terlebih dahulu beserta pintasan buka/batalkan transaksi) dan fitur hapus order yang belum dibayar pada kolom Aksi di panel Admin.",
-  "updatedAt":  "2026-11-09T08:50:47.184520328Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

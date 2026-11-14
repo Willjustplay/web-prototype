@@ -51,11 +51,11 @@ export default function Topup() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.22 }}
-          className="rounded-2xl border border-line/90 bg-gradient-to-br from-panel/95 via-void/90 to-panel/85 p-3.5 sm:p-6 mb-4 sm:mb-5 shadow-[0_14px_36px_rgba(0,0,0,0.4)] relative overflow-hidden"
+          className="bg-transparent py-1 sm:py-2 mb-4 sm:mb-5 relative"
         >
-          <div className="pointer-events-none absolute -right-14 -top-14 w-52 h-52 rounded-full bg-neon/10 blur-3xl" />
+          <div className="pointer-events-none hidden" />
 
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="relative z-10 bg-transparent flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4">
             <div className="space-y-1.5">
               <h1 className="font-display font-black text-lg min-[380px]:text-xl sm:text-3xl uppercase tracking-tight text-white leading-snug sm:leading-tight">
                 {t("Pilih", "Choose Your")}{" "}
@@ -74,7 +74,7 @@ export default function Topup() {
             {/* 3-Column Feature Strip on Android + Desktop History Button */}
             <div className="flex flex-col sm:flex-row lg:items-center gap-2 sm:gap-2.5 shrink-0">
               <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 w-full sm:w-auto">
-                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2 rounded-xl border border-line/80 bg-void/80 px-2 py-2 sm:px-3 sm:py-2 text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2 bg-transparent px-2 py-1.5 sm:px-3 sm:py-1.5 text-center sm:text-left">
                   <Zap size={13} className="text-neon shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[10px] sm:text-[11px] font-display font-bold text-slate-100 leading-tight truncate">
@@ -86,7 +86,7 @@ export default function Topup() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2 rounded-xl border border-line/80 bg-void/80 px-2 py-2 sm:px-3 sm:py-2 text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2 bg-transparent px-2 py-1.5 sm:px-3 sm:py-1.5 text-center sm:text-left">
                   <ShieldCheck size={13} className="text-lime shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[10px] sm:text-[11px] font-display font-bold text-slate-100 leading-tight truncate">
@@ -98,7 +98,7 @@ export default function Topup() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2 rounded-xl border border-line/80 bg-void/80 px-2 py-2 sm:px-3 sm:py-2 text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2 bg-transparent px-2 py-1.5 sm:px-3 sm:py-1.5 text-center sm:text-left">
                   <Clock size={13} className="text-cyan-300 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[10px] sm:text-[11px] font-display font-bold text-slate-100 leading-tight truncate">

@@ -5,13 +5,25 @@ import { formatIDR, imgSrc } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 
 /** Step 1 — pick the game to top up. */
-export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry }) => {
+export const TopupGameGrid = ({
+  games,
+  loading,
+  error,
+  value,
+  onSelect,
+  onRetry,
+  onlyFeatured = false,
+}) => {
   const { t } = useLanguage();
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let list = Array.isArray(games) ? [...games] : [];
+
+    if (onlyFeatured) {
+      list = list.filter((g) => g.featured);
+    }
 
     if (needle) {
       list = list.filter(
@@ -23,7 +35,7 @@ export const TopupGameGrid = ({ games, loading, error, value, onSelect, onRetry 
     }
 
     return list;
-  }, [games, q]);
+  }, [games, q, onlyFeatured]);
 
   if (loading) {
     return (

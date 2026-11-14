@@ -26,6 +26,7 @@ import {
   X,
   ExternalLink,
   XCircle,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
@@ -159,6 +160,7 @@ export default function TopupGameDetail() {
   const [summaryError, setSummaryError] = useState("");
   const [activeOrderConflict, setActiveOrderConflict] = useState(null);
   const [cancellingConflict, setCancellingConflict] = useState(false);
+  const [gameSwitcherOpen, setGameSwitcherOpen] = useState(false);
 
   const game = useMemo(
     () =>
@@ -180,6 +182,7 @@ export default function TopupGameDetail() {
     setSummaryError("");
     setActiveOrderConflict(null);
     setCancellingConflict(false);
+    setGameSwitcherOpen(false);
   }, [slug]);
 
   useEffect(() => {
@@ -567,36 +570,153 @@ export default function TopupGameDetail() {
       <Navbar />
 
       <div className="relative z-10 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-[72px] pb-28 sm:pt-24 sm:pb-32 overflow-x-hidden">
-        {/* Top Breadcrumb & Status Badge (Android Compact) */}
-        <div className="flex items-center justify-between gap-2 mb-3.5 sm:mb-5 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-mono text-slate-400 min-w-0 flex-1">
-            <Link
-              to="/topup"
-              data-testid="topup-back-to-catalog"
-              className="inline-flex items-center gap-1 sm:gap-1.5 bg-transparent py-1 text-slate-200 hover:text-neon transition-colors shrink-0"
-            >
-              <ArrowLeft size={12} />
-              <span>{t("Katalog", "Catalog")}</span>
-            </Link>
-            {game && (
-              <>
-                <span className="text-slate-600 shrink-0">/</span>
-                <span className="text-neon font-bold truncate min-w-0">
-                  {game.name}
+        {/* Clean, Interactive & Dynamic Top Bar (Breadcrumb + Quick Game Switcher + Step Progress) */}
+        <div className="rounded-2xl border border-line/80 bg-panel/80 backdrop-blur-md px-3 py-2.5 sm:px-4 sm:py-3 mb-3.5 sm:mb-5 min-w-0 shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-mono text-slate-400 min-w-0 flex-1">
+              <Link
+                to="/topup"
+                data-testid="topup-back-to-catalog"
+                className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg border border-line/70 bg-void/70 hover:border-neon/60 px-2.5 py-1 text-slate-200 hover:text-neon transition-all shrink-0"
+              >
+                <ArrowLeft size={12} />
+                <span>{t("Katalog", "Catalog")}</span>
+              </Link>
+              {game && (
+                <>
+                  <span className="text-slate-600 shrink-0">/</span>
+                  <button
+                    type="button"
+                    onClick={() => setGameSwitcherOpen((o) => !o)}
+                    className="group inline-flex items-center gap-1.5 rounded-lg border border-line/70 bg-void/70 hover:border-neon/60 px-2.5 py-1 text-neon font-bold transition-all min-w-0 cursor-pointer"
+                    title={t("Ganti game cepat", "Quick switch game")}
+                  >
+                    {(game.icon || game.banner) && (
+                      <img
+                        src={imgSrc(game.icon || game.banner)}
+                        alt={game.name}
+                        className="w-3.5 h-3.5 rounded object-cover shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    )}
+                    <span className="truncate max-w-[130px] sm:max-w-[200px]">
+                      {game.name}
+                    </span>
+                    <ChevronDown
+                      size={12}
+                      className={`text-slate-400 group-hover:text-neon transition-transform duration-200 shrink-0 ${
+                        gameSwitcherOpen ? "rotate-180 text-neon" : ""
+                      }`}
+                    />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Interactive Step Progress & 24/7 Status */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {game && (
+                <div className="hidden md:flex items-center gap-1 rounded-xl border border-line/70 bg-void/75 p-1">
+                  {[
+                    {
+                      id: "codashop-step-1",
+                      num: "1",
+                      label: t("ID", "ID"),
+                      done: accountReady,
+                    },
+                    {
+                      id: "codashop-step-2",
+                      num: "2",
+                      label: t("Nominal", "Amount"),
+                      done: Boolean(denomination),
+                    },
+                    {
+                      id: "codashop-step-3",
+                      num: "3",
+                      label: t("Bayar", "Pay"),
+                      done: Boolean(duitkuChannel),
+                    },
+                    {
+                      id: "codashop-step-4",
+                      num: "4",
+                      label: t("Email", "Email"),
+                      done: emailReady,
+                    },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => scrollToStep(s.id)}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-mono font-semibold transition-all cursor-pointer ${
+                        s.done
+                          ? "bg-lime/15 text-lime border border-lime/30"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-panel/80"
+                      }`}
+                    >
+                      {s.done ? <Check size={10} /> : <span>{s.num}.</span>}
+                      <span>{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-mono text-lime bg-lime/10 border border-lime/30 rounded-xl px-2.5 py-1.5 shrink-0">
+                <Zap size={11} className="shrink-0" />
+                <span className="hidden sm:inline">
+                  {t("Otomatis 24/7", "24/7 Automated")}
                 </span>
-              </>
-            )}
+                <span className="sm:hidden">24/7</span>
+              </div>
+            </div>
           </div>
 
-          <div className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-mono text-lime bg-lime/10 border border-lime/30 rounded-xl px-2 sm:px-3 py-1.5 shrink-0">
-            <Zap size={11} className="shrink-0" />
-            <span className="hidden sm:inline">
-              {t("Otomatis 24/7 • Resmi & Aman", "24/7 Automated • Official & Safe")}
-            </span>
-            <span className="sm:hidden">
-              {t("24/7 Resmi", "24/7 Official")}
-            </span>
-          </div>
+          {/* Expandable Quick Game Switcher Strip */}
+          <AnimatePresence>
+            {gameSwitcherOpen && Array.isArray(games) && games.length > 1 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-2.5 mt-2.5 border-t border-line/60 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  <span className="text-[10px] font-mono text-slate-500 shrink-0 pr-1">
+                    {t("Pindah Game:", "Switch Game:")}
+                  </span>
+                  {games.map((g) => {
+                    const isCurrent = g.slug === game?.slug;
+                    return (
+                      <Link
+                        key={g.slug}
+                        to={`/topup/${g.slug}`}
+                        onClick={() => setGameSwitcherOpen(false)}
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-mono font-semibold transition-all shrink-0 ${
+                          isCurrent
+                            ? "bg-neon text-void font-bold shadow-[0_0_10px_rgba(0,240,255,0.28)]"
+                            : "bg-void/80 border border-line/80 text-slate-300 hover:border-neon/60 hover:text-neon"
+                        }`}
+                      >
+                        {(g.icon || g.banner) && (
+                          <img
+                            src={imgSrc(g.icon || g.banner)}
+                            alt={g.name}
+                            className="w-3.5 h-3.5 rounded object-cover shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        )}
+                        <span className="truncate max-w-[110px]">{g.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {loading && (
