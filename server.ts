@@ -5330,10 +5330,21 @@ api.get("/", (_req, res) => {
 });
 
 const ALL_AUTO_GATEWAYS_META = [
-  { id: "paykita", name: "PayKita", tagline: "QRIS Otomatis Produk Beranda", scope: "beranda" },
+  { id: "paykita", name: "PayKita", tagline: "QRIS Otomatis Produk Beranda & Top Up", scope: "beranda_topup" },
   { id: "duitku", name: "Duitku", tagline: "Multi-Metode Pembayaran Produk Top Up", scope: "topup" },
 ];
 const ALL_AUTO_GATEWAY_IDS = ALL_AUTO_GATEWAYS_META.map((g) => g.id);
+
+const PAYKITA_TOPUP_CHANNEL = {
+  code: "PK_QRIS",
+  gateway_id: "paykita",
+  name: "QRIS Otomatis (PayKita)",
+  short_name: "QRIS Otomatis (PayKita)",
+  category: "qris",
+  category_label: "QRIS Instan",
+  payment_flow: "qris",
+  description: "Scan QRIS instan via GoPay, DANA, OVO, ShopeePay & semua M-Banking",
+};
 
 const DUITKU_PAYMENT_CHANNELS = [
   // QRIS
@@ -6871,30 +6882,75 @@ api.get("/payments/methods", (req, res) => {
   const targetState = gwMap[targetGwId] || {};
 
   if (isTopupContext) {
-    const duitkuChannels = getEnabledDuitkuChannels(targetState);
-    const defaultChannel =
-      duitkuChannels.find((c) => c.code === String(targetState.payment_method || "SP").toUpperCase())?.code ||
-      duitkuChannels[0]?.code ||
-      "SP";
-    const gatewayInfo = {
-      id: "duitku",
-      name: "Duitku",
-      tagline: "Multi-Metode Pembayaran Produk Top Up",
-      scope: "topup",
-      channel: defaultChannel,
-      channels: duitkuChannels,
-      is_global_active: true,
-    };
+    const s = db.settings.paykita || {};
+    const paykitaState = gwMap.paykita || {};
+    const duitkuState = gwMap.duitku || {};
+    const isPaykitaEnabled =
+      paykitaState.enabled !== false &&
+      s.enabled !== false &&
+      !disabledGwSet.has("paykita") &&
+      pCfg.paykita !== false;
+    const isDuitkuEnabled =
+      duitkuState.enabled !== false && !disabledGwSet.has("duitku");
+
+    const duitkuChannels = getEnabledDuitkuChannels(duitkuState).map((ch) => ({
+      ...ch,
+      gateway_id: "duitku",
+    }));
+
+    const combinedChannels: any[] = [];
+    if (isPaykitaEnabled) {
+      combinedChannels.push(PAYKITA_TOPUP_CHANNEL);
+    }
+    if (isDuitkuEnabled) {
+      combinedChannels.push(...duitkuChannels);
+    }
+    if (combinedChannels.length === 0) {
+      combinedChannels.push(PAYKITA_TOPUP_CHANNEL, ...duitkuChannels);
+    }
+
+    const defaultChannel = isPaykitaEnabled
+      ? PAYKITA_TOPUP_CHANNEL.code
+      : combinedChannels.find(
+          (c) => c.code === String(duitkuState.payment_method || "SP").toUpperCase()
+        )?.code ||
+        combinedChannels[0]?.code ||
+        "PK_QRIS";
+
+    const gatewaysList: any[] = [];
+    if (isPaykitaEnabled) {
+      gatewaysList.push({
+        id: "paykita",
+        name: "PayKita",
+        tagline: "QRIS Otomatis Produk Beranda & Top Up",
+        scope: "beranda_topup",
+        channel: PAYKITA_TOPUP_CHANNEL.code,
+        channels: [PAYKITA_TOPUP_CHANNEL],
+        is_global_active: true,
+      });
+    }
+    if (isDuitkuEnabled) {
+      gatewaysList.push({
+        id: "duitku",
+        name: "Duitku",
+        tagline: "Multi-Metode Pembayaran Produk Top Up",
+        scope: "topup",
+        channel: defaultChannel,
+        channels: duitkuChannels,
+        is_global_active: true,
+      });
+    }
+
     return res.json([
       {
-        id: "duitku",
-        gateway_id: "duitku",
-        label: "Duitku Otomatis (QRIS, E-Wallet, VA, Retail)",
-        default_gateway: "duitku",
-        preferred_gateway: "duitku",
+        id: isPaykitaEnabled ? "paykita" : "duitku",
+        gateway_id: isPaykitaEnabled ? "paykita" : "duitku",
+        label: "Pembayaran Otomatis (PayKita QRIS & Duitku Multi-Metode)",
+        default_gateway: isPaykitaEnabled ? "paykita" : "duitku",
+        preferred_gateway: isPaykitaEnabled ? "paykita" : "duitku",
         default_channel: defaultChannel,
-        duitku_channels: duitkuChannels,
-        gateways: [gatewayInfo],
+        duitku_channels: combinedChannels,
+        gateways: gatewaysList,
       },
     ]);
   }
@@ -7885,19 +7941,21 @@ api.post("/payments/paykita/checkout", async (req, res) => {
     if (!product) return res.status(404).json({ detail: "Produk tidak ditemukan" });
     if ((product.stock || 0) < 1) return res.status(400).json({ detail: "Stok produk habis" });
 
-    // Dedicated routing: Produk Beranda -> PayKita, Produk Top Up -> Duitku
+    // Dedicated routing: Produk Beranda -> PayKita, Produk Top Up -> PayKita atau Duitku
     const isTopup = isTopupProduct(product);
-    const resolvedGateway = isTopup ? "duitku" : "paykita";
+    const requestedGw = String(body.gateway_id || body.method || "").toLowerCase();
+    const resolvedGateway =
+      isTopup && requestedGw === "duitku" ? "duitku" : "paykita";
     const pgGateways = db.settings.payment_gateways?.gateways || {};
     const s = db.settings.paykita || {};
 
     if (resolvedGateway === "paykita") {
       if (s.enabled === false || pgGateways.paykita?.enabled === false) {
-        return res.status(400).json({ detail: "Pembayaran QRIS Otomatis (PayKita) untuk Produk Beranda sedang dinonaktifkan oleh admin" });
+        return res.status(400).json({ detail: "Pembayaran QRIS Otomatis (PayKita) sedang dinonaktifkan oleh admin" });
       }
     } else {
       if (pgGateways.duitku?.enabled === false) {
-        return res.status(400).json({ detail: "Pembayaran QRIS Otomatis (Duitku) untuk Produk Top Up sedang dinonaktifkan oleh admin" });
+        return res.status(400).json({ detail: "Pembayaran Otomatis (Duitku) untuk Produk Top Up sedang dinonaktifkan oleh admin" });
       }
     }
 
@@ -8797,29 +8855,53 @@ api.post("/payments/topup/checkout", async (req, res) => {
     const [ok, destination, errMsg] = validateDestination(game, values);
     if (!ok) return res.status(400).json({ detail: errMsg });
     const buyer = parseBuyer(body);
-    const method = String(body.method || "duitku").trim().toLowerCase();
+    const method = String(body.method || body.gateway_id || "paykita").trim().toLowerCase();
     if (method === "manual" || method === "crypto") {
       return res.status(400).json({
-        detail: "Metode pembayaran manual tidak tersedia untuk produk Top Up. Silakan pilih metode pembayaran otomatis Duitku.",
+        detail: "Metode pembayaran manual tidak tersedia untuk produk Top Up. Silakan pilih metode pembayaran otomatis PayKita atau Duitku.",
       });
     }
 
-    const duitkuCfg = db.settings.payment_gateways?.gateways?.duitku || {};
-    if (duitkuCfg.enabled === false) {
-      return res.status(400).json({
-        detail: "Pembayaran otomatis Duitku untuk Produk Top Up sedang dinonaktifkan oleh admin",
-      });
-    }
+    const pgGateways = db.settings.payment_gateways?.gateways || {};
+    const paykitaSettings = db.settings.paykita || {};
+    const paykitaCfg = pgGateways.paykita || {};
+    const duitkuCfg = pgGateways.duitku || {};
 
-    const enabledChannels = getEnabledDuitkuChannels(duitkuCfg);
-    const requestedChannel = String(
-      body.duitku_channel || body.payment_method || body.channel_code || duitkuCfg.payment_method || "SP"
+    const rawChannel = String(
+      body.duitku_channel || body.payment_method || body.channel_code || ""
     )
       .trim()
       .toUpperCase();
-    const chMeta =
-      enabledChannels.find((c) => c.code === requestedChannel) ||
-      getDuitkuChannelMeta(requestedChannel);
+
+    const isPaykitaSelected =
+      rawChannel === "PK_QRIS" ||
+      rawChannel === "PAYKITA" ||
+      rawChannel === "QRIS_PAYKITA" ||
+      (method === "paykita" && (!rawChannel || rawChannel === "PK_QRIS" || rawChannel === "QRIS"));
+
+    const resolvedGatewayId = isPaykitaSelected ? "paykita" : "duitku";
+    const resolvedGatewayName = isPaykitaSelected ? "PayKita" : "Duitku";
+
+    if (resolvedGatewayId === "paykita") {
+      if (paykitaSettings.enabled === false || paykitaCfg.enabled === false) {
+        return res.status(400).json({
+          detail: "Pembayaran QRIS Otomatis (PayKita) sedang dinonaktifkan oleh admin. Silakan pilih metode pembayaran lainnya.",
+        });
+      }
+    } else {
+      if (duitkuCfg.enabled === false) {
+        return res.status(400).json({
+          detail: "Pembayaran otomatis Duitku untuk Produk Top Up sedang dinonaktifkan oleh admin. Silakan pilih QRIS Otomatis (PayKita).",
+        });
+      }
+    }
+
+    const enabledChannels = getEnabledDuitkuChannels(duitkuCfg);
+    const requestedDuitkuChannel = rawChannel || String(duitkuCfg.payment_method || "SP").trim().toUpperCase();
+    const chMeta = isPaykitaSelected
+      ? PAYKITA_TOPUP_CHANNEL
+      : enabledChannels.find((c) => c.code === requestedDuitkuChannel) ||
+        getDuitkuChannelMeta(requestedDuitkuChannel);
 
     const user = getUserOptional(req);
     const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
@@ -8847,8 +8929,8 @@ api.post("/payments/topup/checkout", async (req, res) => {
       buyerEmail: buyer.buyer_email || "",
       buyerWhatsapp: buyer.buyer_whatsapp || "",
       origin,
-      gatewayOverride: "duitku",
-      duitkuMethod: chMeta.code,
+      gatewayOverride: resolvedGatewayId,
+      duitkuMethod: resolvedGatewayId === "duitku" ? chMeta.code : undefined,
     });
     const expiredAt = remoteOrder.expired_at || new Date(Date.now() + 15 * 60 * 1000).toISOString();
     const baseDeliveryInfo = renderDeliveryInfo(product, game, destination);
@@ -8856,16 +8938,22 @@ api.post("/payments/topup/checkout", async (req, res) => {
       ...buyer,
       session_id: orderId,
       paykita_ref: remoteOrder.paykita_ref || orderId,
-      gateway_id: "duitku",
-      gateway_name: "Duitku",
+      gateway_id: resolvedGatewayId,
+      gateway_name: resolvedGatewayName,
       duitku_channel: chMeta.code,
       duitku_channel_name: chMeta.name,
       duitku_payment_flow: chMeta.payment_flow,
       va_number: remoteOrder.va_number || null,
       provider: "paykita",
       payment_type: "paykita",
-      destination_id: `duitku-${chMeta.code.toLowerCase()}`,
-      destination_name: `Duitku — ${chMeta.name}`,
+      destination_id:
+        resolvedGatewayId === "paykita"
+          ? "paykita-qris"
+          : `duitku-${chMeta.code.toLowerCase()}`,
+      destination_name:
+        resolvedGatewayId === "paykita"
+          ? "PayKita — QRIS Otomatis"
+          : `Duitku — ${chMeta.name}`,
       qris_string: remoteOrder.qris_string,
       qris_image: remoteOrder.qris_image,
       pay_url: remoteOrder.pay_url || null,
@@ -8873,7 +8961,11 @@ api.post("/payments/topup/checkout", async (req, res) => {
       pay_amount: remoteOrder.pay_amount || priceIdr,
       unique_code: remoteOrder.unique_code || 0,
       fee_amount: remoteOrder.fee_amount || 0,
-      qris_provider: remoteOrder.qris_provider || `${chMeta.short_name} (${chMeta.code})`,
+      qris_provider:
+        remoteOrder.qris_provider ||
+        (resolvedGatewayId === "paykita"
+          ? "PayKita QRIS"
+          : `${chMeta.short_name} (${chMeta.code})`),
       paykita_mode: remoteOrder.mode,
       paykita_error: remoteOrder.error_message || null,
       paykita_error_code: remoteOrder.error_code || null,
@@ -8916,8 +9008,8 @@ api.post("/payments/topup/checkout", async (req, res) => {
     return res.json({
       order_id: orderId,
       session_id: orderId,
-      gateway_id: "duitku",
-      gateway_name: "Duitku",
+      gateway_id: resolvedGatewayId,
+      gateway_name: resolvedGatewayName,
       duitku_channel: chMeta.code,
       duitku_channel_name: chMeta.name,
       duitku_payment_flow: chMeta.payment_flow,
@@ -10402,8 +10494,8 @@ const buildPaykitaConfigResponse = (req: Request) => {
       subtitle:
         gk === "duitku"
           ? "Multi-Metode Pembayaran Produk Top Up"
-          : "QRIS Otomatis Produk Beranda",
-      scope: gk === "duitku" ? "topup" : "beranda",
+          : "QRIS Otomatis Produk Beranda & Top Up",
+      scope: gk === "duitku" ? "topup" : "beranda_topup",
       enabled: gVal.enabled !== false,
       is_active_gateway: true,
       mode: gVal.mode || "production",

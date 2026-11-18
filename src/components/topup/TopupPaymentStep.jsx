@@ -17,9 +17,20 @@ import {
 import { formatIDR, imgSrc } from "@/lib/api";
 
 export const DEFAULT_DUITKU_CHANNELS = [
-  // QRIS
+  // QRIS (PayKita Primary Option + Duitku QRIS)
+  {
+    code: "PK_QRIS",
+    gateway_id: "paykita",
+    name: "QRIS Otomatis (PayKita)",
+    short_name: "QRIS Otomatis (PayKita)",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS instan via GoPay, DANA, OVO, ShopeePay & semua M-Banking",
+  },
   {
     code: "SP",
+    gateway_id: "duitku",
     name: "QRIS (ShopeePay / All E-Wallet & M-Banking)",
     short_name: "QRIS All Payment",
     category: "qris",
@@ -246,7 +257,7 @@ export const TopupPaymentStep = ({
   onEmail,
   onWa,
   duitkuChannels = DEFAULT_DUITKU_CHANNELS,
-  duitkuChannel = "SP",
+  duitkuChannel = "PK_QRIS",
   onSelectDuitkuChannel,
   submitting,
   summaryError,

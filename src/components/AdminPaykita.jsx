@@ -184,11 +184,11 @@ const GATEWAY_CATALOG = [
     id: "paykita",
     name: "PayKita",
     scope: "beranda",
-    scopeLabel: "Khusus Produk Beranda",
-    tagline: "QRIS Otomatis Produk Beranda",
-    badge: "Produk Beranda",
+    scopeLabel: "Produk Beranda & Top Up",
+    tagline: "QRIS Otomatis Produk Beranda & Opsi Utama QRIS Top Up",
+    badge: "Beranda & Top Up",
     description:
-      "Digunakan khusus untuk pembayaran QRIS otomatis pada Katalog Produk Beranda (Akun Game, Jasa Joki, Item Game, & Voucher).",
+      "Digunakan untuk pembayaran QRIS otomatis pada Katalog Produk Beranda (Akun Game, Jasa Joki, Item Game, & Voucher) serta menjadi opsi utama pada kategori QRIS Instan di halaman Produk Top Up bersama Duitku.",
     defaultBaseUrl: "https://pay.digikita.id",
     docsHint:
       "Salin API Key (pk_live_...) & Webhook Secret dari Dashboard PayKita → Projects.",
@@ -573,7 +573,7 @@ export function AdminPaykita() {
                 <div className="mt-3 pt-2.5 border-t border-[hsl(var(--border))]/60 flex items-center justify-between w-full text-[11px]">
                   <span className="text-[hsl(var(--muted-foreground))] truncate">
                     {gw.scope === "beranda"
-                      ? "QRIS Otomatis Produk Beranda"
+                      ? "QRIS Otomatis Beranda & Opsi Utama QRIS Top Up"
                       : `${(gwState.enabled_methods || ALL_DUITKU_CODES).length} Metode Pembayaran Top Up Aktif`}
                   </span>
                   <span className="inline-flex items-center gap-1.5 font-mono text-[10px] shrink-0">

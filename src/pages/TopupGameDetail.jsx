@@ -131,6 +131,7 @@ const translateLocalFieldErr = (errMsg, lang) => {
 const translateChannelDescription = (desc, lang) => {
   if (!desc || lang !== "en") return desc;
   return String(desc)
+    .replace(/Scan QRIS instan via GoPay, DANA, OVO, ShopeePay & semua M-Banking/gi, "Instant QRIS scan via GoPay, DANA, OVO, ShopeePay & all M-Banking")
     .replace(/Scan QRIS via semua E-Wallet & Mobile Banking/gi, "Scan QRIS via any E-Wallet & Mobile Banking")
     .replace(/Pembayaran instan via aplikasi/gi, "Instant payment via app")
     .replace(/Transfer Virtual Account/gi, "Virtual Account Transfer")
@@ -154,7 +155,7 @@ export default function TopupGameDetail() {
   const [email, setEmail] = useState("");
   const [wa, setWa] = useState("");
   const [duitkuChannels, setDuitkuChannels] = useState(DEFAULT_DUITKU_CHANNELS);
-  const [duitkuChannel, setDuitkuChannel] = useState("SP");
+  const [duitkuChannel, setDuitkuChannel] = useState("PK_QRIS");
   const [submitting, setSubmitting] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [summaryError, setSummaryError] = useState("");
@@ -217,7 +218,7 @@ export default function TopupGameDetail() {
             ? duitkuItem.duitku_channels
             : DEFAULT_DUITKU_CHANNELS;
         setDuitkuChannels(channels);
-        const defaultCode = duitkuItem?.default_channel || channels[0]?.code || "SP";
+        const defaultCode = duitkuItem?.default_channel || channels[0]?.code || "PK_QRIS";
         setDuitkuChannel((cur) =>
           channels.some((c) => c.code === cur) ? cur : defaultCode
         );
@@ -518,6 +519,11 @@ export default function TopupGameDetail() {
     setSummaryError("");
     setActiveOrderConflict(null);
     try {
+      const selectedGw =
+        selectedChannelObj?.gateway_id === "paykita" ||
+        duitkuChannel === "PK_QRIS"
+          ? "paykita"
+          : "duitku";
       const payload = {
         game: game.slug,
         denomination_code: denomination.code,
@@ -526,7 +532,8 @@ export default function TopupGameDetail() {
         verified_nickname: validation?.nickname || "",
         buyer_email: cleanEmail,
         buyer_whatsapp: wa.trim(),
-        method: "duitku",
+        method: selectedGw,
+        gateway_id: selectedGw,
         duitku_channel: duitkuChannel,
         payment_method: duitkuChannel,
         origin_url: window.location.origin,
