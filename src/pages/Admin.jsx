@@ -71,8 +71,12 @@ const isTopupItem = (p) =>
   );
 
 const AUTO_GATEWAYS = [
-  { id: "paykita", name: "PayKita", tagline: "QRIS Produk Beranda" },
-  { id: "duitku", name: "Duitku", tagline: "QRIS Produk Top Up" },
+  { id: "paykita", name: "PayKita", tagline: "QRIS Produk Beranda & Top Up" },
+  { id: "duitku", name: "Duitku", tagline: "Multi-Metode Produk Top Up" },
+  { id: "tripay", name: "Tripay", tagline: "Multi-Metode Produk Top Up" },
+  { id: "midtrans", name: "Midtrans", tagline: "Multi-Metode Produk Top Up" },
+  { id: "xendit", name: "Xendit", tagline: "Multi-Metode Produk Top Up" },
+  { id: "tokopay", name: "Tokopay", tagline: "Multi-Metode Produk Top Up" },
 ];
 const AUTO_GATEWAY_IDS = AUTO_GATEWAYS.map((g) => g.id);
 

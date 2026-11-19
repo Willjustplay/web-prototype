@@ -177,7 +177,382 @@ export const DUITKU_CHANNELS_CATALOG = [
   },
 ];
 
-const ALL_DUITKU_CODES = DUITKU_CHANNELS_CATALOG.map((c) => c.code);
+export const TRIPAY_CHANNELS_CATALOG = [
+  {
+    code: "TP_QRIS",
+    name: "QRIS Tripay (All Payment)",
+    category: "qris",
+    categoryLabel: "QRIS Instan",
+    desc: "QRIS Dinamis Tripay (Semua E-Wallet & M-Banking)",
+  },
+  {
+    code: "TP_QRISC",
+    name: "QRIS Customizable (Tripay)",
+    category: "qris",
+    categoryLabel: "QRIS Instan",
+    desc: "QRIS Instan Tripay untuk semua aplikasi pembayaran",
+  },
+  {
+    code: "TP_DANA",
+    name: "DANA (Tripay)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Checkout instan langsung ke aplikasi DANA",
+  },
+  {
+    code: "TP_OVO",
+    name: "OVO (Tripay)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Notifikasi pembayaran langsung di aplikasi OVO",
+  },
+  {
+    code: "TP_SHOPEEPAY",
+    name: "ShopeePay (Tripay)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Checkout cepat via aplikasi ShopeePay",
+  },
+  {
+    code: "TP_BCAVA",
+    name: "BCA Virtual Account (Tripay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via myBCA / BCA Mobile / ATM BCA",
+  },
+  {
+    code: "TP_BRIVA",
+    name: "BRI Virtual Account (Tripay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via BRImo / Internet Banking / ATM BRI",
+  },
+  {
+    code: "TP_BNIVA",
+    name: "BNI Virtual Account (Tripay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via Wondr / BNI Mobile / ATM BNI",
+  },
+  {
+    code: "TP_MANDIRIVA",
+    name: "Mandiri Virtual Account (Tripay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via Livin' by Mandiri / ATM Mandiri",
+  },
+  {
+    code: "TP_BSIVA",
+    name: "BSI Virtual Account (Tripay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via BYOND / BSI Mobile",
+  },
+  {
+    code: "TP_PERMATAVA",
+    name: "Permata Virtual Account (Tripay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via PermataME / ATM",
+  },
+  {
+    code: "TP_ALFAMART",
+    name: "Alfamart (Tripay)",
+    category: "retail",
+    categoryLabel: "Minimarket / Retail",
+    desc: "Bayar tunai di kasir Alfamart terdekat",
+  },
+  {
+    code: "TP_INDOMARET",
+    name: "Indomaret (Tripay)",
+    category: "retail",
+    categoryLabel: "Minimarket / Retail",
+    desc: "Bayar tunai di kasir Indomaret terdekat",
+  },
+];
+
+export const MIDTRANS_CHANNELS_CATALOG = [
+  {
+    code: "MT_QRIS",
+    name: "QRIS Midtrans (GoPay / All Payment)",
+    category: "qris",
+    categoryLabel: "QRIS Instan",
+    desc: "QRIS Core API Midtrans untuk semua E-Wallet & M-Banking",
+  },
+  {
+    code: "MT_GOPAY",
+    name: "GoPay / GoPay Later (Midtrans)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Bayar langsung via aplikasi Gojek / GoPay",
+  },
+  {
+    code: "MT_SHOPEEPAY",
+    name: "ShopeePay (Midtrans)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Redirect langsung ke aplikasi ShopeePay",
+  },
+  {
+    code: "MT_BCA",
+    name: "BCA Virtual Account (Midtrans)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Verifikasi otomatis via BCA Virtual Account",
+  },
+  {
+    code: "MT_MANDIRI",
+    name: "Mandiri Bill Payment (Midtrans)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via Mandiri E-Channel / Livin'",
+  },
+  {
+    code: "MT_BNI",
+    name: "BNI Virtual Account (Midtrans)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Verifikasi otomatis via BNI Virtual Account",
+  },
+  {
+    code: "MT_BRI",
+    name: "BRI Virtual Account (Midtrans)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Verifikasi otomatis via BRIVA Midtrans",
+  },
+  {
+    code: "MT_PERMATA",
+    name: "Permata Virtual Account (Midtrans)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Verifikasi otomatis via Permata Virtual Account",
+  },
+  {
+    code: "MT_CIMB",
+    name: "CIMB Niaga Virtual Account (Midtrans)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Verifikasi otomatis via CIMB Virtual Account",
+  },
+  {
+    code: "MT_INDOMARET",
+    name: "Indomaret (Midtrans)",
+    category: "retail",
+    categoryLabel: "Minimarket / Retail",
+    desc: "Kode pembayaran kasir gerai Indomaret",
+  },
+  {
+    code: "MT_ALFAMART",
+    name: "Alfamart Group (Midtrans)",
+    category: "retail",
+    categoryLabel: "Minimarket / Retail",
+    desc: "Kode pembayaran kasir Alfamart / Alfamidi",
+  },
+];
+
+export const XENDIT_CHANNELS_CATALOG = [
+  {
+    code: "XD_QRIS",
+    name: "QRIS Dinamis Xendit",
+    category: "qris",
+    categoryLabel: "QRIS Instan",
+    desc: "QRIS resmi Xendit mendukung semua bank & E-Wallet",
+  },
+  {
+    code: "XD_DANA",
+    name: "DANA (Xendit)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Pembayaran instan via akun DANA",
+  },
+  {
+    code: "XD_OVO",
+    name: "OVO (Xendit)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Push notification langsung ke aplikasi OVO",
+  },
+  {
+    code: "XD_SHOPEEPAY",
+    name: "ShopeePay (Xendit)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Jump app langsung ke ShopeePay",
+  },
+  {
+    code: "XD_LINKAJA",
+    name: "LinkAja (Xendit)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Checkout instan via aplikasi LinkAja",
+  },
+  {
+    code: "XD_BCA",
+    name: "BCA Virtual Account (Xendit)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis 24 jam via BCA Virtual Account",
+  },
+  {
+    code: "XD_MANDIRI",
+    name: "Mandiri Virtual Account (Xendit)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis 24 jam via Livin' by Mandiri",
+  },
+  {
+    code: "XD_BNI",
+    name: "BNI Virtual Account (Xendit)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis 24 jam via Wondr / BNI Mobile",
+  },
+  {
+    code: "XD_BRI",
+    name: "BRI Virtual Account (Xendit)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis 24 jam via BRImo / ATM BRI",
+  },
+  {
+    code: "XD_BSI",
+    name: "BSI Virtual Account (Xendit)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis 24 jam via BYOND / BSI Mobile",
+  },
+  {
+    code: "XD_PERMATA",
+    name: "Permata Virtual Account (Xendit)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis 24 jam via Permata Virtual Account",
+  },
+  {
+    code: "XD_ALFAMART",
+    name: "Alfamart (Xendit)",
+    category: "retail",
+    categoryLabel: "Minimarket / Retail",
+    desc: "Bayar tunai di seluruh gerai Alfamart",
+  },
+  {
+    code: "XD_INDOMARET",
+    name: "Indomaret (Xendit)",
+    category: "retail",
+    categoryLabel: "Minimarket / Retail",
+    desc: "Bayar tunai di seluruh gerai Indomaret",
+  },
+];
+
+export const TOKOPAY_CHANNELS_CATALOG = [
+  {
+    code: "TK_QRIS",
+    name: "QRIS Instan Tokopay",
+    category: "qris",
+    categoryLabel: "QRIS Instan",
+    desc: "QRIS Realtime Tokopay (Semua E-Wallet & M-Banking)",
+  },
+  {
+    code: "TK_QRISREALTIME",
+    name: "QRIS Realtime Settlement (Tokopay)",
+    category: "qris",
+    categoryLabel: "QRIS Instan",
+    desc: "QRIS Tokopay verifikasi detik itu juga",
+  },
+  {
+    code: "TK_DANA",
+    name: "DANA (Tokopay)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Checkout instan via saldo DANA",
+  },
+  {
+    code: "TK_OVO",
+    name: "OVO (Tokopay)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Push notifikasi langsung ke aplikasi OVO",
+  },
+  {
+    code: "TK_SHOPEEPAY",
+    name: "ShopeePay (Tokopay)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Bayar instan via aplikasi ShopeePay",
+  },
+  {
+    code: "TK_LINKAJA",
+    name: "LinkAja (Tokopay)",
+    category: "ewallet",
+    categoryLabel: "E-Wallet Instan",
+    desc: "Bayar langsung via aplikasi LinkAja",
+  },
+  {
+    code: "TK_BCAVA",
+    name: "BCA Virtual Account (Tokopay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via myBCA / BCA Mobile / ATM",
+  },
+  {
+    code: "TK_BRIVA",
+    name: "BRI Virtual Account (Tokopay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via BRImo / ATM BRI",
+  },
+  {
+    code: "TK_BNIVA",
+    name: "BNI Virtual Account (Tokopay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via Wondr / BNI Mobile",
+  },
+  {
+    code: "TK_MANDIRIVA",
+    name: "Mandiri Virtual Account (Tokopay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via Livin' by Mandiri",
+  },
+  {
+    code: "TK_BSIVA",
+    name: "BSI Virtual Account (Tokopay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via BYOND / BSI Mobile",
+  },
+  {
+    code: "TK_PERMATAVA",
+    name: "Permata Virtual Account (Tokopay)",
+    category: "va",
+    categoryLabel: "Virtual Account Bank",
+    desc: "Otomatis via PermataME / ATM",
+  },
+  {
+    code: "TK_ALFAMART",
+    name: "Alfamart (Tokopay)",
+    category: "retail",
+    categoryLabel: "Minimarket / Retail",
+    desc: "Bayar tunai di gerai Alfamart terdekat",
+  },
+  {
+    code: "TK_INDOMARET",
+    name: "Indomaret (Tokopay)",
+    category: "retail",
+    categoryLabel: "Minimarket / Retail",
+    desc: "Bayar tunai di gerai Indomaret terdekat",
+  },
+];
+
+export const GATEWAY_CHANNELS_MAP = {
+  duitku: DUITKU_CHANNELS_CATALOG,
+  tripay: TRIPAY_CHANNELS_CATALOG,
+  midtrans: MIDTRANS_CHANNELS_CATALOG,
+  xendit: XENDIT_CHANNELS_CATALOG,
+  tokopay: TOKOPAY_CHANNELS_CATALOG,
+};
 
 const GATEWAY_CATALOG = [
   {
@@ -187,8 +562,15 @@ const GATEWAY_CATALOG = [
     scopeLabel: "Produk Beranda & Top Up",
     tagline: "QRIS Otomatis Produk Beranda & Opsi Utama QRIS Top Up",
     badge: "Beranda & Top Up",
+    hasMerchantCode: false,
+    hasSandboxMode: false,
+    hasMultiChannels: false,
+    apiKeyLabel: "API Key PayKita",
+    apiKeyPlaceholder: "pk_live_xxxxxxxxxxxxxxxx",
+    secretLabel: "Webhook Secret PayKita",
+    secretPlaceholder: "whsec_xxxxxxxxxxxxxxxx",
     description:
-      "Digunakan untuk pembayaran QRIS otomatis pada Katalog Produk Beranda (Akun Game, Jasa Joki, Item Game, & Voucher) serta menjadi opsi utama pada kategori QRIS Instan di halaman Produk Top Up bersama Duitku.",
+      "Digunakan untuk pembayaran QRIS otomatis pada Katalog Produk Beranda (Akun Game, Jasa Joki, Item Game, & Voucher) serta menjadi opsi utama pada kategori QRIS Instan di halaman Produk Top Up.",
     defaultBaseUrl: "https://pay.digikita.id",
     docsHint:
       "Salin API Key (pk_live_...) & Webhook Secret dari Dashboard PayKita → Projects.",
@@ -197,13 +579,23 @@ const GATEWAY_CATALOG = [
     id: "duitku",
     name: "Duitku",
     scope: "topup",
-    scopeLabel: "Khusus Produk Top Up",
-    tagline: "Multi-Metode Pembayaran Produk Top Up (QRIS, E-Wallet, VA, Retail)",
+    scopeLabel: "Produk Top Up",
+    tagline: "Multi-Metode Top Up (QRIS, E-Wallet, VA Bank, Minimarket)",
     badge: "Produk Top Up",
+    hasMerchantCode: true,
+    merchantCodeLabel: "Merchant Code Duitku",
+    merchantCodePlaceholder: "Contoh: D12345 / DS12345",
+    hasSandboxMode: true,
+    hasMultiChannels: true,
+    apiKeyLabel: "API Key Duitku",
+    apiKeyPlaceholder: "Masukkan API Key Project Duitku (32 karakter)",
+    secretLabel: "Callback Secret (Opsional)",
+    secretPlaceholder: "Otomatis diverifikasi dengan API Key MD5",
     description:
-      "Digunakan khusus untuk seluruh pembayaran otomatis Produk Top Up Game. Mendukung banyak metode pembayaran sekaligus: QRIS, E-Wallet (DANA, OVO, ShopeePay, LinkAja), Virtual Account Bank (BCA, Mandiri, BNI, BRI, BSI, dll), serta Minimarket (Indomaret & Alfamart).",
+      "Mendukung pembayaran otomatis Top Up Game melalui QRIS, E-Wallet (DANA, OVO, ShopeePay, LinkAja), Virtual Account Bank (BCA, Mandiri, BNI, BRI, BSI, CIMB, Permata, Maybank, BNC), serta Minimarket (Indomaret & Alfamart).",
     defaultBaseUrl: "https://passport.duitku.com/webapi",
     sandboxBaseUrl: "https://sandbox.duitku.com/webapi",
+    channelsCatalog: DUITKU_CHANNELS_CATALOG,
     channels: DUITKU_CHANNELS_CATALOG.map((c) => ({
       code: c.code,
       label: `${c.code} — ${c.name} (${c.categoryLabel})`,
@@ -211,9 +603,118 @@ const GATEWAY_CATALOG = [
     docsHint:
       "Masukkan Merchant Code (DXXXX), API Key, dan pilih metode pembayaran Duitku yang diaktifkan untuk halaman Top Up.",
   },
+  {
+    id: "tripay",
+    name: "Tripay",
+    scope: "topup",
+    scopeLabel: "Produk Top Up",
+    tagline: "Payment Gateway Top Up Populer (QRIS, VA Bank, E-Wallet, Retail)",
+    badge: "Produk Top Up",
+    hasMerchantCode: true,
+    merchantCodeLabel: "Kode Merchant Tripay",
+    merchantCodePlaceholder: "Contoh: T12345",
+    hasSandboxMode: true,
+    hasMultiChannels: true,
+    apiKeyLabel: "API Key Tripay",
+    apiKeyPlaceholder: "Masukkan API Key Tripay (DEV-... atau Live)",
+    secretLabel: "Private Key Tripay",
+    secretPlaceholder: "Masukkan Private Key untuk Signature HMAC-SHA256",
+    description:
+      "Integrasi resmi Tripay untuk Produk Top Up Game. Kanal yang diaktifkan akan langsung digabungkan ke pilihan pembayaran Top Up berdasarkan kategori (QRIS, E-Wallet, Virtual Account, Minimarket).",
+    defaultBaseUrl: "https://tripay.co.id/api",
+    sandboxBaseUrl: "https://tripay.co.id/api-sandbox",
+    channelsCatalog: TRIPAY_CHANNELS_CATALOG,
+    channels: TRIPAY_CHANNELS_CATALOG.map((c) => ({
+      code: c.code,
+      label: `${c.code} — ${c.name} (${c.categoryLabel})`,
+    })),
+    docsHint:
+      "Masukkan Kode Merchant, API Key, dan Private Key dari Dashboard Tripay → Merchant.",
+  },
+  {
+    id: "midtrans",
+    name: "Midtrans",
+    scope: "topup",
+    scopeLabel: "Produk Top Up",
+    tagline: "Core API Midtrans (QRIS, GoPay, ShopeePay, VA Bank, Retail)",
+    badge: "Produk Top Up",
+    hasMerchantCode: true,
+    merchantCodeLabel: "Merchant ID Midtrans",
+    merchantCodePlaceholder: "Contoh: G123456789",
+    hasSandboxMode: true,
+    hasMultiChannels: true,
+    apiKeyLabel: "Server Key Midtrans",
+    apiKeyPlaceholder: "Mid-server-xxxxxxxxxxxxxxxx",
+    secretLabel: "Client Key Midtrans",
+    secretPlaceholder: "Mid-client-xxxxxxxxxxxxxxxx",
+    description:
+      "Integrasi Core API Midtrans untuk Produk Top Up Game. Mendukung QRIS GoPay, E-Wallet GoPay & ShopeePay, Virtual Account BCA/Mandiri/BNI/BRI/Permata/CIMB, dan Indomaret/Alfamart.",
+    defaultBaseUrl: "https://api.midtrans.com",
+    sandboxBaseUrl: "https://api.sandbox.midtrans.com",
+    channelsCatalog: MIDTRANS_CHANNELS_CATALOG,
+    channels: MIDTRANS_CHANNELS_CATALOG.map((c) => ({
+      code: c.code,
+      label: `${c.code} — ${c.name} (${c.categoryLabel})`,
+    })),
+    docsHint:
+      "Salin Server Key (Mid-server-...) dan Client Key dari Dashboard Midtrans → Settings → Access Keys.",
+  },
+  {
+    id: "xendit",
+    name: "Xendit",
+    scope: "topup",
+    scopeLabel: "Produk Top Up",
+    tagline: "Payment Gateway Enterprise (QRIS, E-Wallet, Virtual Account, Retail)",
+    badge: "Produk Top Up",
+    hasMerchantCode: false,
+    hasSandboxMode: true,
+    hasMultiChannels: true,
+    apiKeyLabel: "Secret API Key Xendit",
+    apiKeyPlaceholder: "xnd_production_... atau xnd_development_...",
+    secretLabel: "Webhook Verification Token",
+    secretPlaceholder: "Token callback dari Xendit Dashboard → Webhooks",
+    description:
+      "Integrasi Xendit API untuk Produk Top Up Game. Mendukung QRIS Dinamis, E-Wallet (DANA, OVO, ShopeePay, LinkAja), Virtual Account Bank lengkap, dan gerai Alfamart/Indomaret.",
+    defaultBaseUrl: "https://api.xendit.co",
+    sandboxBaseUrl: "https://api.xendit.co",
+    channelsCatalog: XENDIT_CHANNELS_CATALOG,
+    channels: XENDIT_CHANNELS_CATALOG.map((c) => ({
+      code: c.code,
+      label: `${c.code} — ${c.name} (${c.categoryLabel})`,
+    })),
+    docsHint:
+      "Masukkan Secret API Key (xnd_...) dan Webhook Verification Token dari Dashboard Xendit.",
+  },
+  {
+    id: "tokopay",
+    name: "Tokopay",
+    scope: "topup",
+    scopeLabel: "Produk Top Up",
+    tagline: "Spesialis Payment Gateway Top Up Game (QRIS, E-Wallet, VA, Retail)",
+    badge: "Produk Top Up",
+    hasMerchantCode: true,
+    merchantCodeLabel: "Merchant ID Tokopay",
+    merchantCodePlaceholder: "Contoh: M230101XXXXX",
+    hasSandboxMode: false,
+    hasMultiChannels: true,
+    apiKeyLabel: "Secret Key Tokopay",
+    apiKeyPlaceholder: "Masukkan Secret Key dari Dashboard Tokopay",
+    secretLabel: "Callback Secret (Opsional)",
+    secretPlaceholder: "Verifikasi otomatis MD5(MerchantID:Secret:RefID)",
+    description:
+      "Payment gateway favorit industri Top Up Game Indonesia dengan pencairan cepat. Mendukung QRIS Realtime, E-Wallet lengkap, Virtual Account semua bank, dan gerai Alfamart/Indomaret.",
+    defaultBaseUrl: "https://api.tokopay.id/v1",
+    channelsCatalog: TOKOPAY_CHANNELS_CATALOG,
+    channels: TOKOPAY_CHANNELS_CATALOG.map((c) => ({
+      code: c.code,
+      label: `${c.code} — ${c.name} (${c.categoryLabel})`,
+    })),
+    docsHint:
+      "Masukkan Merchant ID dan Secret Key dari Dashboard Tokopay → Pengaturan API.",
+  },
 ];
 
-const DUITKU_CATEGORY_GROUPS = [
+const CHANNEL_CATEGORY_GROUPS = [
   { id: "qris", label: "QRIS Instan", icon: QrCode },
   { id: "ewallet", label: "E-Wallet Instan", icon: Wallet },
   { id: "va", label: "Virtual Account Bank", icon: Landmark },
@@ -234,24 +735,38 @@ export function AdminPaykita() {
   const [baseUrl, setBaseUrl] = useState("");
   const [merchantCode, setMerchantCode] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("SP");
-  const [enabledMethods, setEnabledMethods] = useState(ALL_DUITKU_CODES);
+  const [enabledMethods, setEnabledMethods] = useState([]);
   const [apiKey, setApiKey] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
   const [testResult, setTestResult] = useState(null);
+
+  const getCatalogForTab = (tabId) => {
+    return GATEWAY_CHANNELS_MAP[tabId] || DUITKU_CHANNELS_CATALOG;
+  };
 
   const syncFormWithTab = (tabId, mapData) => {
     const meta =
       GATEWAY_CATALOG.find((g) => g.id === tabId) || GATEWAY_CATALOG[0];
     const gw = mapData?.[tabId] || {};
-    setEnabled(gw.enabled !== undefined ? Boolean(gw.enabled) : true);
+    const catalog = getCatalogForTab(tabId);
+    const defaultCodes = catalog.map((c) => c.code);
+    const defaultEnabled =
+      tabId === "paykita" || tabId === "duitku"
+        ? true
+        : gw.enabled !== undefined
+        ? Boolean(gw.enabled)
+        : false;
+    setEnabled(
+      gw.enabled !== undefined ? Boolean(gw.enabled) : defaultEnabled
+    );
     setMode(gw.mode || "production");
     setBaseUrl(gw.base_url || meta.defaultBaseUrl || "");
     setMerchantCode(gw.merchant_code || "");
-    setPaymentMethod(gw.payment_method || "SP");
+    setPaymentMethod(gw.payment_method || defaultCodes[0] || "SP");
     setEnabledMethods(
       Array.isArray(gw.enabled_methods) && gw.enabled_methods.length > 0
         ? gw.enabled_methods
-        : ALL_DUITKU_CODES
+        : defaultCodes
     );
     setApiKey("");
     setWebhookSecret("");
@@ -304,16 +819,19 @@ export function AdminPaykita() {
     }
   };
 
-  const toggleDuitkuChannel = (code) => {
+  const toggleGatewayChannel = (code) => {
+    const currentMeta = GATEWAY_CATALOG.find((g) => g.id === selectedTab);
     setEnabledMethods((prev) => {
       const exists = prev.includes(code);
       if (exists && prev.length <= 1) {
-        toast.error("Minimal 1 metode pembayaran Duitku harus tetap aktif");
+        toast.error(
+          `Minimal 1 metode pembayaran ${currentMeta?.name || "Gateway"} harus tetap aktif`
+        );
         return prev;
       }
       const next = exists ? prev.filter((c) => c !== code) : [...prev, code];
       if (!next.includes(paymentMethod)) {
-        setPaymentMethod(next[0] || "SP");
+        setPaymentMethod(next[0] || code);
       }
       return next;
     });
@@ -331,7 +849,11 @@ export function AdminPaykita() {
       enabled_methods: enabledMethods,
     };
     if (apiKey.trim()) payload.api_key = apiKey.trim();
-    if (webhookSecret.trim()) payload.webhook_secret = webhookSecret.trim();
+    if (webhookSecret.trim()) {
+      payload.webhook_secret = webhookSecret.trim();
+      payload.private_key = webhookSecret.trim();
+      payload.client_key = webhookSecret.trim();
+    }
     return payload;
   };
 
@@ -426,6 +948,8 @@ export function AdminPaykita() {
   const currentMeta =
     GATEWAY_CATALOG.find((g) => g.id === selectedTab) || GATEWAY_CATALOG[0];
   const currentCfg = gatewaysMap[selectedTab] || {};
+  const currentCatalog = currentMeta.channelsCatalog || DUITKU_CHANNELS_CATALOG;
+  const allCurrentCodes = currentCatalog.map((c) => c.code);
   const isSelectedReady = Boolean(
     enabled && currentCfg.api_key_set && !currentCfg.is_demo_key
   );
@@ -433,9 +957,14 @@ export function AdminPaykita() {
     currentCfg.webhook_url ||
     `${window.location.origin}/api/webhook/${selectedTab}`;
 
+  const activeTopupGatewaysCount = GATEWAY_CATALOG.filter((g) => {
+    const st = gatewaysMap[g.id];
+    return st ? st.enabled !== false : g.id === "paykita" || g.id === "duitku";
+  }).length;
+
   return (
     <section className="space-y-6" data-testid="admin-paykita">
-      {/* Header & Separated Allocation Overview */}
+      {/* Header & Multi-Gateway Overview */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-[hsl(var(--border))]">
         <div className="flex items-start gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-[hsl(var(--accent))]/12 text-[hsl(var(--accent))] flex items-center justify-center shrink-0">
@@ -452,20 +981,20 @@ export function AdminPaykita() {
               </span>
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-lime/15 text-lime border border-lime/30">
                 <Gamepad2 className="w-3 h-3" />
-                Top Up: Duitku (Multi-Metode)
+                Top Up: {activeTopupGatewaysCount} Gateway Aktif Digabungkan
               </span>
             </div>
             <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
               <span className="font-semibold text-[hsl(var(--foreground))]">
                 PayKita
               </span>{" "}
-              digunakan khusus untuk{" "}
-              <span className="font-semibold text-neon">Produk Beranda</span>, sedangkan{" "}
+              melayani{" "}
+              <span className="font-semibold text-neon">Produk Beranda &amp; Top Up</span>, sedangkan{" "}
               <span className="font-semibold text-[hsl(var(--foreground))]">
-                Duitku
+                Duitku, Tripay, Midtrans, Xendit, &amp; Tokopay
               </span>{" "}
-              digunakan khusus untuk{" "}
-              <span className="font-semibold text-lime">Produk Top Up</span> dengan dukungan multi-metode (QRIS, E-Wallet, Virtual Account, &amp; Minimarket).
+              dapat diaktifkan bersamaan untuk menggabungkan channel pembayaran otomatis di halaman{" "}
+              <span className="font-semibold text-lime">Produk Top Up</span>.
             </p>
           </div>
         </div>
@@ -491,29 +1020,38 @@ export function AdminPaykita() {
         </label>
       </div>
 
-      {/* 2 Dedicated Gateway Selector Cards: PayKita (Beranda) & Duitku (Top Up) */}
+      {/* 6 Gateway Selector Cards: PayKita, Duitku, Tripay, Midtrans, Xendit, Tokopay */}
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-            Pilih Gateway untuk Dikonfigurasi
+            Pilih Payment Gateway untuk Dikonfigurasi (6 Gateway Tersedia)
           </label>
           <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
-            PayKita = Produk Beranda &bull; Duitku = Produk Top Up (Multi-Payment)
+            Semua channel dari gateway yang berstatus <strong>Aktif</strong> otomatis tampil di halaman Top Up
           </span>
         </div>
 
         <div
-          className="grid grid-cols-1 sm:grid-cols-2 gap-3.5"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5"
           data-testid="payment-gateway-selector"
         >
           {GATEWAY_CATALOG.map((gw) => {
             const gwState = gatewaysMap[gw.id] || {};
             const isTabSelected = selectedTab === gw.id;
-            const isGwEnabled = gwState.enabled !== false;
+            const defaultGwEnabled = gw.id === "paykita" || gw.id === "duitku";
+            const isGwEnabled =
+              gwState.enabled !== undefined
+                ? Boolean(gwState.enabled)
+                : defaultGwEnabled;
             const isLiveConfigured = Boolean(
               gwState.api_key_set && !gwState.is_demo_key
             );
             const ScopeIcon = gw.scope === "topup" ? Gamepad2 : Package;
+            const defaultChannelCount =
+              (gw.channelsCatalog || []).length || 1;
+            const enabledChannelCount = Array.isArray(gwState.enabled_methods)
+              ? gwState.enabled_methods.length
+              : defaultChannelCount;
 
             return (
               <button
@@ -521,16 +1059,16 @@ export function AdminPaykita() {
                 type="button"
                 onClick={() => handleSelectGatewayTab(gw.id)}
                 data-testid={`gateway-tab-${gw.id}`}
-                className={`group text-left p-4 rounded-2xl border transition-all relative flex flex-col justify-between min-h-[116px] cursor-pointer ${
+                className={`group text-left p-4 rounded-2xl border transition-all relative flex flex-col justify-between min-h-[118px] cursor-pointer ${
                   isTabSelected
                     ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent))]/8 shadow-sm ring-1 ring-[hsl(var(--accent))]/30"
                     : "border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--foreground))]/30"
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 w-full">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold ${
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
                         isTabSelected
                           ? "bg-[hsl(var(--accent))] text-white"
                           : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]"
@@ -538,8 +1076,8 @@ export function AdminPaykita() {
                     >
                       <ScopeIcon className="w-4 h-4" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-sm font-bold leading-tight text-[hsl(var(--foreground))]">
                           {gw.name}
                         </p>
@@ -553,14 +1091,14 @@ export function AdminPaykita() {
                           {gw.scopeLabel}
                         </span>
                       </div>
-                      <p className="text-[11px] text-[hsl(var(--muted-foreground))] mt-1">
+                      <p className="text-[11px] text-[hsl(var(--muted-foreground))] mt-1 line-clamp-1">
                         {gw.tagline}
                       </p>
                     </div>
                   </div>
 
                   <span
-                    className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                    className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border shrink-0 ${
                       isGwEnabled
                         ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/25"
                         : "bg-rose-500/15 text-rose-500 border-rose-500/25"
@@ -572,9 +1110,9 @@ export function AdminPaykita() {
 
                 <div className="mt-3 pt-2.5 border-t border-[hsl(var(--border))]/60 flex items-center justify-between w-full text-[11px]">
                   <span className="text-[hsl(var(--muted-foreground))] truncate">
-                    {gw.scope === "beranda"
-                      ? "QRIS Otomatis Beranda & Opsi Utama QRIS Top Up"
-                      : `${(gwState.enabled_methods || ALL_DUITKU_CODES).length} Metode Pembayaran Top Up Aktif`}
+                    {gw.id === "paykita"
+                      ? "QRIS Otomatis Beranda & Top Up"
+                      : `${enabledChannelCount} Channel Top Up Aktif`}
                   </span>
                   <span className="inline-flex items-center gap-1.5 font-mono text-[10px] shrink-0">
                     <span
@@ -635,7 +1173,7 @@ export function AdminPaykita() {
         </div>
       </div>
 
-      {/* Dynamic Form for Selected Gateway (PayKita or Duitku) */}
+      {/* Dynamic Form for Selected Gateway */}
       <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[hsl(var(--border))]">
           <div>
@@ -648,12 +1186,12 @@ export function AdminPaykita() {
             </p>
           </div>
 
-          {selectedTab === "duitku" && (
+          {currentMeta.hasSandboxMode && (
             <div className="inline-flex items-center rounded-xl p-1 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] self-start sm:self-auto">
               <button
                 type="button"
                 onClick={() => handleModeChange("production")}
-                className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
                   mode === "production"
                     ? "bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm"
                     : "text-[hsl(var(--muted-foreground))]"
@@ -664,7 +1202,7 @@ export function AdminPaykita() {
               <button
                 type="button"
                 onClick={() => handleModeChange("sandbox")}
-                className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
                   mode === "sandbox"
                     ? "bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm"
                     : "text-[hsl(var(--muted-foreground))]"
@@ -676,59 +1214,63 @@ export function AdminPaykita() {
           )}
         </div>
 
-        {/* Duitku Merchant Code & Default Channel Row */}
-        {selectedTab === "duitku" && (
+        {/* Merchant Code & Default Channel Row for Multi-Method Gateways */}
+        {(currentMeta.hasMerchantCode || currentMeta.hasMultiChannels) && (
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
-                Merchant Code Duitku
-              </label>
-              <input
-                type="text"
-                value={merchantCode}
-                onChange={(e) => setMerchantCode(e.target.value)}
-                placeholder="Contoh: D12345 / DS12345"
-                data-testid="gateway-merchant-code-input"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs font-mono focus:outline-none focus:border-[hsl(var(--foreground))]"
-              />
-              <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
-                Kode unik proyek dari menu Project Saya di Duitku untuk transaksi Top Up Game.
-              </p>
-            </div>
+            {currentMeta.hasMerchantCode && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
+                  {currentMeta.merchantCodeLabel || `Merchant Code ${currentMeta.name}`}
+                </label>
+                <input
+                  type="text"
+                  value={merchantCode}
+                  onChange={(e) => setMerchantCode(e.target.value)}
+                  placeholder={currentMeta.merchantCodePlaceholder || "Masukkan kode merchant"}
+                  data-testid="gateway-merchant-code-input"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs font-mono focus:outline-none focus:border-[hsl(var(--foreground))]"
+                />
+                <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
+                  ID / Kode Merchant resmi dari dashboard {currentMeta.name} untuk transaksi Top Up Game.
+                </p>
+              </div>
+            )}
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
-                Metode Pembayaran Default (Utama)
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setPaymentMethod(val);
-                  if (!enabledMethods.includes(val)) {
-                    setEnabledMethods((prev) => [...prev, val]);
-                  }
-                }}
-                data-testid="gateway-channel-select"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs font-medium focus:outline-none focus:border-[hsl(var(--foreground))]"
-              >
-                {(currentMeta.channels || []).map((ch) => (
-                  <option key={ch.code} value={ch.code}>
-                    {ch.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
-                Metode yang otomatis terpilih pertama kali saat pembeli membuka checkout Top Up.
-              </p>
-            </div>
+            {currentMeta.hasMultiChannels && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
+                  Metode Pembayaran Default ({currentMeta.name})
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPaymentMethod(val);
+                    if (!enabledMethods.includes(val)) {
+                      setEnabledMethods((prev) => [...prev, val]);
+                    }
+                  }}
+                  data-testid="gateway-channel-select"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs font-medium focus:outline-none focus:border-[hsl(var(--foreground))]"
+                >
+                  {(currentMeta.channels || []).map((ch) => (
+                    <option key={ch.code} value={ch.code}>
+                      {ch.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
+                  Channel utama {currentMeta.name} yang diprioritaskan pada halaman checkout Top Up.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Duitku Multi-Payment Methods Selector */}
-        {selectedTab === "duitku" && (
+        {/* Multi-Payment Methods Selector for Top Up Gateways */}
+        {currentMeta.hasMultiChannels && (
           <div
             className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/25 p-4 space-y-4"
             data-testid="duitku-multi-methods-section"
@@ -736,30 +1278,31 @@ export function AdminPaykita() {
             <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[hsl(var(--border))]">
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[hsl(var(--foreground))]">
-                  Daftar Metode Pembayaran Duitku yang Diaktifkan ({enabledMethods.length}/{ALL_DUITKU_CODES.length})
+                  Daftar Channel Pembayaran {currentMeta.name} yang Diaktifkan ({enabledMethods.length}/{allCurrentCodes.length})
                 </h4>
                 <p className="text-[11px] text-[hsl(var(--muted-foreground))] mt-0.5">
-                  Klik metode di bawah untuk mengaktifkan atau menonaktifkan pilihan pembayaran di halaman Top Up Game.
+                  Klik metode di bawah untuk mengaktifkan atau menonaktifkan channel {currentMeta.name} di halaman Top Up Game.
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setEnabledMethods(ALL_DUITKU_CODES)}
+                  onClick={() => setEnabledMethods(allCurrentCodes)}
                   data-testid="duitku-enable-all-methods"
                   className="px-3 py-1.5 rounded-xl bg-lime/15 text-lime border border-lime/30 text-[11px] font-semibold hover:bg-lime/25 transition-colors cursor-pointer"
                 >
-                  Aktifkan Semua ({ALL_DUITKU_CODES.length})
+                  Aktifkan Semua ({allCurrentCodes.length})
                 </button>
               </div>
             </div>
 
             <div className="space-y-4">
-              {DUITKU_CATEGORY_GROUPS.map((grp) => {
+              {CHANNEL_CATEGORY_GROUPS.map((grp) => {
                 const GroupIcon = grp.icon;
-                const channelsInGroup = DUITKU_CHANNELS_CATALOG.filter(
+                const channelsInGroup = currentCatalog.filter(
                   (c) => c.category === grp.id
                 );
+                if (channelsInGroup.length === 0) return null;
                 return (
                   <div key={grp.id} className="space-y-2">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-[hsl(var(--foreground))]">
@@ -774,7 +1317,7 @@ export function AdminPaykita() {
                           <button
                             key={ch.code}
                             type="button"
-                            onClick={() => toggleDuitkuChannel(ch.code)}
+                            onClick={() => toggleGatewayChannel(ch.code)}
                             data-testid={`duitku-channel-toggle-${ch.code}`}
                             className={`flex items-start justify-between gap-2 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                               isChActive
@@ -818,12 +1361,12 @@ export function AdminPaykita() {
           </div>
         )}
 
-        {/* Primary API Key & Webhook Secret */}
+        {/* Primary API Key & Webhook/Private Secret */}
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
-              {selectedTab === "duitku" ? "API Key Duitku" : "API Key PayKita"}
+              {currentMeta.apiKeyLabel || `API Key ${currentMeta.name}`}
               {currentCfg.api_key_set && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-normal">
                   <CheckCircle2 className="w-3 h-3" /> tersimpan (
@@ -838,26 +1381,20 @@ export function AdminPaykita() {
               placeholder={
                 currentCfg.api_key_set
                   ? "Biarkan kosong jika tidak ingin mengubah"
-                  : selectedTab === "duitku"
-                  ? "Masukkan API Key Project Duitku (32 karakter)"
-                  : "pk_live_xxxxxxxxxxxxxxxx"
+                  : currentMeta.apiKeyPlaceholder || "Masukkan API Key"
               }
               className="w-full px-3.5 py-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs font-mono focus:outline-none focus:border-[hsl(var(--foreground))]"
               data-testid="paykita-api-key-input"
             />
             <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
-              {selectedTab === "duitku"
-                ? "Digunakan untuk membuat signature MD5 transaksi Top Up & cek status otomatis."
-                : "Kunci rahasia autentikasi pembuatan QRIS otomatis Produk Beranda."}
+              Kunci rahasia autentikasi pembuatan tagihan &amp; cek status otomatis di {currentMeta.name}.
             </p>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold flex items-center gap-1.5">
               <Webhook className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
-              {selectedTab === "duitku"
-                ? "Callback Secret (Opsional)"
-                : "Webhook Secret PayKita"}
+              {currentMeta.secretLabel || `Webhook Secret ${currentMeta.name}`}
               {currentCfg.secret_set && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-normal">
                   <CheckCircle2 className="w-3 h-3" /> tersimpan
@@ -871,17 +1408,13 @@ export function AdminPaykita() {
               placeholder={
                 currentCfg.secret_set
                   ? "Biarkan kosong jika tidak ingin mengubah"
-                  : selectedTab === "duitku"
-                  ? "Otomatis diverifikasi dengan API Key MD5"
-                  : "whsec_xxxxxxxxxxxxxxxx"
+                  : currentMeta.secretPlaceholder || "Masukkan secret / private key"
               }
               className="w-full px-3.5 py-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs font-mono focus:outline-none focus:border-[hsl(var(--foreground))]"
               data-testid="paykita-webhook-secret-input"
             />
             <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
-              {selectedTab === "duitku"
-                ? "Duitku memverifikasi callback menggunakan MD5(merchantCode + amount + orderId + apiKey)."
-                : "Memvalidasi tanda tangan notifikasi pembayaran otomatis dari PayKita."}
+              Digunakan untuk memverifikasi signature callback / webhook pembayaran dari {currentMeta.name}.
             </p>
           </div>
         </div>
@@ -917,7 +1450,7 @@ export function AdminPaykita() {
               <button
                 type="button"
                 onClick={() => copyWebhook(webhookUrl)}
-                className="px-3 py-2 rounded-xl border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))] transition-colors inline-flex items-center gap-1.5 text-xs font-medium shrink-0"
+                className="px-3 py-2 rounded-xl border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))] transition-colors inline-flex items-center gap-1.5 text-xs font-medium shrink-0 cursor-pointer"
                 data-testid="paykita-copy-webhook"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -990,7 +1523,7 @@ export function AdminPaykita() {
             ) : (
               <PlugZap className="w-3.5 h-3.5 text-[hsl(var(--accent))]" />
             )}
-            Tes Koneksi &amp; Simpan {currentMeta.name}
+            Tes Koneksi &amp; Aktifkan {currentMeta.name}
           </button>
 
           <button

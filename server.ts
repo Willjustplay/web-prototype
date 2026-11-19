@@ -1448,6 +1448,48 @@ function renderDeliveryInfo(product: any, game: any, destination: Record<string,
   return [base, label ? `Tujuan: ${label}` : ""].filter(Boolean).join(" — ");
 }
 
+function buildGameCoverArtSvg(
+  title: string,
+  publisher: string,
+  monogram: string,
+  bgStart: string,
+  bgEnd: string,
+  accent: string
+): string {
+  const safeTitle = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safePub = publisher.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safeMono = monogram.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${bgStart}" />
+        <stop offset="100%" stop-color="${bgEnd}" />
+      </linearGradient>
+      <radialGradient id="glow" cx="50%" cy="38%" r="55%">
+        <stop offset="0%" stop-color="${accent}" stop-opacity="0.42" />
+        <stop offset="100%" stop-color="${bgEnd}" stop-opacity="0" />
+      </radialGradient>
+      <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${accent}" stop-opacity="0.9" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.25" />
+      </linearGradient>
+    </defs>
+    <rect width="600" height="600" fill="url(#bg)" />
+    <circle cx="300" cy="230" r="260" fill="url(#glow)" />
+    <g opacity="0.16" stroke="${accent}" stroke-width="1.5" fill="none">
+      <circle cx="300" cy="235" r="190" />
+      <circle cx="300" cy="235" r="145" stroke-dasharray="10 8" />
+      <path d="M90 460 L510 460" />
+    </g>
+    <polygon points="300,82 432,158 432,312 300,388 168,312 168,158" fill="#07090e" fill-opacity="0.58" stroke="url(#ring)" stroke-width="5" />
+    <polygon points="300,104 412,169 412,301 300,366 188,301 188,169" fill="none" stroke="${accent}" stroke-opacity="0.35" stroke-width="2" />
+    <text x="300" y="262" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="92" letter-spacing="4">${safeMono}</text>
+    <text x="300" y="486" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="34" letter-spacing="1">${safeTitle}</text>
+    <text x="300" y="528" text-anchor="middle" fill="${accent}" font-family="monospace" font-weight="700" font-size="20" letter-spacing="3">${safePub.toUpperCase()}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 const MERCHANT_MASTER_GAMES = [
   {
     slug: "mobile-legends",
@@ -1814,6 +1856,300 @@ const MERCHANT_MASTER_GAMES = [
     ],
     denominations: [] as any[],
   },
+  {
+    slug: "punishing-gray-raven",
+    name: "Punishing: Gray Raven",
+    publisher: "Kuro Games",
+    currency: "Rainbow Cards",
+    vendor_prefix: "PGR",
+    cek_id_sku: "",
+    featured: true,
+    icon: "/src/assets/images/icon_game_pgr_1795063552507.jpg",
+    banner: "/src/assets/images/icon_game_pgr_1795063552507.jpg",
+    notes: "Masukkan Role ID (8 digit) dan pilih Server akun Punishing: Gray Raven Anda.",
+    delivery_info: "Rainbow Cards & Monthly Pass Punishing: Gray Raven dikirim otomatis ke akun Anda.",
+    fields: [
+      { key: "user_id", label: "Role ID", placeholder: "12345678", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 14, pattern: "^[0-9]{6,14}$", help: "Masukkan angka Role ID di profil Commandant PGR Anda" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 24, pattern: "", options: ["Asia-Pacific", "Europe", "North America"], help: "Pilih server akun Punishing: Gray Raven Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "lords-mobile",
+    name: "Lords Mobile",
+    publisher: "IGG",
+    currency: "Diamonds",
+    vendor_prefix: "LM",
+    cek_id_sku: "CEKLM",
+    featured: true,
+    icon: "/src/assets/images/icon_game_lords_mobile_1795063552628.jpg",
+    banner: "/src/assets/images/icon_game_lords_mobile_1795063552628.jpg",
+    notes: "Masukkan IGG ID akun Lords Mobile Anda (lihat di menu Pengaturan → Akun).",
+    delivery_info: "Diamonds Lords Mobile masuk otomatis ke IGG ID akun Anda.",
+    fields: [
+      { key: "user_id", label: "IGG ID", placeholder: "987654321", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka IGG ID di menu Pengaturan akun Lords Mobile" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "clash-of-clans",
+    name: "Clash of Clans",
+    publisher: "Supercell",
+    currency: "Gems",
+    vendor_prefix: "COC",
+    cek_id_sku: "",
+    featured: true,
+    icon: "/src/assets/images/icon_game_clash_of_clans_1795063552533.jpg",
+    banner: "/src/assets/images/icon_game_clash_of_clans_1795063552533.jpg",
+    notes: "Masukkan Player Tag Clash of Clans Anda (contoh: #2PP98JLC).",
+    delivery_info: "Gems & Gold Pass Clash of Clans dikirim otomatis ke akun Supercell ID / Player Tag Anda.",
+    fields: [
+      { key: "user_id", label: "Player Tag", placeholder: "#2PP98JLC", type: "text", inputmode: "text", required: true, min_len: 5, max_len: 18, pattern: "^#?[A-Za-z0-9]{4,16}$", help: "Masukkan Player Tag dari profil desa Clash of Clans Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "clash-royale",
+    name: "Clash Royale",
+    publisher: "Supercell",
+    currency: "Gems",
+    vendor_prefix: "CR",
+    cek_id_sku: "",
+    featured: true,
+    icon: "/src/assets/images/icon_game_clash_royale_1795063552227.jpg",
+    banner: "/src/assets/images/icon_game_clash_royale_1795063552227.jpg",
+    notes: "Masukkan Player Tag Clash Royale Anda (contoh: #9Y8Q2LPV).",
+    delivery_info: "Gems & Pass Royale masuk otomatis ke Player Tag Clash Royale Anda.",
+    fields: [
+      { key: "user_id", label: "Player Tag", placeholder: "#9Y8Q2LPV", type: "text", inputmode: "text", required: true, min_len: 5, max_len: 18, pattern: "^#?[A-Za-z0-9]{4,16}$", help: "Masukkan Player Tag dari profil akun Clash Royale Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "brawl-stars",
+    name: "Brawl Stars",
+    publisher: "Supercell",
+    currency: "Gems",
+    vendor_prefix: "BS",
+    cek_id_sku: "",
+    featured: true,
+    icon: "/src/assets/images/icon_game_brawl_stars_1795063551696.jpg",
+    banner: "/src/assets/images/icon_game_brawl_stars_1795063551696.jpg",
+    notes: "Masukkan Player Tag Brawl Stars Anda (contoh: #8LQ92PV).",
+    delivery_info: "Gems & Brawl Pass Plus masuk otomatis ke Player Tag Brawl Stars Anda.",
+    fields: [
+      { key: "user_id", label: "Player Tag", placeholder: "#8LQ92PV", type: "text", inputmode: "text", required: true, min_len: 5, max_len: 18, pattern: "^#?[A-Za-z0-9]{4,16}$", help: "Masukkan Player Tag dari profil akun Brawl Stars Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "steam-wallet",
+    name: "Steam Wallet (IDR)",
+    publisher: "Valve Corporation",
+    currency: "Voucher IDR",
+    vendor_prefix: "STEAM",
+    cek_id_sku: "",
+    featured: true,
+    icon: "/src/assets/images/icon_game_steam_wallet_1794083010427.jpg",
+    banner: "/src/assets/images/icon_game_steam_wallet_1794083010427.jpg",
+    notes: "Masukkan Nomor WhatsApp atau ID Steam penerima kode voucher Steam Wallet IDR.",
+    delivery_info: "Kode Voucher Steam Wallet IDR dikirim otomatis dan langsung muncul di halaman pesanan Anda.",
+    fields: [
+      { key: "user_id", label: "No. WhatsApp / Steam ID", placeholder: "081234567890", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 30, pattern: "", help: "Masukkan Nomor WhatsApp atau Steam ID untuk pengiriman kode voucher" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "efootball",
+    name: "eFootball",
+    publisher: "Konami",
+    currency: "eFootball Coins",
+    vendor_prefix: "EFB",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("eFootball", "Konami", "eFB", "#061539", "#040814", "#00f0ff"),
+    banner: buildGameCoverArtSvg("eFootball", "Konami", "eFB", "#061539", "#040814", "#00f0ff"),
+    notes: "Masukkan User ID eFootball Anda (9–12 digit angka).",
+    delivery_info: "eFootball Coins masuk otomatis ke akun eFootball Anda.",
+    fields: [
+      { key: "user_id", label: "User ID", placeholder: "812345678", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 16, pattern: "", help: "Masukkan User ID akun eFootball Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "blood-strike",
+    name: "Blood Strike",
+    publisher: "NetEase Games",
+    currency: "Gold",
+    vendor_prefix: "BST",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("Blood Strike", "NetEase Games", "BS", "#2b090e", "#090406", "#ff3b5c"),
+    banner: buildGameCoverArtSvg("Blood Strike", "NetEase Games", "BS", "#2b090e", "#090406", "#ff3b5c"),
+    notes: "Masukkan User ID Blood Strike Anda (lihat di profil pojok kiri atas).",
+    delivery_info: "Gold & Strike Pass Blood Strike dikirim otomatis ke User ID Anda.",
+    fields: [
+      { key: "user_id", label: "User ID", placeholder: "5401234567", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 16, pattern: "^[0-9]{6,16}$", help: "Masukkan angka User ID Blood Strike Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "arena-breakout",
+    name: "Arena Breakout",
+    publisher: "MoreFun Studios",
+    currency: "Bonds",
+    vendor_prefix: "AB",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("Arena Breakout", "MoreFun Studios", "AB", "#1f1909", "#080705", "#f59e0b"),
+    banner: buildGameCoverArtSvg("Arena Breakout", "MoreFun Studios", "AB", "#1f1909", "#080705", "#f59e0b"),
+    notes: "Masukkan Player ID Arena Breakout Anda.",
+    delivery_info: "Bonds Arena Breakout masuk otomatis ke akun Player ID Anda.",
+    fields: [
+      { key: "user_id", label: "Player ID", placeholder: "1902345678", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 18, pattern: "^[0-9]{6,18}$", help: "Masukkan angka Player ID di profil Arena Breakout" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "nikke",
+    name: "GODDESS OF VICTORY: NIKKE",
+    publisher: "Level Infinite",
+    currency: "Gems",
+    vendor_prefix: "NIKKE",
+    cek_id_sku: "",
+    featured: true,
+    icon: buildGameCoverArtSvg("NIKKE", "Level Infinite", "NK", "#280b26", "#09050d", "#f43f5e"),
+    banner: buildGameCoverArtSvg("NIKKE", "Level Infinite", "NK", "#280b26", "#09050d", "#f43f5e"),
+    notes: "Masukkan Player ID dan pilih Server akun GODDESS OF VICTORY: NIKKE Anda.",
+    delivery_info: "Gems & Monthly Pass NIKKE dikirim otomatis ke akun Anda.",
+    fields: [
+      { key: "user_id", label: "Player ID", placeholder: "01234567", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 15, pattern: "^[0-9]{5,15}$", help: "Masukkan angka Player ID di profil NIKKE Anda" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 16, pattern: "", options: ["SEA", "Global", "NA", "JP", "KR", "HMT"], help: "Pilih server akun NIKKE Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "love-and-deepspace",
+    name: "Love and Deepspace",
+    publisher: "InFold Games",
+    currency: "Crystals",
+    vendor_prefix: "LAD",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("Love & Deepspace", "InFold Games", "L&D", "#1a1033", "#070510", "#c084fc"),
+    banner: buildGameCoverArtSvg("Love & Deepspace", "InFold Games", "L&D", "#1a1033", "#070510", "#c084fc"),
+    notes: "Masukkan Hunter ID dan pilih Server akun Love and Deepspace Anda.",
+    delivery_info: "Crystals & Aurum Pass Love and Deepspace masuk otomatis ke Hunter ID Anda.",
+    fields: [
+      { key: "user_id", label: "Hunter ID", placeholder: "8200123456", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 15, pattern: "^[0-9]{6,15}$", help: "Masukkan angka Hunter ID di profil Love and Deepspace" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 16, pattern: "", options: ["Asia", "America", "Europe"], help: "Pilih server akun Love and Deepspace Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "solo-leveling-arise",
+    name: "Solo Leveling: Arise",
+    publisher: "Netmarble",
+    currency: "Diamonds",
+    vendor_prefix: "SLA",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("Solo Leveling", "Netmarble", "SLA", "#0c1438", "#050712", "#38bdf8"),
+    banner: buildGameCoverArtSvg("Solo Leveling", "Netmarble", "SLA", "#0c1438", "#050712", "#38bdf8"),
+    notes: "Masukkan Account ID (PID) akun Solo Leveling: Arise Anda.",
+    delivery_info: "Diamonds & Hunter Pass Solo Leveling: Arise masuk otomatis ke akun Anda.",
+    fields: [
+      { key: "user_id", label: "Account ID (PID)", placeholder: "A1B2C3D4E5F6", type: "text", inputmode: "text", required: true, min_len: 5, max_len: 32, pattern: "", help: "Masukkan PID di menu pengaturan akun Solo Leveling: Arise" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "tower-of-fantasy",
+    name: "Tower of Fantasy",
+    publisher: "Level Infinite",
+    currency: "Tanium",
+    vendor_prefix: "TOF",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("Tower of Fantasy", "Level Infinite", "ToF", "#0a252e", "#050c12", "#2dd4bf"),
+    banner: buildGameCoverArtSvg("Tower of Fantasy", "Level Infinite", "ToF", "#0a252e", "#050c12", "#2dd4bf"),
+    notes: "Masukkan UID dan pilih Region/Server Tower of Fantasy Anda.",
+    delivery_info: "Tanium & Monthly Pass Tower of Fantasy masuk otomatis ke akun Anda.",
+    fields: [
+      { key: "user_id", label: "UID", placeholder: "1100234567", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 16, pattern: "^[0-9]{6,16}$", help: "Masukkan UID karakter Tower of Fantasy Anda" },
+      { key: "server", label: "Region Server", placeholder: "Pilih Region", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 24, pattern: "", options: ["Southeast Asia", "Asia Pacific", "North America", "Europe", "South America"], help: "Pilih region server Tower of Fantasy Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "stumble-guys",
+    name: "Stumble Guys",
+    publisher: "Scopely",
+    currency: "Gems & Tokens",
+    vendor_prefix: "SG",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("Stumble Guys", "Scopely", "SG", "#0e293d", "#060d14", "#a3e635"),
+    banner: buildGameCoverArtSvg("Stumble Guys", "Scopely", "SG", "#0e293d", "#060d14", "#a3e635"),
+    notes: "Masukkan Username in-game Stumble Guys Anda dengan tepat.",
+    delivery_info: "Gems, Tokens & Stumble Pass masuk otomatis ke Username Stumble Guys Anda.",
+    fields: [
+      { key: "user_id", label: "Username In-Game", placeholder: "StumblePro99", type: "text", inputmode: "text", required: true, min_len: 3, max_len: 24, pattern: "", help: "Masukkan Username persis seperti di profil Stumble Guys Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "eggy-party",
+    name: "Eggy Party",
+    publisher: "NetEase Games",
+    currency: "Eggy Coins",
+    vendor_prefix: "EGGY",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("Eggy Party", "NetEase Games", "EP", "#2e2307", "#0d0903", "#facc15"),
+    banner: buildGameCoverArtSvg("Eggy Party", "NetEase Games", "EP", "#2e2307", "#0d0903", "#facc15"),
+    notes: "Masukkan User ID dan pilih Server akun Eggy Party Anda.",
+    delivery_info: "Eggy Coins masuk otomatis ke akun Eggy Party Anda.",
+    fields: [
+      { key: "user_id", label: "User ID", placeholder: "1023456789", type: "text", inputmode: "numeric", required: true, min_len: 6, max_len: 16, pattern: "^[0-9]{6,16}$", help: "Masukkan angka User ID di profil Eggy Party Anda" },
+      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, pattern: "", options: ["Asia", "North America", "Europe"], help: "Pilih server Eggy Party Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "super-sus",
+    name: "Super Sus",
+    publisher: "PIProductions",
+    currency: "Golden Star",
+    vendor_prefix: "SSUS",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("Super Sus", "PIProductions", "SS", "#290d1f", "#0b0408", "#ec4899"),
+    banner: buildGameCoverArtSvg("Super Sus", "PIProductions", "SS", "#290d1f", "#0b0408", "#ec4899"),
+    notes: "Masukkan Space ID akun Super Sus Anda.",
+    delivery_info: "Golden Star & Super Pass masuk otomatis ke Space ID Super Sus Anda.",
+    fields: [
+      { key: "user_id", label: "Space ID", placeholder: "78123456", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 16, pattern: "^[0-9]{5,16}$", help: "Masukkan angka Space ID di profil Super Sus Anda" },
+    ],
+    denominations: [] as any[],
+  },
+  {
+    slug: "league-of-legends",
+    name: "League of Legends (PC)",
+    publisher: "Riot Games",
+    currency: "Riot Points (RP)",
+    vendor_prefix: "LOL",
+    cek_id_sku: "",
+    featured: false,
+    icon: buildGameCoverArtSvg("League of Legends", "Riot Games", "LoL", "#092129", "#050b0f", "#00f0ff"),
+    banner: buildGameCoverArtSvg("League of Legends", "Riot Games", "LoL", "#092129", "#050b0f", "#00f0ff"),
+    notes: "Masukkan Riot ID beserta Tagline akun League of Legends PC Anda (contoh: HideOnBush#KR1).",
+    delivery_info: "Riot Points (RP) League of Legends PC dikirim otomatis ke Riot ID Anda.",
+    fields: [
+      { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, pattern: "", help: "Format wajib: Nickname#Tagline (contoh: Player#IDN)" },
+    ],
+    denominations: [] as any[],
+  },
 ];
 
 function clearAllTopupProductsAndSkus(gameSlugs?: string[]) {
@@ -2052,6 +2388,79 @@ function ensureDefaultTopupClearedOnce() {
     db.games = nextGames;
 
     db.settings.topup_master_games_21_v4 = {
+      migrated_at: nowIso(),
+      games_count: db.games.length,
+    };
+    changed = true;
+  }
+
+  // Expand master catalog to 38+ official Top Up games (including Punishing: Gray Raven, Lords Mobile, Supercell, Mobile, RPG, and PC)
+  if (!db.settings.topup_master_games_38_v5) {
+    const masterSlugs = new Set(MERCHANT_MASTER_GAMES.map((mg) => mg.slug));
+    const nextGames: any[] = [];
+    MERCHANT_MASTER_GAMES.forEach((mg, idx) => {
+      const existing = (db.games || []).find((g) => g.slug === mg.slug);
+      if (existing) {
+        existing.name = mg.name;
+        existing.publisher = mg.publisher;
+        existing.currency = mg.currency;
+        if (!String(existing.icon || "").trim() || String(existing.icon || "").startsWith("data:image/svg+xml")) {
+          existing.icon = mg.icon;
+        }
+        if (!String(existing.banner || "").trim() || String(existing.banner || "").startsWith("data:image/svg+xml")) {
+          existing.banner = mg.banner;
+        }
+        existing.notes = mg.notes;
+        existing.delivery_info = mg.delivery_info;
+        existing.vendor_prefix = mg.vendor_prefix;
+        if ((mg as any).cek_id_sku !== undefined) {
+          existing.cek_id_sku = (mg as any).cek_id_sku;
+        }
+        existing.vendor_id = "vp-digiflazz";
+        existing.featured = Boolean(mg.featured);
+        existing.seq = idx;
+        existing.fields = mg.fields.map((f: any) => ({ ...f }));
+        existing.denominations = Array.isArray(existing.denominations)
+          ? existing.denominations.map((d: any) => ({
+              ...d,
+              sku_group: normalizeSkuGroup(d.sku_group, d.vendor_sku || d.code, d.label, d.type),
+            }))
+          : [];
+        existing.updated_at = nowIso();
+        nextGames.push(existing);
+      } else {
+        nextGames.push({
+          id: `gm-${mg.slug}-${uuidHex(4)}`,
+          name: mg.name,
+          slug: mg.slug,
+          publisher: mg.publisher,
+          currency: mg.currency,
+          icon: mg.icon,
+          banner: mg.banner,
+          notes: mg.notes,
+          delivery_info: mg.delivery_info,
+          vendor_prefix: mg.vendor_prefix,
+          cek_id_sku: (mg as any).cek_id_sku ?? "",
+          vendor_id: "vp-digiflazz",
+          is_active: true,
+          featured: Boolean(mg.featured),
+          seq: idx,
+          fields: mg.fields.map((f: any) => ({ ...f })),
+          denominations: [],
+          created_at: nowIso(),
+          updated_at: nowIso(),
+        });
+      }
+    });
+
+    for (const g of db.games || []) {
+      if (!masterSlugs.has(g.slug)) {
+        g.seq = nextGames.length;
+        nextGames.push(g);
+      }
+    }
+    db.games = nextGames;
+    db.settings.topup_master_games_38_v5 = {
       migrated_at: nowIso(),
       games_count: db.games.length,
     };
@@ -2344,14 +2753,15 @@ function initDatabase() {
     paykita: {
       id: "paykita",
       name: "PayKita",
-      subtitle: "QRIS Otomatis Produk Beranda",
-      scope: "beranda",
+      subtitle: "QRIS Otomatis Produk Beranda & Top Up",
+      scope: "beranda_topup",
       enabled: db.settings.paykita.enabled !== false,
       mode: "production",
       base_url: db.settings.paykita.base_url || "https://pay.digikita.id",
       api_key: db.settings.paykita.api_key || "pk_live_wjp_qris_99281746",
       webhook_secret: db.settings.paykita.webhook_secret || "whsec_wjp_qris_881920",
-      payment_method: "QRIS",
+      payment_method: "PK_QRIS",
+      enabled_methods: ["PK_QRIS"],
       last_test: db.settings.paykita.last_test || null,
     },
     duitku: {
@@ -2396,6 +2806,152 @@ function initDatabase() {
         tested_at: nowIso(),
       },
     },
+    tripay: {
+      id: "tripay",
+      name: "Tripay",
+      subtitle: "Multi-Metode Pembayaran Produk Top Up (QRIS, VA, E-Wallet, Retail)",
+      scope: "topup",
+      enabled: true,
+      mode: "production",
+      base_url: "https://tripay.co.id/api",
+      merchant_code: process.env.TRIPAY_MERCHANT_CODE || "T28910",
+      api_key: process.env.TRIPAY_API_KEY || "DEV-wjpTripayKey882910",
+      private_key: process.env.TRIPAY_PRIVATE_KEY || "wjpTripayPriv882910",
+      webhook_secret: process.env.TRIPAY_PRIVATE_KEY || "wjpTripayPriv882910",
+      payment_method: "TP_QRISC",
+      enabled_methods: [
+        "TP_QRISC",
+        "TP_QRIS2",
+        "TP_OVO",
+        "TP_DANA",
+        "TP_SHOPEEPAY",
+        "TP_BCAVA",
+        "TP_MANDIRIVA",
+        "TP_BNIVA",
+        "TP_BRIVA",
+        "TP_BSIVA",
+        "TP_CIMBVA",
+        "TP_PERMATAVA",
+        "TP_MYBVA",
+        "TP_ALFAMART",
+        "TP_INDOMARET",
+      ],
+      last_test: {
+        ok: true,
+        is_demo: !process.env.TRIPAY_API_KEY,
+        project: "Tripay Payment Gateway",
+        provider: "Multi-Payment (QRIS, VA, E-Wallet, Retail)",
+        mode: "production",
+        tested_at: nowIso(),
+      },
+    },
+    midtrans: {
+      id: "midtrans",
+      name: "Midtrans",
+      subtitle: "Core API & Snap Multi-Metode Produk Top Up",
+      scope: "topup",
+      enabled: true,
+      mode: "production",
+      base_url: "https://api.midtrans.com",
+      merchant_code: process.env.MIDTRANS_MERCHANT_ID || "G819204411",
+      api_key: process.env.MIDTRANS_SERVER_KEY || "Mid-server-wjp88291044",
+      client_key: process.env.MIDTRANS_CLIENT_KEY || "Mid-client-wjp88291044",
+      webhook_secret: process.env.MIDTRANS_SERVER_KEY || "Mid-server-wjp88291044",
+      payment_method: "MT_QRIS",
+      enabled_methods: [
+        "MT_QRIS",
+        "MT_GOPAY",
+        "MT_SHOPEEPAY",
+        "MT_BCA",
+        "MT_MANDIRI",
+        "MT_BNI",
+        "MT_BRI",
+        "MT_PERMATA",
+        "MT_CIMB",
+        "MT_INDOMARET",
+        "MT_ALFAMART",
+      ],
+      last_test: {
+        ok: true,
+        is_demo: !process.env.MIDTRANS_SERVER_KEY,
+        project: "Midtrans Payment Gateway",
+        provider: "Core API (QRIS, GoPay, VA Bank, Retail)",
+        mode: "production",
+        tested_at: nowIso(),
+      },
+    },
+    xendit: {
+      id: "xendit",
+      name: "Xendit",
+      subtitle: "QRIS, Virtual Account, E-Wallet & Retail Produk Top Up",
+      scope: "topup",
+      enabled: true,
+      mode: "production",
+      base_url: "https://api.xendit.co",
+      merchant_code: process.env.XENDIT_BUSINESS_ID || "XND-WJP-01",
+      api_key: process.env.XENDIT_SECRET_KEY || "xnd_production_wjp88291044",
+      webhook_secret: process.env.XENDIT_CALLBACK_TOKEN || "xnd_cb_wjp88291044",
+      payment_method: "XD_QRIS",
+      enabled_methods: [
+        "XD_QRIS",
+        "XD_DANA",
+        "XD_OVO",
+        "XD_SHOPEEPAY",
+        "XD_LINKAJA",
+        "XD_BCA",
+        "XD_MANDIRI",
+        "XD_BNI",
+        "XD_BRI",
+        "XD_BSI",
+        "XD_PERMATA",
+        "XD_ALFAMART",
+        "XD_INDOMARET",
+      ],
+      last_test: {
+        ok: true,
+        is_demo: !process.env.XENDIT_SECRET_KEY,
+        project: "Xendit Payment Gateway",
+        provider: "Multi-Payment (QRIS, E-Wallet, VA, Retail)",
+        mode: "production",
+        tested_at: nowIso(),
+      },
+    },
+    tokopay: {
+      id: "tokopay",
+      name: "Tokopay",
+      subtitle: "QRIS Instan, E-Wallet, Virtual Account & Retail Produk Top Up",
+      scope: "topup",
+      enabled: true,
+      mode: "production",
+      base_url: "https://api.tokopay.id",
+      merchant_code: process.env.TOKOPAY_MERCHANT_ID || "M240918WJP",
+      api_key: process.env.TOKOPAY_SECRET_KEY || "tk_live_wjp_88291044ff",
+      webhook_secret: process.env.TOKOPAY_SECRET_KEY || "tk_live_wjp_88291044ff",
+      payment_method: "TK_QRIS",
+      enabled_methods: [
+        "TK_QRIS",
+        "TK_DANA",
+        "TK_OVO",
+        "TK_SHOPEEPAY",
+        "TK_LINKAJA",
+        "TK_BCAVA",
+        "TK_BRIVA",
+        "TK_BNIVA",
+        "TK_MANDIRIVA",
+        "TK_PERMATAVA",
+        "TK_BSIVA",
+        "TK_ALFAMART",
+        "TK_INDOMARET",
+      ],
+      last_test: {
+        ok: true,
+        is_demo: !process.env.TOKOPAY_SECRET_KEY,
+        project: "Tokopay Payment Gateway",
+        provider: "Multi-Payment (QRIS, E-Wallet, VA, Retail)",
+        mode: "production",
+        tested_at: nowIso(),
+      },
+    },
   };
 
   if (!db.settings.payment_gateways) {
@@ -2408,16 +2964,22 @@ function initDatabase() {
   } else {
     db.settings.payment_gateways.active_gateway = "paykita";
     db.settings.payment_gateways.beranda_gateway = "paykita";
-    db.settings.payment_gateways.topup_gateway = "duitku";
+    db.settings.payment_gateways.topup_gateway =
+      db.settings.payment_gateways.topup_gateway || "duitku";
     if (!db.settings.payment_gateways.gateways) {
       db.settings.payment_gateways.gateways = defaultGateways;
     } else {
       const cleanedGateways: Record<string, any> = {};
       for (const [gk, gDef] of Object.entries(defaultGateways)) {
+        const existingGw = db.settings.payment_gateways.gateways[gk] || {};
         cleanedGateways[gk] = {
           ...gDef,
-          ...(db.settings.payment_gateways.gateways[gk] || {}),
+          ...existingGw,
           scope: gDef.scope,
+          enabled_methods:
+            Array.isArray(existingGw.enabled_methods) && existingGw.enabled_methods.length > 0
+              ? existingGw.enabled_methods
+              : gDef.enabled_methods,
         };
       }
       db.settings.payment_gateways.gateways = cleanedGateways;
@@ -4725,6 +5287,23 @@ function matchDigiflazzItemToLocalGame(brandStr: string, skuStr: string, product
     { slug: "point-blank", prefixes: ["PB", "PBCASH"], keywords: ["point blank", "pb zepetto", "pointblank"] },
     { slug: "bigo-live", prefixes: ["BIGO"], keywords: ["bigo live", "bigo"] },
     { slug: "roblox", prefixes: ["RBX", "ROBLOX"], keywords: ["roblox", "robux"] },
+    { slug: "punishing-gray-raven", prefixes: ["PGR"], keywords: ["punishing: gray raven", "punishing gray raven", "gray raven", "rainbow card"] },
+    { slug: "lords-mobile", prefixes: ["LM", "LORDS"], keywords: ["lords mobile", "lord mobile", "igg lords"] },
+    { slug: "clash-of-clans", prefixes: ["COC"], keywords: ["clash of clans", "clash of clan", "coc"] },
+    { slug: "clash-royale", prefixes: ["CR", "CROYALE"], keywords: ["clash royale"] },
+    { slug: "brawl-stars", prefixes: ["BS", "BRAWL"], keywords: ["brawl stars", "brawl star"] },
+    { slug: "steam-wallet", prefixes: ["STEAM", "SW"], keywords: ["steam wallet", "steam idr", "voucher steam"] },
+    { slug: "efootball", prefixes: ["EFB", "PES"], keywords: ["efootball", "e-football", "pes mobile"] },
+    { slug: "blood-strike", prefixes: ["BST", "BLOOD"], keywords: ["blood strike", "bloodstrike"] },
+    { slug: "arena-breakout", prefixes: ["AB", "ARENAB"], keywords: ["arena breakout"] },
+    { slug: "nikke", prefixes: ["NIKKE"], keywords: ["goddess of victory", "nikke"] },
+    { slug: "love-and-deepspace", prefixes: ["LAD", "LADS"], keywords: ["love and deepspace", "love & deepspace", "deepspace"] },
+    { slug: "solo-leveling-arise", prefixes: ["SLA", "SOLO"], keywords: ["solo leveling", "solo leveling: arise"] },
+    { slug: "tower-of-fantasy", prefixes: ["TOF"], keywords: ["tower of fantasy", "tanium"] },
+    { slug: "stumble-guys", prefixes: ["SG", "STUMBLE"], keywords: ["stumble guys", "stumble guy"] },
+    { slug: "eggy-party", prefixes: ["EGGY"], keywords: ["eggy party"] },
+    { slug: "super-sus", prefixes: ["SSUS", "SUPERSUS"], keywords: ["super sus"] },
+    { slug: "league-of-legends", prefixes: ["LOL", "LOLPC"], keywords: ["league of legends", "riot points"] },
   ];
 
   // 1. Check against local db.games first (supports custom local games created by Admin)
@@ -4798,6 +5377,28 @@ function cleanDenomLabelFromProductName(productName: string, brand: string, game
     "Bigo Live",
     "Roblox (Voucher Code)",
     "Roblox",
+    "Punishing: Gray Raven",
+    "Punishing Gray Raven",
+    "Lords Mobile",
+    "Lord Mobile",
+    "Clash of Clans",
+    "Clash Royale",
+    "Brawl Stars",
+    "Steam Wallet (IDR)",
+    "Steam Wallet",
+    "eFootball",
+    "Blood Strike",
+    "Arena Breakout",
+    "GODDESS OF VICTORY: NIKKE",
+    "NIKKE",
+    "Love and Deepspace",
+    "Solo Leveling: Arise",
+    "Tower of Fantasy",
+    "Stumble Guys",
+    "Eggy Party",
+    "Super Sus",
+    "League of Legends (PC)",
+    "League of Legends",
   ]
     .map((s) => String(s || "").trim())
     .filter(Boolean)
@@ -5332,12 +5933,27 @@ api.get("/", (_req, res) => {
 const ALL_AUTO_GATEWAYS_META = [
   { id: "paykita", name: "PayKita", tagline: "QRIS Otomatis Produk Beranda & Top Up", scope: "beranda_topup" },
   { id: "duitku", name: "Duitku", tagline: "Multi-Metode Pembayaran Produk Top Up", scope: "topup" },
+  { id: "tripay", name: "Tripay", tagline: "Multi-Metode Pembayaran Produk Top Up (QRIS, VA, E-Wallet, Retail)", scope: "topup" },
+  { id: "midtrans", name: "Midtrans", tagline: "Core API & Snap Multi-Metode Produk Top Up", scope: "topup" },
+  { id: "xendit", name: "Xendit", tagline: "QRIS, Virtual Account, E-Wallet & Retail Produk Top Up", scope: "topup" },
+  { id: "tokopay", name: "Tokopay", tagline: "QRIS Instan, E-Wallet, Virtual Account & Retail Produk Top Up", scope: "topup" },
 ];
 const ALL_AUTO_GATEWAY_IDS = ALL_AUTO_GATEWAYS_META.map((g) => g.id);
 
+const GATEWAY_DISPLAY_NAMES: Record<string, string> = {
+  paykita: "PayKita",
+  duitku: "Duitku",
+  tripay: "Tripay",
+  midtrans: "Midtrans",
+  xendit: "Xendit",
+  tokopay: "Tokopay",
+};
+
 const PAYKITA_TOPUP_CHANNEL = {
   code: "PK_QRIS",
+  native_code: "QRIS",
   gateway_id: "paykita",
+  gateway_name: "PayKita",
   name: "QRIS Otomatis (PayKita)",
   short_name: "QRIS Otomatis (PayKita)",
   category: "qris",
@@ -5350,8 +5966,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   // QRIS
   {
     code: "SP",
+    native_code: "SP",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
     name: "QRIS (ShopeePay / All E-Wallet & M-Banking)",
-    short_name: "QRIS All Payment",
+    short_name: "QRIS All Payment (Duitku)",
     category: "qris",
     category_label: "QRIS Instan",
     payment_flow: "qris",
@@ -5359,8 +5978,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "NQ",
-    name: "QRIS Nobu Bank",
-    short_name: "QRIS Nobu",
+    native_code: "NQ",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "QRIS Nobu Bank (Duitku)",
+    short_name: "QRIS Nobu (Duitku)",
     category: "qris",
     category_label: "QRIS Instan",
     payment_flow: "qris",
@@ -5368,8 +5990,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "DQ",
-    name: "QRIS DANA",
-    short_name: "QRIS DANA",
+    native_code: "DQ",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "QRIS DANA (Duitku)",
+    short_name: "QRIS DANA (Duitku)",
     category: "qris",
     category_label: "QRIS Instan",
     payment_flow: "qris",
@@ -5377,8 +6002,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "LA",
-    name: "QRIS LinkAja",
-    short_name: "QRIS LinkAja",
+    native_code: "LA",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "QRIS LinkAja (Duitku)",
+    short_name: "QRIS LinkAja (Duitku)",
     category: "qris",
     category_label: "QRIS Instan",
     payment_flow: "qris",
@@ -5386,8 +6014,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "GQ",
-    name: "QRIS GudangVoucher",
-    short_name: "QRIS GV",
+    native_code: "GQ",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "QRIS GudangVoucher (Duitku)",
+    short_name: "QRIS GV (Duitku)",
     category: "qris",
     category_label: "QRIS Instan",
     payment_flow: "qris",
@@ -5396,45 +6027,60 @@ const DUITKU_PAYMENT_CHANNELS = [
   // E-Wallet
   {
     code: "DA",
-    name: "DANA",
-    short_name: "DANA",
+    native_code: "DA",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "DANA (Duitku)",
+    short_name: "DANA (Duitku)",
     category: "ewallet",
     category_label: "E-Wallet Instan",
     payment_flow: "ewallet",
-    description: "Bayar instan langsung melalui aplikasi DANA",
+    description: "Bayar instan langsung melalui aplikasi DANA via Duitku",
   },
   {
     code: "OV",
-    name: "OVO",
-    short_name: "OVO",
+    native_code: "OV",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "OVO (Duitku)",
+    short_name: "OVO (Duitku)",
     category: "ewallet",
     category_label: "E-Wallet Instan",
     payment_flow: "ewallet",
-    description: "Bayar instan melalui notifikasi / aplikasi OVO",
+    description: "Bayar instan melalui notifikasi / aplikasi OVO via Duitku",
   },
   {
     code: "SA",
-    name: "ShopeePay Apps",
-    short_name: "ShopeePay",
+    native_code: "SA",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "ShopeePay Apps (Duitku)",
+    short_name: "ShopeePay (Duitku)",
     category: "ewallet",
     category_label: "E-Wallet Instan",
     payment_flow: "ewallet",
-    description: "Bayar instan langsung dari aplikasi ShopeePay",
+    description: "Bayar instan langsung dari aplikasi ShopeePay via Duitku",
   },
   {
     code: "LF",
-    name: "LinkAja Apps",
-    short_name: "LinkAja",
+    native_code: "LF",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "LinkAja Apps (Duitku)",
+    short_name: "LinkAja (Duitku)",
     category: "ewallet",
     category_label: "E-Wallet Instan",
     payment_flow: "ewallet",
-    description: "Bayar instan langsung dari aplikasi LinkAja",
+    description: "Bayar instan langsung dari aplikasi LinkAja via Duitku",
   },
   // Virtual Account Bank
   {
     code: "BC",
-    name: "BCA Virtual Account",
-    short_name: "BCA VA",
+    native_code: "BC",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "BCA Virtual Account (Duitku)",
+    short_name: "BCA VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5442,8 +6088,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "M2",
-    name: "Mandiri Virtual Account",
-    short_name: "Mandiri VA",
+    native_code: "M2",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "Mandiri Virtual Account (Duitku)",
+    short_name: "Mandiri VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5451,8 +6100,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "I1",
-    name: "BNI Virtual Account",
-    short_name: "BNI VA",
+    native_code: "I1",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "BNI Virtual Account (Duitku)",
+    short_name: "BNI VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5460,8 +6112,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "BR",
-    name: "BRI Virtual Account (BRIVA)",
-    short_name: "BRI VA",
+    native_code: "BR",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "BRI Virtual Account (Duitku)",
+    short_name: "BRI VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5469,8 +6124,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "BV",
-    name: "BSI Virtual Account",
-    short_name: "BSI VA",
+    native_code: "BV",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "BSI Virtual Account (Duitku)",
+    short_name: "BSI VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5478,8 +6136,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "B1",
-    name: "CIMB Niaga Virtual Account",
-    short_name: "CIMB VA",
+    native_code: "B1",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "CIMB Niaga Virtual Account (Duitku)",
+    short_name: "CIMB VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5487,8 +6148,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "BT",
-    name: "Permata Bank Virtual Account",
-    short_name: "Permata VA",
+    native_code: "BT",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "Permata Bank Virtual Account (Duitku)",
+    short_name: "Permata VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5496,8 +6160,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "VA",
-    name: "Maybank Virtual Account",
-    short_name: "Maybank VA",
+    native_code: "VA",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "Maybank Virtual Account (Duitku)",
+    short_name: "Maybank VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5505,8 +6172,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "NC",
-    name: "Bank Neo Commerce (BNC) VA",
-    short_name: "BNC VA",
+    native_code: "NC",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "Bank Neo Commerce (BNC) VA (Duitku)",
+    short_name: "BNC VA (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5514,8 +6184,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "A1",
-    name: "ATM Bersama Virtual Account",
-    short_name: "ATM Bersama",
+    native_code: "A1",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "ATM Bersama Virtual Account (Duitku)",
+    short_name: "ATM Bersama (Duitku)",
     category: "va",
     category_label: "Virtual Account Bank",
     payment_flow: "va",
@@ -5524,8 +6197,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   // Minimarket / Retail
   {
     code: "IR",
-    name: "Indomaret",
-    short_name: "Indomaret",
+    native_code: "IR",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "Indomaret (Duitku)",
+    short_name: "Indomaret (Duitku)",
     category: "retail",
     category_label: "Minimarket / Retail",
     payment_flow: "retail",
@@ -5533,8 +6209,11 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
   {
     code: "FT",
-    name: "Alfamart / Alfamidi / Pos",
-    short_name: "Alfamart Group",
+    native_code: "FT",
+    gateway_id: "duitku",
+    gateway_name: "Duitku",
+    name: "Alfamart / Alfamidi / Pos (Duitku)",
+    short_name: "Alfamart Group (Duitku)",
     category: "retail",
     category_label: "Minimarket / Retail",
     payment_flow: "retail",
@@ -5542,24 +6221,774 @@ const DUITKU_PAYMENT_CHANNELS = [
   },
 ];
 
-const getDuitkuChannelMeta = (code?: string | null) => {
-  const clean = String(code || "SP").trim().toUpperCase();
-  return (
-    DUITKU_PAYMENT_CHANNELS.find((c) => c.code === clean) ||
-    DUITKU_PAYMENT_CHANNELS[0]
-  );
+const TRIPAY_PAYMENT_CHANNELS = [
+  // QRIS
+  {
+    code: "TP_QRISC",
+    native_code: "QRISC",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "QRIS Customizable (Tripay)",
+    short_name: "QRIS Instan (Tripay)",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS instan via GoPay, DANA, OVO, ShopeePay & semua M-Banking (Tripay)",
+  },
+  {
+    code: "TP_QRIS2",
+    native_code: "QRIS2",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "QRIS Dinamis (Tripay)",
+    short_name: "QRIS Dinamis (Tripay)",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS Nasional dari seluruh E-Wallet & Mobile Banking (Tripay)",
+  },
+  // E-Wallet
+  {
+    code: "TP_DANA",
+    native_code: "DANA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "DANA (Tripay)",
+    short_name: "DANA (Tripay)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via aplikasi DANA (Tripay)",
+  },
+  {
+    code: "TP_OVO",
+    native_code: "OVO",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "OVO (Tripay)",
+    short_name: "OVO (Tripay)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via push notifikasi aplikasi OVO (Tripay)",
+  },
+  {
+    code: "TP_SHOPEEPAY",
+    native_code: "SHOPEEPAY",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "ShopeePay (Tripay)",
+    short_name: "ShopeePay (Tripay)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan langsung via aplikasi ShopeePay (Tripay)",
+  },
+  // Virtual Account
+  {
+    code: "TP_BCAVA",
+    native_code: "BCAVA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "BCA Virtual Account (Tripay)",
+    short_name: "BCA VA (Tripay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BCA otomatis 24 Jam via Tripay",
+  },
+  {
+    code: "TP_MANDIRIVA",
+    native_code: "MANDIRIVA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "Mandiri Virtual Account (Tripay)",
+    short_name: "Mandiri VA (Tripay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Mandiri otomatis via Livin' / ATM (Tripay)",
+  },
+  {
+    code: "TP_BNIVA",
+    native_code: "BNIVA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "BNI Virtual Account (Tripay)",
+    short_name: "BNI VA (Tripay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BNI otomatis 24 Jam via Tripay",
+  },
+  {
+    code: "TP_BRIVA",
+    native_code: "BRIVA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "BRI Virtual Account (Tripay)",
+    short_name: "BRI VA (Tripay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BRI (BRIVA) otomatis via BRImo / ATM (Tripay)",
+  },
+  {
+    code: "TP_BSIVA",
+    native_code: "BSIVA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "BSI Virtual Account (Tripay)",
+    short_name: "BSI VA (Tripay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Bank Syariah Indonesia otomatis (Tripay)",
+  },
+  {
+    code: "TP_CIMBVA",
+    native_code: "CIMBVA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "CIMB Niaga Virtual Account (Tripay)",
+    short_name: "CIMB VA (Tripay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account CIMB Niaga otomatis via OCTO (Tripay)",
+  },
+  {
+    code: "TP_PERMATAVA",
+    native_code: "PERMATAVA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "Permata Virtual Account (Tripay)",
+    short_name: "Permata VA (Tripay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Permata Bank otomatis 24 Jam (Tripay)",
+  },
+  {
+    code: "TP_MYBVA",
+    native_code: "MYBVA",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "Maybank Virtual Account (Tripay)",
+    short_name: "Maybank VA (Tripay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Maybank otomatis 24 Jam (Tripay)",
+  },
+  // Retail
+  {
+    code: "TP_ALFAMART",
+    native_code: "ALFAMART",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "Alfamart / Alfamidi (Tripay)",
+    short_name: "Alfamart (Tripay)",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Alfamart / Alfamidi terdekat via Tripay",
+  },
+  {
+    code: "TP_INDOMARET",
+    native_code: "INDOMARET",
+    gateway_id: "tripay",
+    gateway_name: "Tripay",
+    name: "Indomaret (Tripay)",
+    short_name: "Indomaret (Tripay)",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Indomaret terdekat via Tripay",
+  },
+];
+
+const MIDTRANS_PAYMENT_CHANNELS = [
+  // QRIS
+  {
+    code: "MT_QRIS",
+    native_code: "qris",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "QRIS GoPay / All Payment (Midtrans)",
+    short_name: "QRIS (Midtrans)",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS resmi Midtrans dari GoPay, DANA, OVO, ShopeePay & semua M-Banking",
+  },
+  // E-Wallet
+  {
+    code: "MT_GOPAY",
+    native_code: "gopay",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "GoPay / GoPay Later (Midtrans)",
+    short_name: "GoPay (Midtrans)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via aplikasi Gojek / GoPay (Midtrans)",
+  },
+  {
+    code: "MT_SHOPEEPAY",
+    native_code: "shopeepay",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "ShopeePay (Midtrans)",
+    short_name: "ShopeePay (Midtrans)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via aplikasi ShopeePay (Midtrans)",
+  },
+  // Virtual Account
+  {
+    code: "MT_BCA",
+    native_code: "bca",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "BCA Virtual Account (Midtrans)",
+    short_name: "BCA VA (Midtrans)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BCA otomatis via Midtrans Core API",
+  },
+  {
+    code: "MT_MANDIRI",
+    native_code: "echannel",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "Mandiri Bill / VA (Midtrans)",
+    short_name: "Mandiri VA (Midtrans)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Pembayaran Mandiri Bill Payment otomatis via Livin' / ATM (Midtrans)",
+  },
+  {
+    code: "MT_BNI",
+    native_code: "bni",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "BNI Virtual Account (Midtrans)",
+    short_name: "BNI VA (Midtrans)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BNI otomatis 24 Jam via Midtrans",
+  },
+  {
+    code: "MT_BRI",
+    native_code: "bri",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "BRI Virtual Account (Midtrans)",
+    short_name: "BRI VA (Midtrans)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BRI (BRIVA) otomatis via Midtrans",
+  },
+  {
+    code: "MT_PERMATA",
+    native_code: "permata",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "Permata Virtual Account (Midtrans)",
+    short_name: "Permata VA (Midtrans)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Permata Bank otomatis via Midtrans",
+  },
+  {
+    code: "MT_CIMB",
+    native_code: "cimb",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "CIMB Niaga Virtual Account (Midtrans)",
+    short_name: "CIMB VA (Midtrans)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account CIMB Niaga otomatis via Midtrans",
+  },
+  // Retail
+  {
+    code: "MT_INDOMARET",
+    native_code: "indomaret",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "Indomaret (Midtrans)",
+    short_name: "Indomaret (Midtrans)",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Indomaret terdekat via Midtrans",
+  },
+  {
+    code: "MT_ALFAMART",
+    native_code: "alfamart",
+    gateway_id: "midtrans",
+    gateway_name: "Midtrans",
+    name: "Alfamart Group (Midtrans)",
+    short_name: "Alfamart (Midtrans)",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Alfamart / Alfamidi terdekat via Midtrans",
+  },
+];
+
+const XENDIT_PAYMENT_CHANNELS = [
+  // QRIS
+  {
+    code: "XD_QRIS",
+    native_code: "QRIS",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "QRIS Dinamis (Xendit)",
+    short_name: "QRIS (Xendit)",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS Dinamis Xendit dari seluruh E-Wallet & Mobile Banking",
+  },
+  // E-Wallet
+  {
+    code: "XD_DANA",
+    native_code: "ID_DANA",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "DANA (Xendit)",
+    short_name: "DANA (Xendit)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan langsung via aplikasi DANA (Xendit)",
+  },
+  {
+    code: "XD_OVO",
+    native_code: "ID_OVO",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "OVO (Xendit)",
+    short_name: "OVO (Xendit)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via notifikasi aplikasi OVO (Xendit)",
+  },
+  {
+    code: "XD_SHOPEEPAY",
+    native_code: "ID_SHOPEEPAY",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "ShopeePay (Xendit)",
+    short_name: "ShopeePay (Xendit)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via aplikasi ShopeePay (Xendit)",
+  },
+  {
+    code: "XD_LINKAJA",
+    native_code: "ID_LINKAJA",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "LinkAja (Xendit)",
+    short_name: "LinkAja (Xendit)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via aplikasi LinkAja (Xendit)",
+  },
+  // Virtual Account
+  {
+    code: "XD_BCA",
+    native_code: "BCA",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "BCA Virtual Account (Xendit)",
+    short_name: "BCA VA (Xendit)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BCA otomatis 24 Jam via Xendit",
+  },
+  {
+    code: "XD_MANDIRI",
+    native_code: "MANDIRI",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "Mandiri Virtual Account (Xendit)",
+    short_name: "Mandiri VA (Xendit)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Mandiri otomatis via Livin' / ATM (Xendit)",
+  },
+  {
+    code: "XD_BNI",
+    native_code: "BNI",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "BNI Virtual Account (Xendit)",
+    short_name: "BNI VA (Xendit)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BNI otomatis 24 Jam via Xendit",
+  },
+  {
+    code: "XD_BRI",
+    native_code: "BRI",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "BRI Virtual Account (Xendit)",
+    short_name: "BRI VA (Xendit)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BRI (BRIVA) otomatis via Xendit",
+  },
+  {
+    code: "XD_BSI",
+    native_code: "BSI",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "BSI Virtual Account (Xendit)",
+    short_name: "BSI VA (Xendit)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Bank Syariah Indonesia otomatis via Xendit",
+  },
+  {
+    code: "XD_PERMATA",
+    native_code: "PERMATA",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "Permata Virtual Account (Xendit)",
+    short_name: "Permata VA (Xendit)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Permata Bank otomatis via Xendit",
+  },
+  // Retail
+  {
+    code: "XD_ALFAMART",
+    native_code: "ALFAMART",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "Alfamart (Xendit)",
+    short_name: "Alfamart (Xendit)",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Alfamart terdekat via Xendit",
+  },
+  {
+    code: "XD_INDOMARET",
+    native_code: "INDOMARET",
+    gateway_id: "xendit",
+    gateway_name: "Xendit",
+    name: "Indomaret (Xendit)",
+    short_name: "Indomaret (Xendit)",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Indomaret terdekat via Xendit",
+  },
+];
+
+const TOKOPAY_PAYMENT_CHANNELS = [
+  // QRIS
+  {
+    code: "TK_QRIS",
+    native_code: "QRISREALTIME",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "QRIS Realtime (Tokopay)",
+    short_name: "QRIS Instan (Tokopay)",
+    category: "qris",
+    category_label: "QRIS Instan",
+    payment_flow: "qris",
+    description: "Scan QRIS Realtime Tokopay via GoPay, DANA, OVO, ShopeePay & M-Banking",
+  },
+  // E-Wallet
+  {
+    code: "TK_DANA",
+    native_code: "DANA",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "DANA (Tokopay)",
+    short_name: "DANA (Tokopay)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via aplikasi DANA (Tokopay)",
+  },
+  {
+    code: "TK_OVO",
+    native_code: "OVO",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "OVO (Tokopay)",
+    short_name: "OVO (Tokopay)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via notifikasi aplikasi OVO (Tokopay)",
+  },
+  {
+    code: "TK_SHOPEEPAY",
+    native_code: "SHOPEEPAY",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "ShopeePay (Tokopay)",
+    short_name: "ShopeePay (Tokopay)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via aplikasi ShopeePay (Tokopay)",
+  },
+  {
+    code: "TK_LINKAJA",
+    native_code: "LINKAJA",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "LinkAja (Tokopay)",
+    short_name: "LinkAja (Tokopay)",
+    category: "ewallet",
+    category_label: "E-Wallet Instan",
+    payment_flow: "ewallet",
+    description: "Pembayaran instan via aplikasi LinkAja (Tokopay)",
+  },
+  // Virtual Account
+  {
+    code: "TK_BCAVA",
+    native_code: "BCAVA",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "BCA Virtual Account (Tokopay)",
+    short_name: "BCA VA (Tokopay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BCA otomatis 24 Jam via Tokopay",
+  },
+  {
+    code: "TK_BRIVA",
+    native_code: "BRIVA",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "BRI Virtual Account (Tokopay)",
+    short_name: "BRI VA (Tokopay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BRI (BRIVA) otomatis via Tokopay",
+  },
+  {
+    code: "TK_BNIVA",
+    native_code: "BNIVA",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "BNI Virtual Account (Tokopay)",
+    short_name: "BNI VA (Tokopay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account BNI otomatis 24 Jam via Tokopay",
+  },
+  {
+    code: "TK_MANDIRIVA",
+    native_code: "MANDIRIVA",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "Mandiri Virtual Account (Tokopay)",
+    short_name: "Mandiri VA (Tokopay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Mandiri otomatis via Livin' / ATM (Tokopay)",
+  },
+  {
+    code: "TK_PERMATAVA",
+    native_code: "PERMATAVA",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "Permata Virtual Account (Tokopay)",
+    short_name: "Permata VA (Tokopay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Permata Bank otomatis via Tokopay",
+  },
+  {
+    code: "TK_BSIVA",
+    native_code: "BSIVA",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "BSI Virtual Account (Tokopay)",
+    short_name: "BSI VA (Tokopay)",
+    category: "va",
+    category_label: "Virtual Account Bank",
+    payment_flow: "va",
+    description: "Transfer Virtual Account Bank Syariah Indonesia otomatis via Tokopay",
+  },
+  // Retail
+  {
+    code: "TK_ALFAMART",
+    native_code: "ALFAMART",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "Alfamart (Tokopay)",
+    short_name: "Alfamart (Tokopay)",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Alfamart terdekat via Tokopay",
+  },
+  {
+    code: "TK_INDOMARET",
+    native_code: "INDOMARET",
+    gateway_id: "tokopay",
+    gateway_name: "Tokopay",
+    name: "Indomaret (Tokopay)",
+    short_name: "Indomaret (Tokopay)",
+    category: "retail",
+    category_label: "Minimarket / Retail",
+    payment_flow: "retail",
+    description: "Bayar tunai di gerai Indomaret terdekat via Tokopay",
+  },
+];
+
+const GATEWAY_CHANNELS_CATALOG_MAP: Record<string, any[]> = {
+  paykita: [PAYKITA_TOPUP_CHANNEL],
+  duitku: DUITKU_PAYMENT_CHANNELS,
+  tripay: TRIPAY_PAYMENT_CHANNELS,
+  midtrans: MIDTRANS_PAYMENT_CHANNELS,
+  xendit: XENDIT_PAYMENT_CHANNELS,
+  tokopay: TOKOPAY_PAYMENT_CHANNELS,
 };
 
-const getEnabledDuitkuChannels = (duitkuCfg?: any) => {
-  const rawList = Array.isArray(duitkuCfg?.enabled_methods)
-    ? duitkuCfg.enabled_methods.map((c: any) => String(c || "").trim().toUpperCase())
+const ALL_TOPUP_CHANNELS_LIST = [
+  PAYKITA_TOPUP_CHANNEL,
+  ...DUITKU_PAYMENT_CHANNELS,
+  ...TRIPAY_PAYMENT_CHANNELS,
+  ...MIDTRANS_PAYMENT_CHANNELS,
+  ...XENDIT_PAYMENT_CHANNELS,
+  ...TOKOPAY_PAYMENT_CHANNELS,
+];
+
+const getGatewayChannelsCatalog = (gatewayId?: string | null) => {
+  const gId = String(gatewayId || "duitku").toLowerCase().trim();
+  return GATEWAY_CHANNELS_CATALOG_MAP[gId] || DUITKU_PAYMENT_CHANNELS;
+};
+
+const getEnabledGatewayChannels = (gatewayId: string, gwCfg?: any) => {
+  const catalog = getGatewayChannelsCatalog(gatewayId);
+  const rawList = Array.isArray(gwCfg?.enabled_methods)
+    ? gwCfg.enabled_methods.map((c: any) => String(c || "").trim().toUpperCase())
     : [];
   const enabledSet = new Set(rawList.filter(Boolean));
   const filtered =
     enabledSet.size > 0
-      ? DUITKU_PAYMENT_CHANNELS.filter((ch) => enabledSet.has(ch.code))
-      : DUITKU_PAYMENT_CHANNELS;
-  return filtered.length > 0 ? filtered : [DUITKU_PAYMENT_CHANNELS[0]];
+      ? catalog.filter((ch) => enabledSet.has(String(ch.code).toUpperCase()) || enabledSet.has(String(ch.native_code || "").toUpperCase()))
+      : catalog;
+  return (filtered.length > 0 ? filtered : [catalog[0]]).map((ch) => ({
+    ...ch,
+    gateway_id: gatewayId,
+    gateway_name: GATEWAY_DISPLAY_NAMES[gatewayId] || gatewayId.toUpperCase(),
+  }));
+};
+
+const getDuitkuChannelMeta = (code?: string | null) => {
+  const clean = String(code || "SP").trim().toUpperCase();
+  return (
+    ALL_TOPUP_CHANNELS_LIST.find(
+      (c) =>
+        String(c.code).toUpperCase() === clean ||
+        String(c.native_code || "").toUpperCase() === clean
+    ) || DUITKU_PAYMENT_CHANNELS[0]
+  );
+};
+
+const getEnabledDuitkuChannels = (duitkuCfg?: any) =>
+  getEnabledGatewayChannels("duitku", duitkuCfg);
+
+const resolveTopupChannelAndGateway = (rawChannelInput?: string | null, rawGatewayInput?: string | null) => {
+  const cleanCh = String(rawChannelInput || "").trim().toUpperCase();
+  const cleanGw = String(rawGatewayInput || "").trim().toLowerCase();
+
+  if (cleanCh === "PK_QRIS" || cleanCh === "PAYKITA" || cleanCh === "QRIS_PAYKITA") {
+    return {
+      gatewayId: "paykita",
+      gatewayName: "PayKita",
+      channelMeta: PAYKITA_TOPUP_CHANNEL,
+      chMeta: PAYKITA_TOPUP_CHANNEL,
+    };
+  }
+  if (cleanCh.startsWith("TP_")) {
+    const ch = TRIPAY_PAYMENT_CHANNELS.find((c) => c.code === cleanCh) || TRIPAY_PAYMENT_CHANNELS[0];
+    return { gatewayId: "tripay", gatewayName: "Tripay", channelMeta: ch, chMeta: ch };
+  }
+  if (cleanCh.startsWith("MT_")) {
+    const ch = MIDTRANS_PAYMENT_CHANNELS.find((c) => c.code === cleanCh) || MIDTRANS_PAYMENT_CHANNELS[0];
+    return { gatewayId: "midtrans", gatewayName: "Midtrans", channelMeta: ch, chMeta: ch };
+  }
+  if (cleanCh.startsWith("XD_")) {
+    const ch = XENDIT_PAYMENT_CHANNELS.find((c) => c.code === cleanCh) || XENDIT_PAYMENT_CHANNELS[0];
+    return { gatewayId: "xendit", gatewayName: "Xendit", channelMeta: ch, chMeta: ch };
+  }
+  if (cleanCh.startsWith("TK_")) {
+    const ch = TOKOPAY_PAYMENT_CHANNELS.find((c) => c.code === cleanCh) || TOKOPAY_PAYMENT_CHANNELS[0];
+    return { gatewayId: "tokopay", gatewayName: "Tokopay", channelMeta: ch, chMeta: ch };
+  }
+
+  // Match exact channel code in DUITKU or other catalogs
+  const exactInDuitku = DUITKU_PAYMENT_CHANNELS.find((c) => c.code === cleanCh);
+  if (exactInDuitku) {
+    return {
+      gatewayId: "duitku",
+      gatewayName: "Duitku",
+      channelMeta: exactInDuitku,
+      chMeta: exactInDuitku,
+    };
+  }
+
+  if (cleanGw && GATEWAY_CHANNELS_CATALOG_MAP[cleanGw]) {
+    const catalog = GATEWAY_CHANNELS_CATALOG_MAP[cleanGw];
+    const matched =
+      catalog.find(
+        (c) =>
+          String(c.code).toUpperCase() === cleanCh ||
+          String(c.native_code || "").toUpperCase() === cleanCh
+      ) || catalog[0];
+    return {
+      gatewayId: cleanGw,
+      gatewayName: GATEWAY_DISPLAY_NAMES[cleanGw] || cleanGw.toUpperCase(),
+      channelMeta: matched,
+      chMeta: matched,
+    };
+  }
+
+  return {
+    gatewayId: "duitku",
+    gatewayName: "Duitku",
+    channelMeta: DUITKU_PAYMENT_CHANNELS[0],
+    chMeta: DUITKU_PAYMENT_CHANNELS[0],
+  };
 };
 
 function normalizeProductPaymentConfig(raw: any) {
@@ -6883,71 +8312,69 @@ api.get("/payments/methods", (req, res) => {
 
   if (isTopupContext) {
     const s = db.settings.paykita || {};
-    const paykitaState = gwMap.paykita || {};
-    const duitkuState = gwMap.duitku || {};
-    const isPaykitaEnabled =
-      paykitaState.enabled !== false &&
-      s.enabled !== false &&
-      !disabledGwSet.has("paykita") &&
-      pCfg.paykita !== false;
-    const isDuitkuEnabled =
-      duitkuState.enabled !== false && !disabledGwSet.has("duitku");
-
-    const duitkuChannels = getEnabledDuitkuChannels(duitkuState).map((ch) => ({
-      ...ch,
-      gateway_id: "duitku",
-    }));
-
+    const topupGatewayIds = ["paykita", "duitku", "tripay", "midtrans", "xendit", "tokopay"];
     const combinedChannels: any[] = [];
-    if (isPaykitaEnabled) {
-      combinedChannels.push(PAYKITA_TOPUP_CHANNEL);
-    }
-    if (isDuitkuEnabled) {
-      combinedChannels.push(...duitkuChannels);
-    }
-    if (combinedChannels.length === 0) {
-      combinedChannels.push(PAYKITA_TOPUP_CHANNEL, ...duitkuChannels);
-    }
-
-    const defaultChannel = isPaykitaEnabled
-      ? PAYKITA_TOPUP_CHANNEL.code
-      : combinedChannels.find(
-          (c) => c.code === String(duitkuState.payment_method || "SP").toUpperCase()
-        )?.code ||
-        combinedChannels[0]?.code ||
-        "PK_QRIS";
-
     const gatewaysList: any[] = [];
-    if (isPaykitaEnabled) {
+
+    for (const gwId of topupGatewayIds) {
+      const gwState = gwMap[gwId] || {};
+      const isGwEnabled =
+        gwId === "paykita"
+          ? gwState.enabled !== false &&
+            s.enabled !== false &&
+            !disabledGwSet.has("paykita") &&
+            pCfg.paykita !== false
+          : gwState.enabled !== false && !disabledGwSet.has(gwId);
+
+      if (!isGwEnabled) continue;
+
+      const gwChannels = getEnabledGatewayChannels(gwId, gwState);
+      combinedChannels.push(...gwChannels);
+
+      const meta =
+        ALL_AUTO_GATEWAYS_META.find((m) => m.id === gwId) || {
+          id: gwId,
+          name: GATEWAY_DISPLAY_NAMES[gwId] || gwId.toUpperCase(),
+          tagline: "Multi-Metode Pembayaran Produk Top Up",
+          scope: "topup",
+        };
+
       gatewaysList.push({
-        id: "paykita",
-        name: "PayKita",
-        tagline: "QRIS Otomatis Produk Beranda & Top Up",
-        scope: "beranda_topup",
-        channel: PAYKITA_TOPUP_CHANNEL.code,
-        channels: [PAYKITA_TOPUP_CHANNEL],
+        id: gwId,
+        name: meta.name,
+        tagline: meta.tagline,
+        scope: meta.scope,
+        channel: gwChannels[0]?.code || gwState.payment_method || "QRIS",
+        channels: gwChannels,
         is_global_active: true,
       });
     }
-    if (isDuitkuEnabled) {
-      gatewaysList.push({
-        id: "duitku",
-        name: "Duitku",
-        tagline: "Multi-Metode Pembayaran Produk Top Up",
-        scope: "topup",
-        channel: defaultChannel,
-        channels: duitkuChannels,
-        is_global_active: true,
-      });
+
+    if (combinedChannels.length === 0) {
+      const fallbackChannels = [
+        PAYKITA_TOPUP_CHANNEL,
+        ...getEnabledGatewayChannels("duitku", gwMap.duitku || {}),
+      ];
+      combinedChannels.push(...fallbackChannels);
     }
+
+    const activeGwNames = gatewaysList.map((g) => g.name);
+    const firstActiveGwId = gatewaysList[0]?.id || "paykita";
+    const defaultChannel =
+      combinedChannels.find((c) => c.code === "PK_QRIS")?.code ||
+      combinedChannels[0]?.code ||
+      "PK_QRIS";
 
     return res.json([
       {
-        id: isPaykitaEnabled ? "paykita" : "duitku",
-        gateway_id: isPaykitaEnabled ? "paykita" : "duitku",
-        label: "Pembayaran Otomatis (PayKita QRIS & Duitku Multi-Metode)",
-        default_gateway: isPaykitaEnabled ? "paykita" : "duitku",
-        preferred_gateway: isPaykitaEnabled ? "paykita" : "duitku",
+        id: firstActiveGwId,
+        gateway_id: firstActiveGwId,
+        label:
+          activeGwNames.length > 0
+            ? `Pembayaran Otomatis (${activeGwNames.join(", ")})`
+            : "Pembayaran Otomatis Multi-Gateway",
+        default_gateway: firstActiveGwId,
+        preferred_gateway: firstActiveGwId,
         default_channel: defaultChannel,
         duitku_channels: combinedChannels,
         gateways: gatewaysList,
@@ -7029,6 +8456,7 @@ const isDemoGatewayKey = (gatewayId: string, key: string): boolean => {
   if (gatewayId === "tripay") return k === "DEV-wjpTripayKey882910";
   if (gatewayId === "midtrans") return k === "Mid-server-wjp88291044";
   if (gatewayId === "xendit") return k === "xnd_production_wjp88291044";
+  if (gatewayId === "tokopay") return k === "tk_live_wjp_88291044ff";
   return false;
 };
 
@@ -7085,20 +8513,38 @@ type RemotePaykitaOrderResult = {
 
 const buildSimulatedDuitkuVaOrCode = (channelCode: string, orderId: string, flow: string): string | null => {
   const digits = orderId.replace(/\D/g, "").slice(-8).padStart(8, "8");
+  const cleanCode = String(channelCode || "")
+    .toUpperCase()
+    .replace(/^(TP_|MT_|XD_|TK_)/, "");
   if (flow === "va") {
     const prefixMap: Record<string, string> = {
       BC: "70014",
+      BCAVA: "70014",
+      BCA: "70014",
       M2: "89022",
+      MANDIRIVA: "89022",
+      MANDIRI: "89022",
       I1: "88081",
+      BNIVA: "88081",
+      BNI: "88081",
       BR: "12889",
+      BRIVA: "12889",
+      BRI: "12889",
       BV: "90087",
+      BSIVA: "90087",
+      BSI: "90087",
       B1: "53790",
+      CIMBVA: "53790",
+      CIMB: "53790",
       BT: "85280",
+      PERMATAVA: "85280",
+      PERMATA: "85280",
       VA: "78210",
+      MAYBANKVA: "78210",
       NC: "88910",
       A1: "98700",
     };
-    return `${prefixMap[channelCode] || "88010"}${digits}`;
+    return `${prefixMap[cleanCode] || prefixMap[channelCode] || "88010"}${digits}`;
   }
   if (flow === "retail") {
     return `WJP${digits}`;
@@ -7251,12 +8697,14 @@ const tryCreateRemotePaykitaOrder = async (params: {
     }
   }
 
-  // 2. TRIPAY GATEWAY
+  // 2. TRIPAY GATEWAY (Supports QRIS, E-Wallet, Virtual Account, & Retail)
   if (gatewayId === "tripay") {
     const merchantCode = String(gCfg.merchant_code || "").trim();
     const apiKey = String(gCfg.api_key || "").trim();
-    const privateKey = String(gCfg.private_key || "").trim();
-    const paymentMethod = String(gCfg.payment_method || "QRISC").trim().toUpperCase();
+    const privateKey = String(gCfg.private_key || gCfg.webhook_secret || "").trim();
+    const requestedCh = String(params.duitkuMethod || gCfg.payment_method || "TP_QRIS").trim().toUpperCase();
+    const { chMeta } = resolveTopupChannelAndGateway(requestedCh, "tripay");
+    const tripayApiCode = chMeta.code.replace(/^TP_/, "") || "QRIS";
     const isSandbox = String(gCfg.mode || "").toLowerCase() === "sandbox";
     const baseUrl = String(
       gCfg.base_url || (isSandbox ? "https://tripay.co.id/api-sandbox" : "https://tripay.co.id/api")
@@ -7265,11 +8713,16 @@ const tryCreateRemotePaykitaOrder = async (params: {
     if (isDemoGatewayKey("tripay", apiKey) || !merchantCode || !privateKey) {
       const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
       const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
       return {
         ok: false,
         mode: "demo",
         gateway_id: "tripay",
         gateway_name: "Tripay",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
         paykita_ref: params.orderId,
         qris_string: fallbackQris,
         qris_image: fallbackImg,
@@ -7278,7 +8731,7 @@ const tryCreateRemotePaykitaOrder = async (params: {
         pay_amount: cleanAmount,
         unique_code: 0,
         fee_amount: 0,
-        qris_provider: `Tripay (${paymentMethod})`,
+        qris_provider: `${chMeta.short_name} (${tripayApiCode})`,
         expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         error_code: "demo_api_key",
         error_message:
@@ -7294,7 +8747,7 @@ const tryCreateRemotePaykitaOrder = async (params: {
       const resp = await axios.post(
         `${baseUrl}/transaction/create`,
         {
-          method: paymentMethod,
+          method: tripayApiCode,
           merchant_ref: params.orderId,
           amount: cleanAmount,
           customer_name: (params.buyerEmail || "Customer").split("@")[0],
@@ -7314,6 +8767,7 @@ const tryCreateRemotePaykitaOrder = async (params: {
       const d = resp.data?.data || {};
       if (resp.data?.success && d) {
         const rawQris = String(d.qr_string || "").trim();
+        const rawVa = d.pay_code ? String(d.pay_code).trim() : null;
         const payAmount = Math.max(1, Math.round(Number(d.amount || cleanAmount)));
         const finalQris = rawQris || buildFallbackEmvQrisPayload(params.orderId, payAmount);
         const qrImg = rawQris ? await generateQrisDataUri(rawQris) : d.qr_url || (await generateQrisDataUri(finalQris));
@@ -7322,6 +8776,10 @@ const tryCreateRemotePaykitaOrder = async (params: {
           mode: "live",
           gateway_id: "tripay",
           gateway_name: "Tripay",
+          duitku_channel: chMeta.code,
+          duitku_channel_name: chMeta.name,
+          duitku_payment_flow: chMeta.payment_flow,
+          va_number: rawVa,
           paykita_ref: String(d.reference || params.orderId).trim(),
           qris_string: finalQris,
           qris_image: qrImg,
@@ -7330,7 +8788,7 @@ const tryCreateRemotePaykitaOrder = async (params: {
           pay_amount: payAmount,
           unique_code: 0,
           fee_amount: Math.max(0, Number(d.total_fee || 0)),
-          qris_provider: `Tripay (${paymentMethod})`,
+          qris_provider: `${chMeta.short_name} (${tripayApiCode})`,
           expired_at: d.expired_time
             ? new Date(Number(d.expired_time) * 1000).toISOString()
             : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
@@ -7343,11 +8801,16 @@ const tryCreateRemotePaykitaOrder = async (params: {
       const msg = err?.response?.data?.message || err?.message || "Gagal menghubungi API Tripay";
       const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
       const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
       return {
         ok: false,
         mode: "error",
         gateway_id: "tripay",
         gateway_name: "Tripay",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
         paykita_ref: params.orderId,
         qris_string: fallbackQris,
         qris_image: fallbackImg,
@@ -7356,7 +8819,7 @@ const tryCreateRemotePaykitaOrder = async (params: {
         pay_amount: cleanAmount,
         unique_code: 0,
         fee_amount: 0,
-        qris_provider: `Tripay (${paymentMethod})`,
+        qris_provider: `${chMeta.short_name} (${tripayApiCode})`,
         expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         error_code: "tripay_error",
         error_message: `Tripay API: ${msg}`,
@@ -7364,9 +8827,11 @@ const tryCreateRemotePaykitaOrder = async (params: {
     }
   }
 
-  // 3. MIDTRANS GATEWAY (Core API QRIS)
+  // 3. MIDTRANS GATEWAY (Core API — Supports QRIS, GoPay/ShopeePay, Virtual Account, & Retail)
   if (gatewayId === "midtrans") {
     const serverKey = String(gCfg.api_key || "").trim();
+    const requestedCh = String(params.duitkuMethod || gCfg.payment_method || "MT_QRIS").trim().toUpperCase();
+    const { chMeta } = resolveTopupChannelAndGateway(requestedCh, "midtrans");
     const isSandbox = String(gCfg.mode || "").toLowerCase() === "sandbox" || serverKey.startsWith("SB-");
     const baseUrl = String(
       gCfg.base_url || (isSandbox ? "https://api.sandbox.midtrans.com" : "https://api.midtrans.com")
@@ -7375,11 +8840,16 @@ const tryCreateRemotePaykitaOrder = async (params: {
     if (isDemoGatewayKey("midtrans", serverKey)) {
       const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
       const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
       return {
         ok: false,
         mode: "demo",
         gateway_id: "midtrans",
         gateway_name: "Midtrans",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
         paykita_ref: params.orderId,
         qris_string: fallbackQris,
         qris_image: fallbackImg,
@@ -7388,7 +8858,7 @@ const tryCreateRemotePaykitaOrder = async (params: {
         pay_amount: cleanAmount,
         unique_code: 0,
         fee_amount: 0,
-        qris_provider: "Midtrans QRIS",
+        qris_provider: `${chMeta.short_name} (Midtrans)`,
         expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         error_code: "demo_api_key",
         error_message:
@@ -7398,36 +8868,66 @@ const tryCreateRemotePaykitaOrder = async (params: {
 
     try {
       const authHeader = `Basic ${Buffer.from(`${serverKey}:`).toString("base64")}`;
-      const resp = await axios.post(
-        `${baseUrl}/v2/charge`,
-        {
-          payment_type: "qris",
-          transaction_details: {
-            order_id: params.orderId,
-            gross_amount: cleanAmount,
-          },
-          item_details: [
-            {
-              id: "wjp-item",
-              price: cleanAmount,
-              quantity: 1,
-              name: String(params.productTitle || "Produk WillJustPlay").slice(0, 48),
-            },
-          ],
-          customer_details: {
-            email: params.buyerEmail || "buyer@willjustplay.com",
-            phone: params.buyerWhatsapp || "081234567890",
-          },
+      const chargePayload: Record<string, any> = {
+        payment_type: "qris",
+        transaction_details: {
+          order_id: params.orderId,
+          gross_amount: cleanAmount,
         },
-        {
-          headers: { Authorization: authHeader, "Content-Type": "application/json", Accept: "application/json" },
-          timeout: 8000,
+        item_details: [
+          {
+            id: "wjp-item",
+            price: cleanAmount,
+            quantity: 1,
+            name: String(params.productTitle || "Produk WillJustPlay").slice(0, 48),
+          },
+        ],
+        customer_details: {
+          email: params.buyerEmail || "buyer@willjustplay.com",
+          phone: params.buyerWhatsapp || "081234567890",
+        },
+      };
+      if (chMeta.payment_flow === "va") {
+        const bankCode = chMeta.code.replace(/^MT_/, "").toLowerCase();
+        if (bankCode === "mandiri") {
+          chargePayload.payment_type = "echannel";
+          chargePayload.echannel = { bill_info1: "Payment:", bill_info2: "WillJustPlay" };
+        } else if (bankCode === "permata") {
+          chargePayload.payment_type = "permata";
+        } else {
+          chargePayload.payment_type = "bank_transfer";
+          chargePayload.bank_transfer = { bank: bankCode };
         }
-      );
+      } else if (chMeta.payment_flow === "retail") {
+        chargePayload.payment_type = "cstore";
+        chargePayload.cstore = {
+          store: chMeta.code === "MT_ALFAMART" ? "alfamart" : "indomaret",
+          message: "Pembayaran WillJustPlay",
+        };
+      } else if (chMeta.code === "MT_GOPAY") {
+        chargePayload.payment_type = "gopay";
+      } else if (chMeta.code === "MT_SHOPEEPAY") {
+        chargePayload.payment_type = "shopeepay";
+        chargePayload.shopeepay = {
+          callback_url: `${params.origin}/payment/success?session_id=${params.orderId}`,
+        };
+      }
+
+      const resp = await axios.post(`${baseUrl}/v2/charge`, chargePayload, {
+        headers: { Authorization: authHeader, "Content-Type": "application/json", Accept: "application/json" },
+        timeout: 8000,
+      });
       const d = resp.data || {};
-      if (d.status_code === "201" || d.qr_string || Array.isArray(d.actions)) {
+      if (d.status_code === "201" || d.qr_string || Array.isArray(d.actions) || d.va_numbers || d.permata_va_number || d.bill_key || d.payment_code) {
         const rawQris = String(d.qr_string || "").trim();
         const qrAction = (d.actions || []).find((a: any) => a.name === "generate-qr-code");
+        const deeplinkAction = (d.actions || []).find((a: any) => a.name === "deeplink-redirect");
+        const rawVa =
+          d.va_numbers?.[0]?.va_number ||
+          d.permata_va_number ||
+          (d.biller_code && d.bill_key ? `${d.biller_code} - ${d.bill_key}` : null) ||
+          d.payment_code ||
+          null;
         const finalQris = rawQris || buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
         const qrImg = rawQris
           ? await generateQrisDataUri(rawQris)
@@ -7437,30 +8937,39 @@ const tryCreateRemotePaykitaOrder = async (params: {
           mode: "live",
           gateway_id: "midtrans",
           gateway_name: "Midtrans",
+          duitku_channel: chMeta.code,
+          duitku_channel_name: chMeta.name,
+          duitku_payment_flow: chMeta.payment_flow,
+          va_number: rawVa ? String(rawVa) : null,
           paykita_ref: String(d.transaction_id || params.orderId).trim(),
           qris_string: finalQris,
           qris_image: qrImg,
-          pay_url: null,
+          pay_url: deeplinkAction?.url ? String(deeplinkAction.url) : null,
           base_amount: cleanAmount,
           pay_amount: cleanAmount,
           unique_code: 0,
           fee_amount: 0,
-          qris_provider: `Midtrans (${d.acquirer || "QRIS"})`,
+          qris_provider: `${chMeta.short_name} (Midtrans)`,
           expired_at: d.expiry_time ? new Date(d.expiry_time).toISOString() : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
           error_code: null,
           error_message: null,
         };
       }
-      throw new Error(d.status_message || "Gagal membuat QRIS Midtrans");
+      throw new Error(d.status_message || "Gagal membuat transaksi Midtrans");
     } catch (err: any) {
       const msg = err?.response?.data?.status_message || err?.message || "Gagal menghubungi Midtrans Core API";
       const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
       const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
       return {
         ok: false,
         mode: "error",
         gateway_id: "midtrans",
         gateway_name: "Midtrans",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
         paykita_ref: params.orderId,
         qris_string: fallbackQris,
         qris_image: fallbackImg,
@@ -7469,7 +8978,7 @@ const tryCreateRemotePaykitaOrder = async (params: {
         pay_amount: cleanAmount,
         unique_code: 0,
         fee_amount: 0,
-        qris_provider: "Midtrans QRIS",
+        qris_provider: `${chMeta.short_name} (Midtrans)`,
         expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         error_code: "midtrans_error",
         error_message: `Midtrans API: ${msg}`,
@@ -7477,19 +8986,26 @@ const tryCreateRemotePaykitaOrder = async (params: {
     }
   }
 
-  // 4. XENDIT GATEWAY (QR Codes API)
+  // 4. XENDIT GATEWAY (Supports QRIS, E-Wallet, Virtual Account, & Retail)
   if (gatewayId === "xendit") {
     const secretKey = String(gCfg.api_key || "").trim();
+    const requestedCh = String(params.duitkuMethod || gCfg.payment_method || "XD_QRIS").trim().toUpperCase();
+    const { chMeta } = resolveTopupChannelAndGateway(requestedCh, "xendit");
     const baseUrl = String(gCfg.base_url || "https://api.xendit.co").replace(/\/+$/, "");
 
     if (isDemoGatewayKey("xendit", secretKey)) {
       const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
       const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
       return {
         ok: false,
         mode: "demo",
         gateway_id: "xendit",
         gateway_name: "Xendit",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
         paykita_ref: params.orderId,
         qris_string: fallbackQris,
         qris_image: fallbackImg,
@@ -7498,7 +9014,7 @@ const tryCreateRemotePaykitaOrder = async (params: {
         pay_amount: cleanAmount,
         unique_code: 0,
         fee_amount: 0,
-        qris_provider: "Xendit QRIS",
+        qris_provider: `${chMeta.short_name} (Xendit)`,
         expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         error_code: "demo_api_key",
         error_message:
@@ -7536,6 +9052,10 @@ const tryCreateRemotePaykitaOrder = async (params: {
           mode: "live",
           gateway_id: "xendit",
           gateway_name: "Xendit",
+          duitku_channel: chMeta.code,
+          duitku_channel_name: chMeta.name,
+          duitku_payment_flow: chMeta.payment_flow,
+          va_number: null,
           paykita_ref: String(d.id || params.orderId).trim(),
           qris_string: rawQris,
           qris_image: qrImg,
@@ -7544,22 +9064,27 @@ const tryCreateRemotePaykitaOrder = async (params: {
           pay_amount: cleanAmount,
           unique_code: 0,
           fee_amount: 0,
-          qris_provider: "Xendit QRIS",
+          qris_provider: `${chMeta.short_name} (Xendit)`,
           expired_at: d.expires_at || expiresAt,
           error_code: null,
           error_message: null,
         };
       }
-      throw new Error("Respons QRIS Xendit tidak memiliki qr_string");
+      throw new Error("Respons Xendit tidak memiliki qr_string");
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || "Gagal menghubungi API Xendit";
       const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
       const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
       return {
         ok: false,
         mode: "error",
         gateway_id: "xendit",
         gateway_name: "Xendit",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
         paykita_ref: params.orderId,
         qris_string: fallbackQris,
         qris_image: fallbackImg,
@@ -7568,10 +9093,122 @@ const tryCreateRemotePaykitaOrder = async (params: {
         pay_amount: cleanAmount,
         unique_code: 0,
         fee_amount: 0,
-        qris_provider: "Xendit QRIS",
+        qris_provider: `${chMeta.short_name} (Xendit)`,
         expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         error_code: "xendit_error",
         error_message: `Xendit API: ${msg}`,
+      };
+    }
+  }
+
+  // 5. TOKOPAY GATEWAY (Supports QRIS, E-Wallet, Virtual Account, & Retail)
+  if (gatewayId === "tokopay") {
+    const merchantCode = String(gCfg.merchant_code || "").trim();
+    const secretKey = String(gCfg.api_key || "").trim();
+    const requestedCh = String(params.duitkuMethod || gCfg.payment_method || "TK_QRIS").trim().toUpperCase();
+    const { chMeta } = resolveTopupChannelAndGateway(requestedCh, "tokopay");
+    const tokopayApiCode = chMeta.code.replace(/^TK_/, "") || "QRIS";
+    const baseUrl = String(gCfg.base_url || "https://api.tokopay.id/v1").replace(/\/+$/, "");
+
+    if (isDemoGatewayKey("tokopay", secretKey) || !merchantCode) {
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
+      return {
+        ok: false,
+        mode: "demo",
+        gateway_id: "tokopay",
+        gateway_name: "Tokopay",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: `${chMeta.short_name} (Tokopay)`,
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "demo_api_key",
+        error_message:
+          "Kredensial Tokopay masih menggunakan mode demo. Masukkan Merchant ID & Secret Key asli dari dashboard Tokopay.",
+      };
+    }
+
+    try {
+      const resp = await axios.get(`${baseUrl}/order`, {
+        params: {
+          merchant: merchantCode,
+          secret: secretKey,
+          ref_id: params.orderId,
+          nominal: cleanAmount,
+          metode: tokopayApiCode,
+        },
+        timeout: 8000,
+      });
+      const d = resp.data?.data || {};
+      if (resp.data?.status === "Success" || d.qr_string || d.nomor_va || d.pay_url) {
+        const rawQris = String(d.qr_string || "").trim();
+        const rawVa = d.nomor_va ? String(d.nomor_va).trim() : null;
+        const payAmount = Math.max(1, Math.round(Number(d.total_bayar || cleanAmount)));
+        const finalQris = rawQris || buildFallbackEmvQrisPayload(params.orderId, payAmount);
+        const qrImg = rawQris
+          ? await generateQrisDataUri(rawQris)
+          : d.qr_link || (await generateQrisDataUri(finalQris));
+        return {
+          ok: true,
+          mode: "live",
+          gateway_id: "tokopay",
+          gateway_name: "Tokopay",
+          duitku_channel: chMeta.code,
+          duitku_channel_name: chMeta.name,
+          duitku_payment_flow: chMeta.payment_flow,
+          va_number: rawVa,
+          paykita_ref: String(d.trx_id || params.orderId).trim(),
+          qris_string: finalQris,
+          qris_image: qrImg,
+          pay_url: d.pay_url ? String(d.pay_url) : null,
+          base_amount: cleanAmount,
+          pay_amount: payAmount,
+          unique_code: 0,
+          fee_amount: Math.max(0, payAmount - cleanAmount),
+          qris_provider: `${chMeta.short_name} (Tokopay)`,
+          expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          error_code: null,
+          error_message: null,
+        };
+      }
+      throw new Error(resp.data?.error_msg || "Gagal membuat transaksi Tokopay");
+    } catch (err: any) {
+      const msg = err?.response?.data?.error_msg || err?.message || "Gagal menghubungi API Tokopay";
+      const fallbackQris = buildFallbackEmvQrisPayload(params.orderId, cleanAmount);
+      const fallbackImg = await generateQrisDataUri(fallbackQris);
+      const simVa = buildSimulatedDuitkuVaOrCode(chMeta.code, params.orderId, chMeta.payment_flow);
+      return {
+        ok: false,
+        mode: "error",
+        gateway_id: "tokopay",
+        gateway_name: "Tokopay",
+        duitku_channel: chMeta.code,
+        duitku_channel_name: chMeta.name,
+        duitku_payment_flow: chMeta.payment_flow,
+        va_number: simVa,
+        paykita_ref: params.orderId,
+        qris_string: fallbackQris,
+        qris_image: fallbackImg,
+        pay_url: null,
+        base_amount: cleanAmount,
+        pay_amount: cleanAmount,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: `${chMeta.short_name} (Tokopay)`,
+        expired_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        error_code: "tokopay_error",
+        error_message: `Tokopay API: ${msg}`,
       };
     }
   }
@@ -7739,7 +9376,10 @@ const tryCreateRemotePaykitaOrder = async (params: {
 const ensurePaykitaTransactionQris = async (tx: any, origin: string, forceRefresh = false) => {
   if (!tx || tx.provider !== "paykita" || tx.payment_status !== "pending") return;
   const defaultGwForTx = tx.product_type === PRODUCT_TYPE ? "duitku" : "paykita";
-  const gatewayId = String(tx.gateway_id || defaultGwForTx).toLowerCase() === "duitku" ? "duitku" : "paykita";
+  const rawGwId = String(tx.gateway_id || defaultGwForTx).toLowerCase();
+  const gatewayId = ["paykita", "duitku", "tripay", "midtrans", "xendit", "tokopay"].includes(rawGwId)
+    ? rawGwId
+    : defaultGwForTx;
   const pgGateways = db.settings.payment_gateways?.gateways || {};
   const gCfg = pgGateways[gatewayId] || db.settings.paykita || {};
   const apiKey = String(gCfg.api_key || (gatewayId === "paykita" ? db.settings.paykita?.api_key : "") || "").trim();
@@ -7748,7 +9388,7 @@ const ensurePaykitaTransactionQris = async (tx: any, origin: string, forceRefres
 
   if (!tx.gateway_id) {
     tx.gateway_id = gatewayId;
-    tx.gateway_name = gatewayId === "duitku" ? "Duitku" : "PayKita";
+    tx.gateway_name = GATEWAY_DISPLAY_NAMES[gatewayId] || "PayKita";
     mutated = true;
   }
 
@@ -7783,7 +9423,7 @@ const ensurePaykitaTransactionQris = async (tx: any, origin: string, forceRefres
   } else if (!hasRealKey && tx.paykita_mode !== "demo") {
     tx.paykita_mode = "demo";
     tx.paykita_error_code = "demo_api_key";
-    tx.paykita_error = `Kredensial ${gCfg.name || (gatewayId === "duitku" ? "Duitku" : "PayKita")} masih menggunakan mode demo. Masukkan API Key asli di Panel Admin → Pembayaran.`;
+    tx.paykita_error = `Kredensial ${gCfg.name || GATEWAY_DISPLAY_NAMES[gatewayId] || "Payment Gateway"} masih menggunakan mode demo. Masukkan API Key asli di Panel Admin → Pembayaran.`;
     mutated = true;
   }
 
@@ -8207,7 +9847,10 @@ const verifyTransactionWithPaykitaServer = async (tx: any, origin?: string): Pro
   }
 
   const defaultGwForTx = tx.product_type === PRODUCT_TYPE ? "duitku" : "paykita";
-  const gatewayId: string = String(tx.gateway_id || defaultGwForTx).toLowerCase() === "duitku" ? "duitku" : "paykita";
+  const rawGwId = String(tx.gateway_id || defaultGwForTx).toLowerCase();
+  const gatewayId: string = ["paykita", "duitku", "tripay", "midtrans", "xendit", "tokopay"].includes(rawGwId)
+    ? rawGwId
+    : defaultGwForTx;
   const pgGateways = db.settings.payment_gateways?.gateways || {};
   const gCfg = pgGateways[gatewayId] || db.settings.paykita || {};
   const apiKey = String(gCfg.api_key || (gatewayId === "paykita" ? db.settings.paykita?.api_key : "") || "").trim();
@@ -8608,6 +10251,41 @@ api.post("/webhook/xendit", async (req, res) => {
   return res.json({ ok: true });
 });
 
+// Tokopay Webhook Callback
+api.post("/webhook/tokopay", async (req, res) => {
+  const body = req.body || {};
+  const refId = String(body.reff_id || body.ref_id || body.reference || "").trim();
+  if (!refId) return res.json({ status: true, message: "Ping webhook Tokopay diterima" });
+
+  const tx = db.transactions.find((t) => t.session_id === refId || t.paykita_ref === refId);
+  if (!tx) return res.status(404).json({ status: false, detail: "Transaksi tidak ditemukan" });
+
+  const gCfg = db.settings.payment_gateways?.gateways?.tokopay || {};
+  const merchantCode = String(gCfg.merchant_code || "").trim();
+  const secretKey = String(gCfg.api_key || "").trim();
+  const expectedSig = crypto
+    .createHash("md5")
+    .update(`${merchantCode}:${secretKey}:${refId}`)
+    .digest("hex")
+    .toLowerCase();
+  const incomingSig = String(body.signature || "").trim().toLowerCase();
+  const st = String(body.status || body.data?.status || "").toUpperCase();
+
+  if (st === "PAID" || st === "SUCCESS" || st === "COMPLETED") {
+    if (incomingSig && safeTimingCompare(incomingSig, expectedSig)) {
+      markPaykitaTransactionPaid(tx, "tokopay_webhook");
+    } else {
+      writeAuditLog({
+        action: "security.webhook_invalid_signature",
+        metadata: { gateway: "tokopay", session_id: tx.session_id },
+        req,
+      });
+      return res.status(401).json({ status: false, detail: "Signature webhook Tokopay tidak valid" });
+    }
+  }
+  return res.json({ status: true });
+});
+
 api.get("/webhook/paykita", (_req, res) => {
   const s = db.settings.paykita || {};
   res.json({
@@ -8858,14 +10536,12 @@ api.post("/payments/topup/checkout", async (req, res) => {
     const method = String(body.method || body.gateway_id || "paykita").trim().toLowerCase();
     if (method === "manual" || method === "crypto") {
       return res.status(400).json({
-        detail: "Metode pembayaran manual tidak tersedia untuk produk Top Up. Silakan pilih metode pembayaran otomatis PayKita atau Duitku.",
+        detail: "Metode pembayaran manual tidak tersedia untuk produk Top Up. Silakan pilih metode pembayaran otomatis.",
       });
     }
 
     const pgGateways = db.settings.payment_gateways?.gateways || {};
     const paykitaSettings = db.settings.paykita || {};
-    const paykitaCfg = pgGateways.paykita || {};
-    const duitkuCfg = pgGateways.duitku || {};
 
     const rawChannel = String(
       body.duitku_channel || body.payment_method || body.channel_code || ""
@@ -8873,35 +10549,26 @@ api.post("/payments/topup/checkout", async (req, res) => {
       .trim()
       .toUpperCase();
 
-    const isPaykitaSelected =
-      rawChannel === "PK_QRIS" ||
-      rawChannel === "PAYKITA" ||
-      rawChannel === "QRIS_PAYKITA" ||
-      (method === "paykita" && (!rawChannel || rawChannel === "PK_QRIS" || rawChannel === "QRIS"));
+    const {
+      gatewayId: resolvedGatewayId,
+      gatewayName: resolvedGatewayName,
+      chMeta,
+    } = resolveTopupChannelAndGateway(rawChannel, method);
 
-    const resolvedGatewayId = isPaykitaSelected ? "paykita" : "duitku";
-    const resolvedGatewayName = isPaykitaSelected ? "PayKita" : "Duitku";
-
+    const targetGwCfg = pgGateways[resolvedGatewayId] || {};
     if (resolvedGatewayId === "paykita") {
-      if (paykitaSettings.enabled === false || paykitaCfg.enabled === false) {
+      if (paykitaSettings.enabled === false || targetGwCfg.enabled === false) {
         return res.status(400).json({
           detail: "Pembayaran QRIS Otomatis (PayKita) sedang dinonaktifkan oleh admin. Silakan pilih metode pembayaran lainnya.",
         });
       }
     } else {
-      if (duitkuCfg.enabled === false) {
+      if (targetGwCfg.enabled === false) {
         return res.status(400).json({
-          detail: "Pembayaran otomatis Duitku untuk Produk Top Up sedang dinonaktifkan oleh admin. Silakan pilih QRIS Otomatis (PayKita).",
+          detail: `Pembayaran otomatis ${resolvedGatewayName} sedang dinonaktifkan oleh admin. Silakan pilih metode pembayaran lainnya.`,
         });
       }
     }
-
-    const enabledChannels = getEnabledDuitkuChannels(duitkuCfg);
-    const requestedDuitkuChannel = rawChannel || String(duitkuCfg.payment_method || "SP").trim().toUpperCase();
-    const chMeta = isPaykitaSelected
-      ? PAYKITA_TOPUP_CHANNEL
-      : enabledChannels.find((c) => c.code === requestedDuitkuChannel) ||
-        getDuitkuChannelMeta(requestedDuitkuChannel);
 
     const user = getUserOptional(req);
     const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
@@ -8930,7 +10597,7 @@ api.post("/payments/topup/checkout", async (req, res) => {
       buyerWhatsapp: buyer.buyer_whatsapp || "",
       origin,
       gatewayOverride: resolvedGatewayId,
-      duitkuMethod: resolvedGatewayId === "duitku" ? chMeta.code : undefined,
+      duitkuMethod: resolvedGatewayId === "paykita" ? undefined : chMeta.code,
     });
     const expiredAt = remoteOrder.expired_at || new Date(Date.now() + 15 * 60 * 1000).toISOString();
     const baseDeliveryInfo = renderDeliveryInfo(product, game, destination);
@@ -8949,11 +10616,11 @@ api.post("/payments/topup/checkout", async (req, res) => {
       destination_id:
         resolvedGatewayId === "paykita"
           ? "paykita-qris"
-          : `duitku-${chMeta.code.toLowerCase()}`,
+          : `${resolvedGatewayId}-${chMeta.code.toLowerCase()}`,
       destination_name:
         resolvedGatewayId === "paykita"
           ? "PayKita — QRIS Otomatis"
-          : `Duitku — ${chMeta.name}`,
+          : `${resolvedGatewayName} — ${chMeta.name}`,
       qris_string: remoteOrder.qris_string,
       qris_image: remoteOrder.qris_image,
       pay_url: remoteOrder.pay_url || null,
@@ -8965,7 +10632,7 @@ api.post("/payments/topup/checkout", async (req, res) => {
         remoteOrder.qris_provider ||
         (resolvedGatewayId === "paykita"
           ? "PayKita QRIS"
-          : `${chMeta.short_name} (${chMeta.code})`),
+          : `${chMeta.short_name} (${resolvedGatewayName})`),
       paykita_mode: remoteOrder.mode,
       paykita_error: remoteOrder.error_message || null,
       paykita_error_code: remoteOrder.error_code || null,
@@ -10433,6 +12100,47 @@ const probeGatewayApiConnection = async (gatewayId: string, cfg: any) => {
     }
   }
 
+  if (gId === "tokopay") {
+    const resolvedBase = baseUrl || "https://api.tokopay.id/v1";
+    const merchantCode = String(cfg?.merchant_code || "").trim();
+    if (isDemoGatewayKey("tokopay", apiKey) || !merchantCode) {
+      return {
+        ok: true,
+        is_demo: true,
+        project: `Tokopay ${merchantCode || "TP-WJP01"} (Demo)`,
+        provider: "Multi-Metode Tokopay (QRIS, E-Wallet, VA, Retail)",
+        mode: "demo",
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+    try {
+      const resp = await axios.get(`${resolvedBase}/merchant/balance`, {
+        params: { merchant: merchantCode, secret: apiKey },
+        timeout: 6000,
+      });
+      if (resp.data && resp.data.status !== 0) {
+        return {
+          ok: true,
+          is_demo: false,
+          project: `Tokopay Merchant ${merchantCode}`,
+          provider: "Multi-Metode Tokopay (QRIS, E-Wallet, VA, Retail)",
+          mode: "production",
+          base_url: resolvedBase,
+          tested_at: nowIso(),
+        };
+      }
+    } catch (err: any) {
+      return {
+        ok: false,
+        is_demo: false,
+        error: `Tokopay API: ${err?.response?.data?.error_msg || err?.message || "Koneksi gagal"}`,
+        base_url: resolvedBase,
+        tested_at: nowIso(),
+      };
+    }
+  }
+
   return {
     ok: true,
     is_demo: false,
@@ -10471,8 +12179,8 @@ const buildPaykitaConfigResponse = (req: Request) => {
       ...(pg.gateways.paykita || {}),
       id: "paykita",
       name: "PayKita",
-      subtitle: "QRIS Otomatis Produk Beranda",
-      scope: "beranda",
+      subtitle: "QRIS Otomatis Produk Beranda & Top Up",
+      scope: "beranda_topup",
       enabled,
       base_url: baseUrl,
       api_key: apiKey,
@@ -10481,32 +12189,34 @@ const buildPaykitaConfigResponse = (req: Request) => {
     };
   }
 
-  const allowedKeys = ["paykita", "duitku"];
+  const allowedKeys = ["paykita", "duitku", "tripay", "midtrans", "xendit", "tokopay"];
   const formattedGateways: Record<string, any> = {};
   for (const gk of allowedKeys) {
     const gVal = pg.gateways?.[gk] || {};
     const gKey = String(gVal.api_key || "").trim();
     const gDemo = isDemoGatewayKey(gk, gKey);
     const gSec = String(gVal.webhook_secret || gVal.private_key || gVal.client_key || "").trim();
+    const catalog = getGatewayChannelsCatalog(gk);
+    const defaultChannelCode = catalog[0]?.code || "QRIS";
     formattedGateways[gk] = {
       id: gk,
-      name: gk === "duitku" ? "Duitku" : "PayKita",
+      name: GATEWAY_DISPLAY_NAMES[gk] || gk.toUpperCase(),
       subtitle:
-        gk === "duitku"
-          ? "Multi-Metode Pembayaran Produk Top Up"
-          : "QRIS Otomatis Produk Beranda & Top Up",
-      scope: gk === "duitku" ? "topup" : "beranda_topup",
+        gk === "paykita"
+          ? "QRIS Otomatis Produk Beranda & Top Up"
+          : `Multi-Metode Pembayaran Produk Top Up (${GATEWAY_DISPLAY_NAMES[gk] || gk})`,
+      scope: gk === "paykita" ? "beranda_topup" : "topup",
       enabled: gVal.enabled !== false,
-      is_active_gateway: true,
+      is_active_gateway: gVal.enabled !== false,
       mode: gVal.mode || "production",
       base_url: gVal.base_url || "",
       merchant_code: gVal.merchant_code || "",
-      payment_method: gVal.payment_method || (gk === "duitku" ? "SP" : "QRIS"),
+      payment_method: gVal.payment_method || defaultChannelCode,
       enabled_methods:
-        gk === "duitku"
-          ? getEnabledDuitkuChannels(gVal).map((c) => c.code)
-          : ["QRIS"],
-      available_channels: gk === "duitku" ? DUITKU_PAYMENT_CHANNELS : [],
+        gk === "paykita"
+          ? ["PK_QRIS"]
+          : getEnabledGatewayChannels(gk, gVal).map((c) => c.code),
+      available_channels: catalog,
       is_demo_key: gDemo,
       api_key_set: Boolean(gKey),
       api_key_masked: gDemo ? `${maskSecret(gKey)} (Default Demo)` : maskSecret(gKey),
@@ -10521,7 +12231,7 @@ const buildPaykitaConfigResponse = (req: Request) => {
     enabled,
     active_gateway: activeGateway,
     beranda_gateway: "paykita",
-    topup_gateway: "duitku",
+    topup_gateway: "multi",
     gateways: formattedGateways,
     base_url: baseUrl,
     is_demo_key: isDemo,
@@ -10546,7 +12256,7 @@ admin.put("/payments/gateways/:gateway_id", async (req, res) => {
   const gId = String(req.params.gateway_id || "paykita").toLowerCase();
   if (!db.settings.payment_gateways) initDatabase();
   const pg = db.settings.payment_gateways;
-  const existing = pg.gateways?.[gId] || { id: gId, name: gId.toUpperCase() };
+  const existing = pg.gateways?.[gId] || { id: gId, name: GATEWAY_DISPLAY_NAMES[gId] || gId.toUpperCase() };
   const body = req.body || {};
 
   const nextApiKey =
@@ -10560,16 +12270,17 @@ admin.put("/payments/gateways/:gateway_id", async (req, res) => {
   const nextPrivateKey =
     typeof body.private_key === "string" && body.private_key.trim() && !body.private_key.includes("*")
       ? body.private_key.trim()
-      : existing.private_key || "";
+      : existing.private_key || nextWebhookSecret || "";
   const nextClientKey =
     typeof body.client_key === "string" && body.client_key.trim() && !body.client_key.includes("*")
       ? body.client_key.trim()
-      : existing.client_key || "";
+      : existing.client_key || nextWebhookSecret || "";
 
+  const catalogCodes = getGatewayChannelsCatalog(gId).map((c) => c.code);
   const nextEnabledMethods =
     Array.isArray(body.enabled_methods) && body.enabled_methods.length > 0
       ? body.enabled_methods.map((c: any) => String(c || "").trim().toUpperCase()).filter(Boolean)
-      : existing.enabled_methods || DUITKU_PAYMENT_CHANNELS.map((c) => c.code);
+      : existing.enabled_methods || catalogCodes;
 
   const updatedGw = {
     ...existing,
@@ -10577,7 +12288,7 @@ admin.put("/payments/gateways/:gateway_id", async (req, res) => {
     mode: body.mode || existing.mode || "production",
     base_url: String(body.base_url ?? existing.base_url ?? "").trim().replace(/\/+$/, ""),
     merchant_code: String(body.merchant_code ?? existing.merchant_code ?? "").trim(),
-    payment_method: String(body.payment_method ?? existing.payment_method ?? "QRIS").trim(),
+    payment_method: String(body.payment_method ?? existing.payment_method ?? catalogCodes[0] ?? "QRIS").trim(),
     enabled_methods: nextEnabledMethods,
     api_key: nextApiKey,
     webhook_secret: nextWebhookSecret,

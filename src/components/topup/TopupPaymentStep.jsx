@@ -417,11 +417,11 @@ export const TopupPaymentStep = ({
                   02. Pilih Metode Pembayaran Otomatis
                 </p>
                 <span className="px-2 py-0.5 rounded-md border border-neon/40 bg-neon/10 text-neon text-[10px] font-mono font-bold uppercase">
-                  Duitku Gateway
+                  Multi-Gateway Otomatis
                 </span>
               </div>
               <p className="text-xs font-mono text-slate-400 mt-1">
-                Semua metode di bawah diproses otomatis 24/7 oleh Duitku tanpa perlu unggah bukti transfer manual.
+                Semua metode di bawah diproses otomatis 24/7 (PayKita, Duitku, Tripay, Midtrans, Xendit, &amp; Tokopay) tanpa perlu unggah bukti transfer manual.
               </p>
             </div>
           </div>
@@ -632,7 +632,9 @@ export const TopupPaymentStep = ({
                   className="text-right font-mono text-neon font-bold"
                   data-testid="topup-summary-method"
                 >
-                  Duitku &middot; {selectedChannelObj?.short_name || selectedChannelObj?.name} ({selectedChannelObj?.code})
+                  {selectedChannelObj?.gateway_name || "Otomatis"} &middot;{" "}
+                  {selectedChannelObj?.short_name || selectedChannelObj?.name} (
+                  {selectedChannelObj?.code})
                 </dd>
               </div>
 

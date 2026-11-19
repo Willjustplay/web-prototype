@@ -76,8 +76,16 @@ const translateFieldMeta = (field, lang) => {
     "Zone ID": "Zone ID",
     "Server": "Server",
     "Server / Region": "Server / Region",
+    "Region Server": "Server Region",
     "UID": "UID",
     "Player ID": "Player ID",
+    "Player Tag": "Player Tag",
+    "IGG ID": "IGG ID",
+    "Hunter ID": "Hunter ID",
+    "Account ID (PID)": "Account ID (PID)",
+    "Space ID": "Space ID",
+    "Username In-Game": "In-Game Username",
+    "No. WhatsApp / Steam ID": "WhatsApp No. / Steam ID",
     "Riot ID": "Riot ID",
     "Tagline": "Tagline",
     "Open ID": "Open ID",
@@ -162,6 +170,7 @@ export default function TopupGameDetail() {
   const [activeOrderConflict, setActiveOrderConflict] = useState(null);
   const [cancellingConflict, setCancellingConflict] = useState(false);
   const [gameSwitcherOpen, setGameSwitcherOpen] = useState(false);
+  const [switcherQuery, setSwitcherQuery] = useState("");
 
   const game = useMemo(
     () =>
@@ -184,6 +193,7 @@ export default function TopupGameDetail() {
     setActiveOrderConflict(null);
     setCancellingConflict(false);
     setGameSwitcherOpen(false);
+    setSwitcherQuery("");
   }, [slug]);
 
   useEffect(() => {
@@ -519,11 +529,20 @@ export default function TopupGameDetail() {
     setSummaryError("");
     setActiveOrderConflict(null);
     try {
-      const selectedGw =
-        selectedChannelObj?.gateway_id === "paykita" ||
-        duitkuChannel === "PK_QRIS"
-          ? "paykita"
-          : "duitku";
+      const rawGw = String(selectedChannelObj?.gateway_id || "").toLowerCase();
+      const selectedGw = ["paykita", "duitku", "tripay", "midtrans", "xendit", "tokopay"].includes(rawGw)
+        ? rawGw
+        : duitkuChannel === "PK_QRIS"
+        ? "paykita"
+        : duitkuChannel.startsWith("TP_")
+        ? "tripay"
+        : duitkuChannel.startsWith("MT_")
+        ? "midtrans"
+        : duitkuChannel.startsWith("XD_")
+        ? "xendit"
+        : duitkuChannel.startsWith("TK_")
+        ? "tokopay"
+        : "duitku";
       const payload = {
         game: game.slug,
         denomination_code: denomination.code,
@@ -578,13 +597,13 @@ export default function TopupGameDetail() {
 
       <div className="relative z-10 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-[72px] pb-28 sm:pt-24 sm:pb-32 overflow-x-hidden">
         {/* Clean, Interactive & Dynamic Top Bar (Breadcrumb + Quick Game Switcher + Step Progress) */}
-        <div className="rounded-2xl border border-line/80 bg-panel/80 backdrop-blur-md px-3 py-2.5 sm:px-4 sm:py-3 mb-3.5 sm:mb-5 min-w-0 shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
+        <div className="rounded-2xl border border-line/75 bg-panel/75 backdrop-blur-md px-3 py-2.5 sm:px-4 sm:py-3 mb-3.5 sm:mb-5 min-w-0 shadow-[0_8px_24px_rgba(0,0,0,0.28)]">
           <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-mono text-slate-400 min-w-0 flex-1">
               <Link
                 to="/topup"
                 data-testid="topup-back-to-catalog"
-                className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg border border-line/70 bg-void/70 hover:border-neon/60 px-2.5 py-1 text-slate-200 hover:text-neon transition-all shrink-0"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-1.5 py-1 text-slate-300 hover:text-neon transition-colors shrink-0"
               >
                 <ArrowLeft size={12} />
                 <span>{t("Katalog", "Catalog")}</span>
@@ -595,7 +614,8 @@ export default function TopupGameDetail() {
                   <button
                     type="button"
                     onClick={() => setGameSwitcherOpen((o) => !o)}
-                    className="group inline-flex items-center gap-1.5 rounded-lg border border-line/70 bg-void/70 hover:border-neon/60 px-2.5 py-1 text-neon font-bold transition-all min-w-0 cursor-pointer"
+                    data-testid="topup-quick-game-switcher"
+                    className="group inline-flex items-center gap-1.5 rounded-xl border border-line/75 bg-void/70 hover:border-neon/60 px-2.5 py-1 text-neon font-bold transition-all min-w-0 cursor-pointer"
                     title={t("Ganti game cepat", "Quick switch game")}
                   >
                     {(game.icon || game.banner) && (
@@ -608,8 +628,11 @@ export default function TopupGameDetail() {
                         }}
                       />
                     )}
-                    <span className="truncate max-w-[130px] sm:max-w-[200px]">
+                    <span className="truncate max-w-[140px] sm:max-w-[220px]">
                       {game.name}
+                    </span>
+                    <span className="hidden sm:inline text-[10px] font-normal text-slate-400">
+                      ({games.length})
                     </span>
                     <ChevronDown
                       size={12}
@@ -623,9 +646,9 @@ export default function TopupGameDetail() {
             </div>
 
             {/* Interactive Step Progress & 24/7 Status */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {game && (
-                <div className="hidden md:flex items-center gap-1 rounded-xl border border-line/70 bg-void/75 p-1">
+                <div className="hidden md:flex items-center gap-1">
                   {[
                     {
                       id: "codashop-step-1",
@@ -658,8 +681,8 @@ export default function TopupGameDetail() {
                       onClick={() => scrollToStep(s.id)}
                       className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-mono font-semibold transition-all cursor-pointer ${
                         s.done
-                          ? "bg-lime/15 text-lime border border-lime/30"
-                          : "text-slate-400 hover:text-slate-200 hover:bg-panel/80"
+                          ? "text-lime bg-lime/10"
+                          : "text-slate-400 hover:text-slate-200"
                       }`}
                     >
                       {s.done ? <Check size={10} /> : <span>{s.num}.</span>}
@@ -669,7 +692,7 @@ export default function TopupGameDetail() {
                 </div>
               )}
 
-              <div className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-mono text-lime bg-lime/10 border border-lime/30 rounded-xl px-2.5 py-1.5 shrink-0">
+              <div className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-mono text-lime px-1.5 py-1 shrink-0">
                 <Zap size={11} className="shrink-0" />
                 <span className="hidden sm:inline">
                   {t("Otomatis 24/7", "24/7 Automated")}
@@ -679,7 +702,7 @@ export default function TopupGameDetail() {
             </div>
           </div>
 
-          {/* Expandable Quick Game Switcher Strip */}
+          {/* Expandable Quick Game Switcher Panel with Search Filter for 38+ Games */}
           <AnimatePresence>
             {gameSwitcherOpen && Array.isArray(games) && games.length > 1 && (
               <motion.div
@@ -689,37 +712,57 @@ export default function TopupGameDetail() {
                 transition={{ duration: 0.18 }}
                 className="overflow-hidden"
               >
-                <div className="pt-2.5 mt-2.5 border-t border-line/60 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                  <span className="text-[10px] font-mono text-slate-500 shrink-0 pr-1">
-                    {t("Pindah Game:", "Switch Game:")}
-                  </span>
-                  {games.map((g) => {
-                    const isCurrent = g.slug === game?.slug;
-                    return (
-                      <Link
-                        key={g.slug}
-                        to={`/topup/${g.slug}`}
-                        onClick={() => setGameSwitcherOpen(false)}
-                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-mono font-semibold transition-all shrink-0 ${
-                          isCurrent
-                            ? "bg-neon text-void font-bold shadow-[0_0_10px_rgba(0,240,255,0.28)]"
-                            : "bg-void/80 border border-line/80 text-slate-300 hover:border-neon/60 hover:text-neon"
-                        }`}
-                      >
-                        {(g.icon || g.banner) && (
-                          <img
-                            src={imgSrc(g.icon || g.banner)}
-                            alt={g.name}
-                            className="w-3.5 h-3.5 rounded object-cover shrink-0"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        )}
-                        <span className="truncate max-w-[110px]">{g.name}</span>
-                      </Link>
-                    );
-                  })}
+                <div className="pt-3 mt-2.5 border-t border-line/60 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                      {t("Pindah Cepat ke Game Lain", "Quick Jump to Another Game")} ({games.length})
+                    </span>
+                    <input
+                      type="text"
+                      value={switcherQuery}
+                      onChange={(e) => setSwitcherQuery(e.target.value)}
+                      placeholder={t("Filter nama game...", "Filter game name...")}
+                      className="w-40 sm:w-56 rounded-lg bg-void/90 border border-line/80 px-2.5 py-1 text-[11px] font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-neon"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                    {games
+                      .filter((g) => {
+                        const q = switcherQuery.trim().toLowerCase();
+                        if (!q) return true;
+                        return (
+                          (g.name || "").toLowerCase().includes(q) ||
+                          (g.publisher || "").toLowerCase().includes(q)
+                        );
+                      })
+                      .map((g) => {
+                        const isCurrent = g.slug === game?.slug;
+                        return (
+                          <Link
+                            key={g.slug}
+                            to={`/topup/${g.slug}`}
+                            onClick={() => setGameSwitcherOpen(false)}
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-mono font-semibold transition-all shrink-0 ${
+                              isCurrent
+                                ? "bg-neon text-void font-bold shadow-[0_0_10px_rgba(0,240,255,0.28)]"
+                                : "bg-void/80 border border-line/75 text-slate-300 hover:border-neon/60 hover:text-neon"
+                            }`}
+                          >
+                            {(g.icon || g.banner) && (
+                              <img
+                                src={imgSrc(g.icon || g.banner)}
+                                alt={g.name}
+                                className="w-3.5 h-3.5 rounded object-cover shrink-0"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            )}
+                            <span className="truncate max-w-[125px]">{g.name}</span>
+                          </Link>
+                        );
+                      })}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -805,9 +848,10 @@ export default function TopupGameDetail() {
                       />
                     </div>
                     <div className="min-w-0 flex-1 pb-0.5">
-                      <span className="inline-block text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-widest px-1.5 sm:px-2 py-0.5 rounded bg-neon/15 text-neon border border-neon/40 mb-0.5 sm:mb-1 max-w-full truncate">
+                      <p className="text-[9px] sm:text-[10px] font-mono uppercase tracking-widest text-neon mb-0.5 truncate">
                         {game.publisher || "Official Publisher"}
-                      </span>
+                        {game.currency ? ` · ${game.currency}` : ""}
+                      </p>
                       <h1 className="font-display font-black text-sm sm:text-lg text-slate-100 leading-tight truncate">
                         {game.name}
                       </h1>
@@ -1557,9 +1601,17 @@ export default function TopupGameDetail() {
                                   {selected && <Check size={10} strokeWidth={3} />}
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                  <span className="font-display font-bold text-xs sm:text-[13px] text-slate-100 block truncate">
-                                    {ch.short_name || ch.name}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="font-display font-bold text-xs sm:text-[13px] text-slate-100 block truncate">
+                                      {ch.short_name || ch.name}
+                                    </span>
+                                    {(ch.gateway_name || ch.gateway_id) && (
+                                      <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-panel/90 border border-line/80 text-neon shrink-0">
+                                        {ch.gateway_name ||
+                                          String(ch.gateway_id || "").toUpperCase()}
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-[10px] font-mono text-slate-400 block truncate">
                                     {translateChannelDescription(
                                       ch.description || ch.name,
