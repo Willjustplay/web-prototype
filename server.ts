@@ -5949,13 +5949,21 @@ const GATEWAY_DISPLAY_NAMES: Record<string, string> = {
   tokopay: "Tokopay",
 };
 
+const stripPublicGatewayBrand = (str: any): string =>
+  String(str || "")
+    .replace(/\s*\(\s*(?:PayKita|Duitku|Tripay|Midtrans|Xendit|Tokopay)\s*\)/gi, "")
+    .replace(/\s+via\s+(?:PayKita|Duitku|Tripay|Midtrans|Xendit|Tokopay)(?:\s+Core\s+API)?/gi, "")
+    .replace(/\b(?:PayKita|Duitku|Tripay|Midtrans|Xendit|Tokopay)\s+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
 const PAYKITA_TOPUP_CHANNEL = {
   code: "PK_QRIS",
   native_code: "QRIS",
   gateway_id: "paykita",
   gateway_name: "PayKita",
-  name: "QRIS Otomatis (PayKita)",
-  short_name: "QRIS Otomatis (PayKita)",
+  name: "QRIS Otomatis",
+  short_name: "QRIS Otomatis",
   category: "qris",
   category_label: "QRIS Instan",
   payment_flow: "qris",
@@ -6908,6 +6916,9 @@ const getEnabledGatewayChannels = (gatewayId: string, gwCfg?: any) => {
       : catalog;
   return (filtered.length > 0 ? filtered : [catalog[0]]).map((ch) => ({
     ...ch,
+    name: stripPublicGatewayBrand(ch.name),
+    short_name: stripPublicGatewayBrand(ch.short_name || ch.name),
+    description: stripPublicGatewayBrand(ch.description),
     gateway_id: gatewayId,
     gateway_name: GATEWAY_DISPLAY_NAMES[gatewayId] || gatewayId.toUpperCase(),
   }));
@@ -8369,10 +8380,7 @@ api.get("/payments/methods", (req, res) => {
       {
         id: firstActiveGwId,
         gateway_id: firstActiveGwId,
-        label:
-          activeGwNames.length > 0
-            ? `Pembayaran Otomatis (${activeGwNames.join(", ")})`
-            : "Pembayaran Otomatis Multi-Gateway",
+        label: "Pembayaran Otomatis",
         default_gateway: firstActiveGwId,
         preferred_gateway: firstActiveGwId,
         default_channel: defaultChannel,
@@ -8389,7 +8397,7 @@ api.get("/payments/methods", (req, res) => {
   const autoEnabled = Boolean(isTargetGwEnabled && pCfg.paykita !== false);
   const gatewayInfo = {
     id: targetMeta.id,
-    name: targetMeta.name,
+    name: "QRIS Otomatis",
     tagline: targetMeta.tagline,
     scope: targetMeta.scope,
     channel: targetState.payment_method || "QRIS",
@@ -8406,7 +8414,7 @@ api.get("/payments/methods", (req, res) => {
     methods.push({
       id: "paykita",
       gateway_id: "paykita",
-      label: `QRIS Otomatis (${targetMeta.name})`,
+      label: "QRIS Otomatis",
       default_gateway: "paykita",
       preferred_gateway: "paykita",
       gateways: [gatewayInfo],

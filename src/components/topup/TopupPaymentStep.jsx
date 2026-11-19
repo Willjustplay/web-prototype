@@ -17,12 +17,12 @@ import {
 import { formatIDR, imgSrc } from "@/lib/api";
 
 export const DEFAULT_DUITKU_CHANNELS = [
-  // QRIS (PayKita Primary Option + Duitku QRIS)
+  // QRIS
   {
     code: "PK_QRIS",
     gateway_id: "paykita",
-    name: "QRIS Otomatis (PayKita)",
-    short_name: "QRIS Otomatis (PayKita)",
+    name: "QRIS Otomatis",
+    short_name: "QRIS Otomatis",
     category: "qris",
     category_label: "QRIS Instan",
     payment_flow: "qris",
@@ -417,11 +417,11 @@ export const TopupPaymentStep = ({
                   02. Pilih Metode Pembayaran Otomatis
                 </p>
                 <span className="px-2 py-0.5 rounded-md border border-neon/40 bg-neon/10 text-neon text-[10px] font-mono font-bold uppercase">
-                  Multi-Gateway Otomatis
+                  Otomatis 24/7
                 </span>
               </div>
               <p className="text-xs font-mono text-slate-400 mt-1">
-                Semua metode di bawah diproses otomatis 24/7 (PayKita, Duitku, Tripay, Midtrans, Xendit, &amp; Tokopay) tanpa perlu unggah bukti transfer manual.
+                Semua metode di bawah diproses otomatis 24/7 tanpa perlu unggah bukti transfer manual.
               </p>
             </div>
           </div>
@@ -627,12 +627,11 @@ export const TopupPaymentStep = ({
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-slate-400 font-mono">Gateway &amp; Metode</dt>
+                <dt className="text-slate-400 font-mono">Metode Pembayaran</dt>
                 <dd
                   className="text-right font-mono text-neon font-bold"
                   data-testid="topup-summary-method"
                 >
-                  {selectedChannelObj?.gateway_name || "Otomatis"} &middot;{" "}
                   {selectedChannelObj?.short_name || selectedChannelObj?.name} (
                   {selectedChannelObj?.code})
                 </dd>
@@ -677,7 +676,7 @@ export const TopupPaymentStep = ({
                 </>
               ) : (
                 <>
-                  <span>Bayar dengan {selectedChannelObj?.short_name || "Duitku"}</span>
+                  <span>Bayar dengan {selectedChannelObj?.short_name || "QRIS"}</span>
                   <ArrowRight size={15} />
                 </>
               )}
@@ -685,7 +684,7 @@ export const TopupPaymentStep = ({
 
             <div className="mt-4 pt-3.5 border-t border-line/60 flex items-center justify-center gap-2 text-[11px] font-mono text-slate-400 text-center">
               <ShieldCheck size={14} className="text-lime shrink-0" />
-              <span>Verifikasi pembayaran otomatis Duitku 24/7</span>
+              <span>Verifikasi pembayaran otomatis 24/7</span>
             </div>
           </div>
         </div>

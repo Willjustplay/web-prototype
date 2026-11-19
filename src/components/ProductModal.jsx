@@ -83,7 +83,7 @@ export const ProductModal = ({
     : [];
   const paykitaMethodObj = methods.find((m) => m.id === "paykita");
   const fallbackGateways = [
-    { id: "paykita", name: "PayKita", tagline: "QRIS Otomatis Produk Beranda" },
+    { id: "paykita", name: "QRIS Otomatis", tagline: "QRIS Otomatis Produk Beranda" },
   ];
   const availableAutoGateways = (
     Array.isArray(paykitaMethodObj?.gateways) && paykitaMethodObj.gateways.length > 0

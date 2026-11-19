@@ -136,9 +136,20 @@ const translateLocalFieldErr = (errMsg, lang) => {
     .replace(/^Format\s+(.+?)\s+tidak valid$/i, "Invalid $1 format");
 };
 
+const stripGatewayNames = (text) => {
+  if (!text) return "";
+  return String(text)
+    .replace(/\s*\(\s*(?:PayKita|Duitku|Tripay|Midtrans|Xendit|Tokopay)\s*\)/gi, "")
+    .replace(/\s+via\s+(?:PayKita|Duitku|Tripay|Midtrans|Xendit|Tokopay)(?:\s+Core\s+API)?/gi, "")
+    .replace(/\b(?:PayKita|Duitku|Tripay|Midtrans|Xendit|Tokopay)\s+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
 const translateChannelDescription = (desc, lang) => {
-  if (!desc || lang !== "en") return desc;
-  return String(desc)
+  const cleaned = stripGatewayNames(desc);
+  if (!cleaned || lang !== "en") return cleaned;
+  return String(cleaned)
     .replace(/Scan QRIS instan via GoPay, DANA, OVO, ShopeePay & semua M-Banking/gi, "Instant QRIS scan via GoPay, DANA, OVO, ShopeePay & all M-Banking")
     .replace(/Scan QRIS via semua E-Wallet & Mobile Banking/gi, "Scan QRIS via any E-Wallet & Mobile Banking")
     .replace(/Pembayaran instan via aplikasi/gi, "Instant payment via app")
@@ -1486,7 +1497,9 @@ export default function TopupGameDetail() {
                         {t("Terpilih:", "Selected:")}
                       </span>
                       <span className="font-display font-bold text-neon truncate">
-                        {selectedChannelObj.short_name || selectedChannelObj.name}
+                        {stripGatewayNames(
+                          selectedChannelObj.short_name || selectedChannelObj.name
+                        )}
                       </span>
                     </div>
                   )}
@@ -1603,14 +1616,8 @@ export default function TopupGameDetail() {
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <span className="font-display font-bold text-xs sm:text-[13px] text-slate-100 block truncate">
-                                      {ch.short_name || ch.name}
+                                      {stripGatewayNames(ch.short_name || ch.name)}
                                     </span>
-                                    {(ch.gateway_name || ch.gateway_id) && (
-                                      <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-panel/90 border border-line/80 text-neon shrink-0">
-                                        {ch.gateway_name ||
-                                          String(ch.gateway_id || "").toUpperCase()}
-                                      </span>
-                                    )}
                                   </div>
                                   <span className="text-[10px] font-mono text-slate-400 block truncate">
                                     {translateChannelDescription(
@@ -1737,8 +1744,10 @@ export default function TopupGameDetail() {
                           </span>
                           <span className="text-slate-600">&bull;</span>
                           <span className="text-neon break-words">
-                            {selectedChannelObj?.short_name ||
-                              selectedChannelObj?.name}
+                            {stripGatewayNames(
+                              selectedChannelObj?.short_name ||
+                                selectedChannelObj?.name
+                            )}
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
@@ -1943,7 +1952,9 @@ export default function TopupGameDetail() {
                     {t("Pembayaran", "Payment")}
                   </span>
                   <span className="text-slate-200 text-right break-words">
-                    {selectedChannelObj?.short_name || selectedChannelObj?.name}
+                    {stripGatewayNames(
+                      selectedChannelObj?.short_name || selectedChannelObj?.name
+                    )}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">

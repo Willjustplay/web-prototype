@@ -1,13 +1,9 @@
-import { MessageCircle, ShieldCheck, CreditCard, Clock, ArrowUpRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { MessageCircle, ShieldCheck, CreditCard, Clock } from "lucide-react";
 import { waLink, STORE_LOGO_URL } from "@/lib/api";
-import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
 export const Footer = () => {
-  const { user } = useAuth();
   const { t } = useLanguage();
-  const isAdmin = user?.role === "admin";
 
   return (
     <footer
@@ -42,39 +38,6 @@ export const Footer = () => {
                 "Indonesia's trusted game account, instant top-up, & boosting marketplace. All transactions are backed by an official 100% money-back guarantee."
               )}
             </p>
-
-            {/* Dynamic Action Buttons Area */}
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <a
-                href={waLink(t("Halo WillJustPlay!", "Hello WillJustPlay!"))}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="footer-whatsapp-button"
-                className="group inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-neon to-cyan-300 hover:from-lime hover:to-neon text-void font-display font-bold text-xs uppercase tracking-wider px-5 py-3 shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:shadow-[0_0_25px_rgba(163,230,53,0.45)] transition-all duration-200 active:scale-95"
-              >
-                <MessageCircle
-                  size={15}
-                  className="transition-transform duration-200 group-hover:scale-110"
-                />
-                <span>{t("Chat WhatsApp CS", "Chat WhatsApp Support")}</span>
-                <ArrowUpRight
-                  size={14}
-                  className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                />
-              </a>
-
-              {isAdmin && (
-                <Link
-                  to="/admin"
-                  data-testid="footer-admin-link"
-                  aria-label={t("Panel Admin", "Admin Panel")}
-                  className="inline-flex items-center gap-2 rounded-xl border border-lime/50 bg-lime/10 text-lime hover:bg-lime/20 font-display font-bold text-xs uppercase tracking-wider px-4 py-3 transition-all duration-200 active:scale-95"
-                >
-                  <ShieldCheck size={14} />
-                  <span>{t("Panel Admin", "Admin Panel")}</span>
-                </Link>
-              )}
-            </div>
           </div>
 
           <div className="md:col-span-5 md:pl-6">
@@ -128,6 +91,22 @@ export const Footer = () => {
           </p>
         </div>
       </div>
+
+      {/* Compact Floating WhatsApp Icon Button (Located slightly higher up) */}
+      <a
+        href={waLink(t("Halo WillJustPlay!", "Hello WillJustPlay!"))}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="footer-whatsapp-button"
+        aria-label={t("Chat WhatsApp CS", "Chat WhatsApp Support")}
+        title={t("Chat WhatsApp CS", "Chat WhatsApp Support")}
+        className="fixed bottom-16 right-4 sm:bottom-14 sm:right-5 z-40 group inline-flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-r from-neon to-cyan-300 hover:from-lime hover:to-neon text-void shadow-[0_6px_20px_rgba(0,240,255,0.32)] hover:shadow-[0_6px_24px_rgba(163,230,53,0.45)] transition-all duration-200 active:scale-95"
+      >
+        <MessageCircle
+          size={20}
+          className="shrink-0 transition-transform duration-200 group-hover:scale-110"
+        />
+      </a>
     </footer>
   );
 };

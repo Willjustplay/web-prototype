@@ -88,13 +88,13 @@ export const Testimonials = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-xl bg-panel/90 border border-line px-4 py-2.5 flex items-center gap-3">
-              <div className="flex items-center gap-1.5 text-lime font-display font-black text-lg font-mono tabular-nums">
-                <Star size={16} fill="currentColor" />
+            <div className="w-fit flex items-center gap-2.5 py-1">
+              <div className="flex items-center gap-1.5 text-lime font-display font-black text-base sm:text-lg font-mono tabular-nums">
+                <Star size={15} fill="currentColor" />
                 <span>{avgRating}</span>
               </div>
               <span className="text-slate-600">·</span>
-              <p className="text-xs font-mono text-slate-300 flex items-center gap-1.5 tabular-nums">
+              <p className="text-[11px] sm:text-xs font-mono text-slate-300 flex items-center gap-1.5 tabular-nums">
                 <MessageSquare size={13} className="text-neon" />
                 <span>
                   {items.length} {t("ulasan terverifikasi", "verified reviews")}
@@ -106,15 +106,15 @@ export const Testimonials = () => {
 
         {/* Dynamic Filter Controls */}
         {(games.length > 1 || items.some((x) => x.image)) && (
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-8 pb-4 border-b border-line/80">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 mb-8 pb-3.5 border-b border-line/80">
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
               <button
                 type="button"
                 onClick={() => setActiveGame("all")}
-                className={`relative px-3.5 py-1.5 rounded-lg text-xs font-mono transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`relative w-fit flex-none px-2.5 py-1 text-[11px] sm:text-xs font-mono leading-tight transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   activeGame === "all"
-                    ? "bg-neon text-void font-bold shadow-[0_0_14px_rgba(0,240,255,0.3)]"
-                    : "bg-panel/80 text-slate-400 border border-line hover:text-slate-100 hover:border-neon/40"
+                    ? "text-neon font-bold underline decoration-neon decoration-2 underline-offset-4"
+                    : "text-slate-400 hover:text-slate-100"
                 }`}
               >
                 {t(`Semua Game (${items.length})`, `All Games (${items.length})`)}
@@ -126,10 +126,10 @@ export const Testimonials = () => {
                     key={g}
                     type="button"
                     onClick={() => setActiveGame(g)}
-                    className={`relative px-3.5 py-1.5 rounded-lg text-xs font-mono transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    className={`relative w-fit flex-none px-2.5 py-1 text-[11px] sm:text-xs font-mono leading-tight transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       isSelected
-                        ? "bg-neon text-void font-bold shadow-[0_0_14px_rgba(0,240,255,0.3)]"
-                        : "bg-panel/80 text-slate-400 border border-line hover:text-slate-100 hover:border-neon/40"
+                        ? "text-neon font-bold underline decoration-neon decoration-2 underline-offset-4"
+                        : "text-slate-400 hover:text-slate-100"
                     }`}
                   >
                     {g}
@@ -142,13 +142,13 @@ export const Testimonials = () => {
               <button
                 type="button"
                 onClick={() => setOnlyWithPhoto((v) => !v)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`w-fit flex-none inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-mono leading-tight transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   onlyWithPhoto
-                    ? "border-lime bg-lime/15 text-lime font-bold"
-                    : "border-line bg-panel/80 text-slate-400 hover:text-slate-200 hover:border-neon/40"
+                    ? "text-lime font-bold underline decoration-lime decoration-2 underline-offset-4"
+                    : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                <ImageIcon size={13} />
+                <ImageIcon size={12} />
                 <span>{t("Dengan Bukti Foto", "With Photo Proof")}</span>
               </button>
             )}
