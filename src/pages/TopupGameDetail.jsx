@@ -160,9 +160,10 @@ const translateChannelDescription = (desc, lang) => {
 
 export default function TopupGameDetail() {
   const { slug } = useParams();
-  const { user } = useAuth();
+  const { user, openAuth, refreshUser } = useAuth();
   const { lang, t } = useLanguage();
   const { games, loading, error, reload } = useTopupGames();
+  const userBalance = Math.max(0, Math.round(Number(user?.balance || 0)));
 
   const [values, setValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -241,7 +242,7 @@ export default function TopupGameDetail() {
         setDuitkuChannels(channels);
         const defaultCode = duitkuItem?.default_channel || channels[0]?.code || "PK_QRIS";
         setDuitkuChannel((cur) =>
-          channels.some((c) => c.code === cur) ? cur : defaultCode
+          cur === "WALLET" || channels.some((c) => c.code === cur) ? cur : defaultCode
         );
       })
       .catch(() => {});
@@ -278,6 +279,23 @@ export default function TopupGameDetail() {
     return currencyDenoms;
   }, [currencyDenoms, membershipDenoms, denomFilter]);
 
+  const walletChannelObj = useMemo(
+    () => ({
+      code: "WALLET",
+      gateway_id: "wallet",
+      name: t("Saldo Akun (Potong Langsung)", "Account Balance (Instant Deduct)"),
+      short_name: t("Saldo Akun", "Account Balance"),
+      category: "wallet",
+      category_label: t("Saldo Akun", "Account Balance"),
+      payment_flow: "wallet",
+      description: t(
+        "Bayar instan langsung memotong Saldo Akun Anda tanpa antre",
+        "Instant checkout deducted directly from your Account Balance"
+      ),
+    }),
+    [t]
+  );
+
   const channels = useMemo(
     () =>
       Array.isArray(duitkuChannels) && duitkuChannels.length > 0
@@ -286,13 +304,14 @@ export default function TopupGameDetail() {
     [duitkuChannels]
   );
 
-  const selectedChannelObj = useMemo(
-    () =>
+  const selectedChannelObj = useMemo(() => {
+    if (duitkuChannel === "WALLET") return walletChannelObj;
+    return (
       channels.find((c) => c.code === duitkuChannel) ||
       channels[0] ||
-      DEFAULT_DUITKU_CHANNELS[0],
-    [channels, duitkuChannel]
-  );
+      DEFAULT_DUITKU_CHANNELS[0]
+    );
+  }, [channels, duitkuChannel, walletChannelObj]);
 
   const paymentGroups = useMemo(
     () => [
@@ -441,6 +460,30 @@ export default function TopupGameDetail() {
       return;
     }
 
+    if (duitkuChannel === "WALLET") {
+      if (!user) {
+        const msg = t(
+          "Silakan login akun member terlebih dahulu untuk membayar menggunakan Saldo Akun.",
+          "Please sign in first to pay using your Account Balance."
+        );
+        setSummaryError(msg);
+        toast.error(msg);
+        openAuth?.("login");
+        scrollToStep("codashop-step-3");
+        return;
+      }
+      if (userBalance < Number(denomination.price || 0)) {
+        const msg = t(
+          `Saldo Akun Anda (${formatIDR(userBalance)}) belum cukup untuk paket ini (${formatIDR(denomination.price)}). Silakan isi saldo terlebih dahulu atau pilih QRIS Otomatis.`,
+          `Your Account Balance (${formatIDR(userBalance)}) is insufficient for this package (${formatIDR(denomination.price)}). Please top up your balance or choose QRIS.`
+        );
+        setSummaryError(msg);
+        toast.error(msg);
+        scrollToStep("codashop-step-3");
+        return;
+      }
+    }
+
     // 4. Validate Buyer Email
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) {
@@ -541,19 +584,22 @@ export default function TopupGameDetail() {
     setActiveOrderConflict(null);
     try {
       const rawGw = String(selectedChannelObj?.gateway_id || "").toLowerCase();
-      const selectedGw = ["paykita", "duitku", "tripay", "midtrans", "xendit", "tokopay"].includes(rawGw)
-        ? rawGw
-        : duitkuChannel === "PK_QRIS"
-        ? "paykita"
-        : duitkuChannel.startsWith("TP_")
-        ? "tripay"
-        : duitkuChannel.startsWith("MT_")
-        ? "midtrans"
-        : duitkuChannel.startsWith("XD_")
-        ? "xendit"
-        : duitkuChannel.startsWith("TK_")
-        ? "tokopay"
-        : "duitku";
+      const selectedGw =
+        duitkuChannel === "WALLET" || rawGw === "wallet"
+          ? "wallet"
+          : ["paykita", "duitku", "tripay", "midtrans", "xendit", "tokopay"].includes(rawGw)
+          ? rawGw
+          : duitkuChannel === "PK_QRIS"
+          ? "paykita"
+          : duitkuChannel.startsWith("TP_")
+          ? "tripay"
+          : duitkuChannel.startsWith("MT_")
+          ? "midtrans"
+          : duitkuChannel.startsWith("XD_")
+          ? "xendit"
+          : duitkuChannel.startsWith("TK_")
+          ? "tokopay"
+          : "duitku";
       const payload = {
         game: game.slug,
         denomination_code: denomination.code,
@@ -570,9 +616,21 @@ export default function TopupGameDetail() {
         active_session_ids: getActiveClientSessions(),
       };
       const { data } = await api.post("/payments/topup/checkout", payload);
-      rememberActiveClientSession(data.session_id || data.order_id);
+      if (selectedGw === "wallet") {
+        await refreshUser?.();
+      } else {
+        rememberActiveClientSession(data.session_id || data.order_id);
+      }
       window.location.href = data.checkout_url;
     } catch (e) {
+      if (
+        e.response?.data?.sku_problem ||
+        e.response?.data?.code === "SKU_TEMPORARILY_DISRUPTED"
+      ) {
+        setConfirmModalOpen(false);
+        setDenomination(null);
+        reload?.();
+      }
       if (
         e.response?.status === 409 &&
         e.response?.data?.code === "ACTIVE_ORDER_EXISTS" &&
@@ -1503,6 +1561,94 @@ export default function TopupGameDetail() {
                       </span>
                     </div>
                   )}
+                </div>
+
+                {/* Saldo Akun (Instant Balance Payment Option) */}
+                <div className="mb-3.5 sm:mb-4">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDuitkuChannel("WALLET")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setDuitkuChannel("WALLET");
+                      }
+                    }}
+                    data-testid="topup-channel-WALLET"
+                    className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 rounded-xl px-3.5 py-3 border text-left transition-all duration-200 cursor-pointer min-w-0 w-full ${
+                      duitkuChannel === "WALLET"
+                        ? "border-lime bg-lime/10 shadow-[0_0_22px_rgba(163,230,53,0.18)] ring-1 ring-lime/50"
+                        : "border-line bg-void/85 hover:border-lime/50 hover:bg-void"
+                    }`}
+                  >
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
+                      <span
+                        className={`w-4 h-4 rounded-full border grid place-items-center shrink-0 mt-0.5 sm:mt-0 transition-colors ${
+                          duitkuChannel === "WALLET"
+                            ? "bg-lime border-lime text-void"
+                            : "border-slate-600 group-hover:border-lime/60"
+                        }`}
+                      >
+                        {duitkuChannel === "WALLET" && <Check size={10} strokeWidth={3} />}
+                      </span>
+                      <span className="w-8 h-8 rounded-xl bg-lime/15 border border-lime/40 text-lime grid place-items-center shrink-0">
+                        <Wallet size={15} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-display font-bold text-xs sm:text-[13px] text-slate-100">
+                            {t("Saldo Akun (Bayar Instan)", "Account Balance (Instant Pay)")}
+                          </span>
+                          <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-lime/15 text-lime border border-lime/40">
+                            {t("Potong Langsung", "Instant")}
+                          </span>
+                        </div>
+                        <p className="text-[10px] sm:text-[11px] font-mono text-slate-400 mt-0.5">
+                          {user
+                            ? `${t("Saldo tersedia:", "Available balance:")} ${formatIDR(userBalance)}${
+                                denomination && userBalance < Number(denomination.price || 0)
+                                  ? ` (${t("Kurang", "Short")} ${formatIDR(
+                                      Number(denomination.price || 0) - userBalance
+                                    )})`
+                                  : ""
+                              }`
+                            : t(
+                                "Login akun member untuk membayar langsung menggunakan Saldo Akun",
+                                "Sign in to pay directly with your Account Balance"
+                              )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pl-6 sm:pl-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {user ? (
+                        <Link
+                          to="/account?tab=wallet"
+                          data-testid="topup-wallet-topup-link"
+                          className="inline-flex items-center gap-1 rounded-lg border border-lime/50 bg-void/90 hover:bg-lime hover:text-void text-lime px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors"
+                        >
+                          + {t("Isi Saldo", "Top Up Balance")}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openAuth?.("login")}
+                          className="inline-flex items-center gap-1 rounded-lg border border-neon/50 bg-void/90 hover:bg-neon hover:text-void text-neon px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                        >
+                          {t("Login", "Sign In")}
+                        </button>
+                      )}
+                      {denomination && (
+                        <span className="font-mono font-extrabold text-xs sm:text-sm text-lime tabular-nums">
+                          {formatIDR(denomination.price)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Dynamic 4-Tab Payment Category Switch (No All Button) */}

@@ -224,7 +224,7 @@ function PureQrisImage({
 export default function PaymentSuccess() {
   const [params] = useSearchParams();
   const sessionId = params.get("session_id") || params.get("order_id");
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [status, setStatus] = useState("checking");
   const [delivery, setDelivery] = useState("");
   const [paymentType, setPaymentType] = useState("");
@@ -391,6 +391,8 @@ export default function PaymentSuccess() {
   const isLink = /^https?:\/\//i.test(delivery.trim());
   const parsedCred = parseClientDeliveryInfo(delivery, txData?.structured_delivery);
   const isTopupOrder = txData?.product_type === "topup";
+  const isWalletTopupOrder =
+    txData?.order_type === "wallet_topup" || txData?.product_type === "wallet_topup";
 
   const copyDelivery = () => {
     const textToCopy = parsedCred.isStructured ? parsedCred.formattedBracket : delivery;
@@ -524,16 +526,19 @@ export default function PaymentSuccess() {
   useEffect(() => {
     if (status !== "paid" || !sessionId) return;
     let alive = true;
-    api
-      .get(`/reviews/eligibility/${sessionId}`, {
-        params: user?.email ? { email: user.email } : {},
-      })
-      .then(({ data }) => alive && setReviewEligibility(data))
-      .catch(() => alive && setReviewEligibility(null));
+    refreshUser?.();
+    if (!isWalletTopupOrder) {
+      api
+        .get(`/reviews/eligibility/${sessionId}`, {
+          params: user?.email ? { email: user.email } : {},
+        })
+        .then(({ data }) => alive && setReviewEligibility(data))
+        .catch(() => alive && setReviewEligibility(null));
+    }
     return () => {
       alive = false;
     };
-  }, [status, sessionId, user?.email]);
+  }, [status, sessionId, user?.email, isWalletTopupOrder, refreshUser]);
 
   const reviewProductTitle =
     txData?.product_title || reviewEligibility?.order?.product_title || "";
@@ -649,16 +654,26 @@ export default function PaymentSuccess() {
               className="font-display font-bold text-xl mt-4 text-slate-100"
               data-testid="payment-success-title"
             >
-              Pembayaran <span className="text-lime">Berhasil</span>
+              {isWalletTopupOrder ? (
+                <>
+                  Top Up Saldo <span className="text-lime">Berhasil</span>
+                </>
+              ) : (
+                <>
+                  Pembayaran <span className="text-lime">Berhasil</span>
+                </>
+              )}
             </h1>
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-              {isTopupOrder
+              {isWalletTopupOrder
+                ? `Saldo sebesar ${formatIDR(txData?.amount || 0)} telah berhasil ditambahkan ke Saldo Akun Anda.`
+                : isTopupOrder
                 ? "Pembayaran Top Up kamu telah lunas dan invoice resmi telah dikirim ke email."
                 : "Pembayaran terkonfirmasi! Akses data akun telah dikirim ke email kamu & tersedia di bawah ini."}
             </p>
 
             {/* Email Delivery Confirmation & Resend Banner */}
-            {txData?.buyer_email && (
+            {txData?.buyer_email && !isWalletTopupOrder && (
               <div
                 data-testid="email-delivery-banner"
                 className="mt-4 flex flex-wrap items-center justify-between gap-2.5 bg-lime/10 border border-lime/40 px-3.5 py-2.5 text-left"
@@ -777,7 +792,29 @@ export default function PaymentSuccess() {
               </div>
             )}
 
-            {delivery ? (
+            {isWalletTopupOrder ? (
+              <div
+                data-testid="wallet-topup-success-card"
+                className="mt-4 text-left border border-lime/40 bg-lime/10 p-4 space-y-2.5"
+              >
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-300">Nominal Saldo Ditambahkan</span>
+                  <strong className="text-lime text-sm font-extrabold">
+                    +{formatIDR(txData?.amount || 0)}
+                  </strong>
+                </div>
+                <p className="text-xs font-mono text-slate-300 leading-relaxed">
+                  {delivery ||
+                    "Saldo Akun Anda sudah aktif dan dapat langsung digunakan untuk membeli Produk Akun maupun Top Up Game."}
+                </p>
+                <Link
+                  to="/account?tab=wallet"
+                  className="inline-flex items-center justify-center gap-2 w-full bg-lime text-void font-display font-bold text-xs uppercase tracking-wider py-2.5 px-4 mt-1 hover:bg-neon transition-colors"
+                >
+                  <span>Lihat Saldo Akun Saya</span>
+                </Link>
+              </div>
+            ) : delivery ? (
               <div
                 className="mt-4 text-left border border-neon/40 bg-void/80 p-4 space-y-3"
                 data-testid="delivery-info-box"
@@ -945,24 +982,26 @@ export default function PaymentSuccess() {
               ID Sesi: {sessionId}
             </p>
 
-            {!reviewEligibility?.has_review ? (
-              <button
-                type="button"
-                onClick={() => setReviewOpen(true)}
-                data-testid="payment-review-button"
-                className="mt-4 w-full flex items-center justify-center gap-2 border border-lime/50 text-lime hover:bg-lime/10 text-xs font-semibold py-2.5 px-4 transition-colors duration-200"
-              >
-                <Star size={14} />
-                <span>Beri Ulasan Pembelian</span>
-              </button>
-            ) : (
-              <p
-                data-testid="payment-review-done"
-                className="mt-4 flex items-center justify-center gap-1.5 text-xs font-mono text-lime"
-              >
-                <Star size={13} fill="currentColor" />
-                <span>Terima kasih, ulasanmu sudah tersimpan</span>
-              </p>
+            {!isWalletTopupOrder && (
+              !reviewEligibility?.has_review ? (
+                <button
+                  type="button"
+                  onClick={() => setReviewOpen(true)}
+                  data-testid="payment-review-button"
+                  className="mt-4 w-full flex items-center justify-center gap-2 border border-lime/50 text-lime hover:bg-lime/10 text-xs font-semibold py-2.5 px-4 transition-colors duration-200"
+                >
+                  <Star size={14} />
+                  <span>Beri Ulasan Pembelian</span>
+                </button>
+              ) : (
+                <p
+                  data-testid="payment-review-done"
+                  className="mt-4 flex items-center justify-center gap-1.5 text-xs font-mono text-lime"
+                >
+                  <Star size={13} fill="currentColor" />
+                  <span>Terima kasih, ulasanmu sudah tersimpan</span>
+                </p>
+              )
             )}
           </div>
         )}

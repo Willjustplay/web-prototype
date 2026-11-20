@@ -4969,6 +4969,8 @@ function publicUser(user: any) {
     id: user.id,
     email: user.email,
     name: user.name || "",
+    avatar: user.avatar || "",
+    balance: Math.max(0, Math.round(Number(user.balance || 0))),
     role: user.role || "buyer",
     status: user.status || "active",
     is_verified: Boolean(user.is_verified),
@@ -4977,6 +4979,149 @@ function publicUser(user: any) {
     created_at: user.created_at || null,
     last_login_at: user.last_login_at || null,
   };
+}
+
+function getWalletLedgerStore(): any[] {
+  const anyDb = db as any;
+  if (!Array.isArray(anyDb.wallet_ledger)) {
+    anyDb.wallet_ledger = [];
+  }
+  return anyDb.wallet_ledger;
+}
+
+function getUserWalletLedger(user: any, limit = 50): any[] {
+  if (!user) return [];
+  const store = getWalletLedgerStore();
+  const uid = String(user.id || "").trim();
+  const uemail = String(user.email || "").trim().toLowerCase();
+  return store
+    .filter(
+      (entry) =>
+        (uid && entry.user_id === uid) ||
+        (uemail && String(entry.user_email || "").toLowerCase() === uemail)
+    )
+    .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+    .slice(0, limit);
+}
+
+function recordWalletLedgerEntry(params: {
+  user: any;
+  type: "deposit" | "payment" | "refund";
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  sessionId?: string;
+  description: string;
+}) {
+  const store = getWalletLedgerStore();
+  const entry = {
+    id: `wl-${uuidHex(10)}`,
+    user_id: params.user?.id || null,
+    user_email: params.user?.email || null,
+    type: params.type,
+    amount: Math.round(Number(params.amount || 0)),
+    balance_before: Math.round(Number(params.balanceBefore || 0)),
+    balance_after: Math.round(Number(params.balanceAfter || 0)),
+    reference_session_id: params.sessionId || null,
+    description: params.description,
+    created_at: nowIso(),
+  };
+  store.unshift(entry);
+  if (store.length > 1000) {
+    store.length = 1000;
+  }
+  return entry;
+}
+
+function creditWalletTopupIfNeeded(tx: any, confirmedBy = "system"): boolean {
+  if (!tx) return false;
+  const isWalletTopup =
+    tx.order_type === "wallet_topup" ||
+    tx.product_type === "wallet_topup" ||
+    tx.product_id === "wallet-topup";
+  if (!isWalletTopup) return false;
+  if (tx.wallet_credited) return false;
+  if (tx.payment_status !== "paid") return false;
+  if (tx.provider === "paykita" && !tx.paykita_confirmed) return false;
+
+  const user =
+    (tx.user_id && db.users.find((u) => u.id === tx.user_id)) ||
+    (tx.buyer_email &&
+      db.users.find(
+        (u) => String(u.email || "").toLowerCase() === String(tx.buyer_email).toLowerCase()
+      ));
+  if (!user) return false;
+
+  const creditAmount = Math.max(0, Math.round(Number(tx.base_amount || tx.amount || 0)));
+  if (creditAmount <= 0) return false;
+
+  const before = Math.max(0, Math.round(Number(user.balance || 0)));
+  const after = before + creditAmount;
+  user.balance = after;
+  user.updated_at = nowIso();
+
+  tx.wallet_credited = true;
+  tx.wallet_credited_amount = creditAmount;
+  tx.wallet_credited_at = nowIso();
+  tx.wallet_credited_by = confirmedBy;
+  tx.status = "completed";
+  tx.delivery_info = `Saldo Akun +Rp ${new Intl.NumberFormat("id-ID").format(creditAmount)} telah masuk ke akun (${user.email}). Saldo sekarang: Rp ${new Intl.NumberFormat("id-ID").format(after)}`;
+
+  recordWalletLedgerEntry({
+    user,
+    type: "deposit",
+    amount: creditAmount,
+    balanceBefore: before,
+    balanceAfter: after,
+    sessionId: tx.session_id,
+    description: `Top Up Saldo Akun (${tx.destination_name || tx.provider || "Transfer"})`,
+  });
+
+  saveDb();
+  return true;
+}
+
+function refundWalletOrderIfNeeded(tx: any, reason = "Pengembalian dana pesanan gagal"): boolean {
+  if (!tx) return false;
+  const isWalletPaid = tx.provider === "wallet" || tx.payment_type === "wallet";
+  if (!isWalletPaid || !tx.wallet_debited || tx.wallet_refunded) return false;
+
+  const user =
+    (tx.user_id && db.users.find((u) => u.id === tx.user_id)) ||
+    (tx.buyer_email &&
+      db.users.find(
+        (u) => String(u.email || "").toLowerCase() === String(tx.buyer_email).toLowerCase()
+      ));
+  if (!user) return false;
+
+  const refundAmount = Math.max(
+    0,
+    Math.round(Number(tx.wallet_debited_amount || tx.amount || 0))
+  );
+  if (refundAmount <= 0) return false;
+
+  const before = Math.max(0, Math.round(Number(user.balance || 0)));
+  const after = before + refundAmount;
+  user.balance = after;
+  user.updated_at = nowIso();
+
+  tx.wallet_refunded = true;
+  tx.wallet_refunded_amount = refundAmount;
+  tx.wallet_refunded_at = nowIso();
+  tx.wallet_refund_reason = reason;
+
+  recordWalletLedgerEntry({
+    user,
+    type: "refund",
+    amount: refundAmount,
+    balanceBefore: before,
+    balanceAfter: after,
+    sessionId: tx.session_id,
+    description: `${reason} (${tx.product_title || tx.session_id})`,
+  });
+
+  saveDb();
+  return true;
 }
 
 function parseCookies(req: Request): Record<string, string> {
@@ -7398,16 +7543,58 @@ api.get("/social-links", (_req, res) => {
 api.get("/me/orders", (req, res) => {
   const user = requireUser(req, res);
   if (!user) return;
+  const userEmailLower = String(user.email || "").toLowerCase();
   const orders = db.transactions
-    .filter((t) => t.user_id === user.id)
+    .filter(
+      (t) =>
+        t.user_id === user.id ||
+        (userEmailLower && String(t.buyer_email || "").toLowerCase() === userEmailLower)
+    )
     .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
     .map((o) => {
+      creditWalletTopupIfNeeded(o);
       const copy = { ...o };
       delete copy.payment_proof;
       if (copy.payment_status !== "paid") delete copy.delivery_info;
       return copy;
     });
   res.json(orders);
+});
+
+api.get("/me/wallet", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const userEmailLower = String(user.email || "").toLowerCase();
+  for (const tx of db.transactions || []) {
+    if (
+      tx.user_id === user.id ||
+      (userEmailLower && String(tx.buyer_email || "").toLowerCase() === userEmailLower)
+    ) {
+      creditWalletTopupIfNeeded(tx);
+    }
+  }
+  const balance = Math.max(0, Math.round(Number(user.balance || 0)));
+  const ledger = getUserWalletLedger(user, 100);
+  const topupOrders = (db.transactions || [])
+    .filter(
+      (t) =>
+        (t.order_type === "wallet_topup" || t.product_type === "wallet_topup") &&
+        (t.user_id === user.id ||
+          (userEmailLower && String(t.buyer_email || "").toLowerCase() === userEmailLower))
+    )
+    .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+    .slice(0, 30)
+    .map((o) => {
+      const copy = { ...o };
+      delete copy.payment_proof;
+      return copy;
+    });
+  res.json({
+    balance,
+    min_topup: 20000,
+    ledger,
+    topup_orders: topupOrders,
+  });
 });
 
 api.get("/me/wishlist", (req, res) => {
@@ -8711,12 +8898,39 @@ api.get("/payments/methods", (req, res) => {
     is_global_active: true,
   };
 
-  const activeDests = db.manual_destinations
-    .filter((d) => d.is_active !== false && !disabledSet.has(d.id))
-    .sort((a, b) => (a.seq || 0) - (b.seq || 0));
-  const fiatDests = pCfg.manual !== false ? activeDests.filter((d) => d.type !== "crypto") : [];
-  const cryptoDests = pCfg.crypto !== false ? activeDests.filter((d) => d.type === "crypto") : [];
-  const methods: any[] = [];
+  if (scopeParam === "wallet") {
+    const activeDests = db.manual_destinations
+      .filter((d) => d.is_active !== false)
+      .sort((a, b) => (a.seq || 0) - (b.seq || 0));
+    const fiatDests = activeDests.filter((d) => d.type !== "crypto");
+    const cryptoDests = activeDests.filter((d) => d.type === "crypto");
+    const walletTopupMethods: any[] = [];
+    if (fiatDests.length > 0) {
+      walletTopupMethods.push({ id: "manual", label: "Transfer / QRIS Manual" });
+    }
+    if (cryptoDests.length > 0) {
+      walletTopupMethods.push({ id: "crypto", label: "Crypto (USDT / Coin)" });
+    }
+    if (targetState.enabled !== false && s.enabled !== false) {
+      walletTopupMethods.push({
+        id: "paykita",
+        gateway_id: "paykita",
+        label: "QRIS Otomatis",
+        default_gateway: "paykita",
+        preferred_gateway: "paykita",
+        gateways: [gatewayInfo],
+      });
+    }
+    return res.json(walletTopupMethods);
+  }
+
+  // Store Product (Produk Beranda): Saldo Akun & QRIS Otomatis (Manual & Crypto dipindahkan ke Top Up Saldo Akun)
+  const methods: any[] = [
+    {
+      id: "wallet",
+      label: "Saldo Akun",
+    },
+  ];
   if (autoEnabled) {
     methods.push({
       id: "paykita",
@@ -8727,8 +8941,6 @@ api.get("/payments/methods", (req, res) => {
       gateways: [gatewayInfo],
     });
   }
-  if (fiatDests.length > 0) methods.push({ id: "manual", label: "Transfer / QRIS" });
-  if (cryptoDests.length > 0) methods.push({ id: "crypto", label: "Crypto (USDT / Coin)" });
   res.json(methods);
 });
 
@@ -10134,6 +10346,7 @@ const applyDigiflazzTransactionUpdate = (tx: any, data: any, source = "digiflazz
     if (isSkuProblem && sku) {
       markDigiflazzSkuProblemByCode(sku, message || `Gangguan Digiflazz (RC ${rc})`);
     }
+    refundWalletOrderIfNeeded(tx, "Refund otomatis Top Up gagal di pusat");
   }
 
   saveDb();
@@ -10320,6 +10533,7 @@ const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
     if (p && p.product_type !== PRODUCT_TYPE && Number(p.stock ?? 0) <= 0) {
       cancelOngoingTransactionsForOutOfStockProduct(p.id, tx.session_id);
     }
+    creditWalletTopupIfNeeded(tx, confirmedBy);
     saveDb();
     if (tx.product_type === PRODUCT_TYPE) {
       const dfProvider =
@@ -10329,8 +10543,11 @@ const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
       }
     }
     void sendOrderFulfillmentEmail(tx);
-  } else if (tx.payment_status === "paid" && !tx.fulfillment_email_sent_at) {
-    void sendOrderFulfillmentEmail(tx);
+  } else if (tx.payment_status === "paid") {
+    creditWalletTopupIfNeeded(tx, confirmedBy);
+    if (!tx.fulfillment_email_sent_at) {
+      void sendOrderFulfillmentEmail(tx);
+    }
   }
 };
 
@@ -11181,6 +11398,278 @@ const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
 api.post("/payments/manual/checkout", handleManualOrCryptoCheckout);
 api.post("/payments/crypto/checkout", handleManualOrCryptoCheckout);
 
+// Top Up Saldo Akun (Minimal Rp 20.000 — Mendukung Pembayaran Manual, Crypto & QRIS Otomatis)
+api.post("/payments/wallet/topup", async (req, res) => {
+  try {
+    if (!enforceCheckoutRateLimit(req, res, "wallet_topup")) return;
+    const user = requireUser(req, res);
+    if (!user) return;
+
+    const body = req.body || {};
+    const rawAmount = Math.round(Number(body.amount || 0));
+    if (!Number.isFinite(rawAmount) || rawAmount < 20000) {
+      return res.status(400).json({
+        detail: "Nominal Top Up Saldo Akun minimal Rp 20.000",
+      });
+    }
+    if (rawAmount > 50000000) {
+      return res.status(400).json({
+        detail: "Nominal Top Up Saldo Akun maksimal Rp 50.000.000 per transaksi",
+      });
+    }
+
+    const method = String(body.method || "manual").trim().toLowerCase();
+    const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
+    const amountIdr = rawAmount;
+    const amountUsd = Math.max(1, Math.round((amountIdr / 16000) * 100) / 100);
+    const formattedIdr = new Intl.NumberFormat("id-ID").format(amountIdr);
+    const productTitle = `Top Up Saldo Akun — Rp ${formattedIdr}`;
+
+    let buyerWa = String(body.buyer_whatsapp || "").replace(/[^\d]/g, "");
+    if (buyerWa.startsWith("0")) buyerWa = "62" + buyerWa.slice(1);
+
+    if (method === "paykita") {
+      const s = db.settings.paykita || {};
+      const pgGateways = db.settings.payment_gateways?.gateways || {};
+      if (s.enabled === false || pgGateways.paykita?.enabled === false) {
+        return res.status(400).json({
+          detail: "Pembayaran QRIS Otomatis sedang dinonaktifkan. Silakan gunakan metode Transfer / QRIS Manual.",
+        });
+      }
+      const orderId = genOrderId("NXG-W");
+      const remoteOrder = await tryCreateRemotePaykitaOrder({
+        orderId,
+        amount: amountIdr,
+        productTitle,
+        buyerEmail: user.email,
+        buyerWhatsapp: buyerWa,
+        origin,
+        gatewayOverride: "paykita",
+      });
+      const expiredAt = remoteOrder.expired_at || new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const tx = {
+        buyer_email: user.email,
+        buyer_whatsapp: buyerWa || null,
+        session_id: orderId,
+        order_type: "wallet_topup",
+        product_type: "wallet_topup",
+        category: "Saldo Akun",
+        product_id: "wallet-topup",
+        product_title: productTitle,
+        paykita_ref: remoteOrder.paykita_ref || orderId,
+        gateway_id: "paykita",
+        gateway_name: "QRIS Otomatis",
+        provider: "paykita",
+        payment_type: "paykita",
+        destination_id: "paykita-qris",
+        destination_name: "QRIS Otomatis",
+        qris_string: remoteOrder.qris_string,
+        qris_image: remoteOrder.qris_image,
+        pay_url: remoteOrder.pay_url || null,
+        base_amount: amountIdr,
+        pay_amount: remoteOrder.pay_amount || amountIdr,
+        unique_code: remoteOrder.unique_code || 0,
+        fee_amount: remoteOrder.fee_amount || 0,
+        qris_provider: "QRIS Otomatis",
+        paykita_mode: remoteOrder.mode,
+        paykita_error: remoteOrder.error_message || null,
+        paykita_error_code: remoteOrder.error_code || null,
+        expired_at: expiredAt,
+        delivery_info: `Pengisian Saldo Akun sebesar Rp ${formattedIdr} untuk ${user.email}`,
+        user_id: user.id,
+        amount: amountIdr,
+        amount_usd: amountUsd,
+        currency: "idr",
+        status: "pending",
+        payment_status: "pending",
+        paykita_confirmed: false,
+        paykita_confirmed_by: null as string | null,
+        paykita_confirmed_at: null as string | null,
+        wallet_credited: false,
+        payment_proof: null,
+        has_proof: false,
+        stock_deducted: true,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      db.transactions.push(tx);
+      saveDb();
+      return res.json({
+        order_id: orderId,
+        session_id: orderId,
+        checkout_url: `${origin}/payment/success?session_id=${orderId}`,
+      });
+    }
+
+    // Manual / Crypto transfer for Wallet Top Up
+    const dest = db.manual_destinations.find(
+      (d) => d.id === body.destination_id && d.is_active !== false
+    );
+    if (!dest) {
+      return res.status(404).json({
+        detail: "Pilih tujuan pembayaran manual (Transfer / QRIS / E-Wallet / Crypto) yang aktif",
+      });
+    }
+    const isCrypto = dest.type === "crypto";
+    const orderId = genOrderId("NXG-W");
+    const tx = {
+      buyer_email: user.email,
+      buyer_whatsapp: buyerWa || null,
+      session_id: orderId,
+      order_type: "wallet_topup",
+      product_type: "wallet_topup",
+      category: "Saldo Akun",
+      product_id: "wallet-topup",
+      product_title: productTitle,
+      provider: "manual",
+      payment_type: isCrypto ? "crypto" : "manual",
+      destination_id: dest.id,
+      destination_name: dest.name,
+      crypto_network: isCrypto ? dest.network || "" : null,
+      crypto_symbol: isCrypto ? dest.symbol || "USDT" : null,
+      tx_hash: null as string | null,
+      delivery_info: `Pengisian Saldo Akun sebesar Rp ${formattedIdr} untuk ${user.email}`,
+      user_id: user.id,
+      base_amount: amountIdr,
+      pay_amount: amountIdr,
+      amount: amountIdr,
+      amount_usd: amountUsd,
+      currency: isCrypto ? "usd" : "idr",
+      status: "pending",
+      payment_status: "pending",
+      wallet_credited: false,
+      payment_proof: null,
+      has_proof: false,
+      stock_deducted: true,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    db.transactions.push(tx);
+    saveDb();
+    return res.json({
+      order_id: orderId,
+      session_id: orderId,
+      checkout_url: `${origin}/payment/success?session_id=${orderId}`,
+    });
+  } catch (err: any) {
+    return res.status(err.status || 400).json({
+      detail: err.detail || "Gagal membuat pesanan Top Up Saldo Akun",
+    });
+  }
+});
+
+// Pembelian Produk Beranda Menggunakan Saldo Akun (Langsung Lunas & Terkirim)
+api.post("/payments/wallet/checkout", async (req, res) => {
+  try {
+    if (!enforceCheckoutRateLimit(req, res, "wallet_store_checkout")) return;
+    const user = requireUser(req, res);
+    if (!user) return;
+
+    const body = req.body || {};
+    const product = findProductFlexible(body.product_id);
+    if (!product) return res.status(404).json({ detail: "Produk tidak ditemukan" });
+    if ((product.stock || 0) < 1) return res.status(400).json({ detail: "Stok produk habis" });
+
+    const buyer = parseBuyer({
+      ...body,
+      buyer_email: body.buyer_email || user.email,
+    });
+    const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
+    if (!enforceSingleActiveOrderPerProduct(req, res, product, buyer, user, origin)) return;
+
+    const priceIdr = Math.round(Number(product.price || 0));
+    const currentBalance = Math.max(0, Math.round(Number(user.balance || 0)));
+    if (currentBalance < priceIdr) {
+      return res.status(400).json({
+        detail: `Saldo Akun Anda (Rp ${new Intl.NumberFormat("id-ID").format(currentBalance)}) belum mencukupi untuk produk ini (Rp ${new Intl.NumberFormat("id-ID").format(priceIdr)}). Silakan Top Up Saldo Akun terlebih dahulu.`,
+        code: "INSUFFICIENT_WALLET_BALANCE",
+        current_balance: currentBalance,
+        required_amount: priceIdr,
+      });
+    }
+
+    const orderId = genOrderId("NXG-S");
+    const priceUsd =
+      product.price_usd && Number(product.price_usd) > 0
+        ? Number(product.price_usd)
+        : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
+
+    const balanceBefore = currentBalance;
+    const balanceAfter = balanceBefore - priceIdr;
+    user.balance = balanceAfter;
+    user.updated_at = nowIso();
+
+    if ((product.stock || 0) > 0) product.stock -= 1;
+    product.sold = (product.sold || 0) + 1;
+
+    const tx = {
+      ...buyer,
+      session_id: orderId,
+      provider: "wallet",
+      payment_type: "wallet",
+      gateway_id: "wallet",
+      gateway_name: "Saldo Akun",
+      destination_id: "wallet-balance",
+      destination_name: "Saldo Akun",
+      product_id: product.id,
+      product_title: product.title,
+      delivery_info:
+        product.delivery_info ||
+        `[Gmail] [akses.${String(product.id || "akun").toLowerCase()}@willjustplay.com] [Wjp#${String(
+          product.id || "2026"
+        )
+          .slice(0, 4)
+          .toUpperCase()}2026]`,
+      user_id: user.id,
+      base_amount: priceIdr,
+      pay_amount: priceIdr,
+      amount: priceIdr,
+      amount_usd: priceUsd,
+      currency: "idr",
+      status: "completed",
+      payment_status: "paid",
+      wallet_debited: true,
+      wallet_debited_amount: priceIdr,
+      wallet_refunded: false,
+      payment_proof: null,
+      has_proof: false,
+      stock_deducted: true,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+
+    db.transactions.push(tx);
+    recordWalletLedgerEntry({
+      user,
+      type: "payment",
+      amount: priceIdr,
+      balanceBefore,
+      balanceAfter,
+      sessionId: orderId,
+      description: `Pembelian Produk: ${product.title}`,
+    });
+
+    if (product.product_type !== PRODUCT_TYPE && Number(product.stock ?? 0) <= 0) {
+      cancelOngoingTransactionsForOutOfStockProduct(product.id, tx.session_id);
+    }
+
+    saveDb();
+    void sendOrderFulfillmentEmail(tx, req);
+
+    return res.json({
+      order_id: orderId,
+      session_id: orderId,
+      payment_status: "paid",
+      balance_after: balanceAfter,
+      checkout_url: `${origin}/payment/success?session_id=${orderId}`,
+    });
+  } catch (err: any) {
+    return res.status(err.status || 400).json({
+      detail: err.detail || "Gagal memproses pembayaran dengan Saldo Akun",
+    });
+  }
+});
+
 function resolveTopupItemModalPrice(game: any, denom: any, fallbackPrice = 0): number {
   const explicitModal = Number(denom?.modal_price || 0);
   if (explicitModal > 0) return Math.round(explicitModal);
@@ -11236,6 +11725,7 @@ async function verifyDigiflazzBalanceForTopupCheckout(
   product: any
 ): Promise<{
   ok: boolean;
+  sku_problem?: boolean;
   current_balance: number;
   item_modal: number;
   reserved_modal: number;
@@ -11243,10 +11733,6 @@ async function verifyDigiflazzBalanceForTopupCheckout(
   total_required: number;
   buyer_message: string;
 }> {
-  const itemModal = resolveTopupItemModalPrice(game, denom, Number(product?.price || 0));
-  const { reserved_modal: reservedModal, active_count: activeOrders } = computeReservedTopupModal();
-  const totalRequired = itemModal + reservedModal;
-
   const doc =
     db.topup_providers.find((v) => v.kind === "digiflazz") ||
     db.topup_providers[0];
@@ -11260,6 +11746,117 @@ async function verifyDigiflazzBalanceForTopupCheckout(
 
   const buyerDisruptionMsg =
     "Maaf, stok atau layanan untuk produk ini sedang mengalami gangguan sementara. Silakan pilih nominal lain atau coba beberapa saat lagi.";
+  const skuDisruptionMsg =
+    "Maaf, produk / nominal yang Anda pilih saat ini sedang mengalami gangguan dari pusat dan disembunyikan sementara. Silakan pilih nominal lainnya.";
+
+  const targetSku = String(
+    denom?.vendor_sku || `${game?.vendor_prefix || ""}${denom?.code || ""}`
+  )
+    .trim()
+    .toUpperCase();
+
+  // 1. Pre-Checkout Digiflazz SKU Health Check (cek apakah SKU sedang gangguan sebelum pembayaran dibuat)
+  if (denom?.digiflazz_problem === true) {
+    return {
+      ok: false,
+      sku_problem: true,
+      current_balance: Number(doc?.cached_balance || 0),
+      item_modal: resolveTopupItemModalPrice(game, denom, Number(product?.price || 0)),
+      reserved_modal: 0,
+      active_orders: 0,
+      total_required: 0,
+      buyer_message: skuDisruptionMsg,
+    };
+  }
+
+  if (!isDemoDigiflazzCredential(username, apiKey) && targetSku) {
+    try {
+      const sign = crypto.createHash("md5").update(username + apiKey + "pricelist").digest("hex");
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5500);
+      const resp = await fetch("https://api.digiflazz.com/v1/price-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cmd: "prepaid", username, sign, code: targetSku }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      const json: any = await resp.json().catch(() => null);
+      const rawList = Array.isArray(json?.data) ? json.data : [];
+      if (rawList.length > 0) {
+        // Update global SKU health if full list returned, or inspect target SKU directly
+        if (rawList.length > 5) {
+          applyDigiflazzRawListHealthToLocalGames(rawList, doc, "pre_checkout_check");
+        }
+        const matchedRows = rawList.filter(
+          (r: any) =>
+            r &&
+            typeof r === "object" &&
+            String(r.buyer_sku_code || "").trim().toUpperCase() === targetSku
+        );
+        if (matchedRows.length > 0) {
+          const anyHealthy = matchedRows.some(
+            (r: any) =>
+              r.buyer_product_status !== false &&
+              r.seller_product_status !== false &&
+              !isWithinDigiflazzCutOff(r.start_cut_off, r.end_cut_off)
+          );
+          const firstRow = matchedRows[0];
+          if (typeof firstRow.price === "number" && firstRow.price > 0) {
+            denom.modal_price = Number(firstRow.price);
+          }
+          if (!anyHealthy) {
+            const cutOff = isWithinDigiflazzCutOff(firstRow.start_cut_off, firstRow.end_cut_off);
+            const reason =
+              firstRow.buyer_product_status === false
+                ? "Buyer SKU Nonaktif di Digiflazz"
+                : firstRow.seller_product_status === false
+                  ? "Gangguan Seller di Digiflazz"
+                  : cutOff
+                    ? `Sedang Cut-Off (${firstRow.start_cut_off} - ${firstRow.end_cut_off} WIB)`
+                    : "SKU Sedang Gangguan di Digiflazz";
+            denom.digiflazz_problem = true;
+            denom.digiflazz_status = "gangguan";
+            denom.digiflazz_status_note = reason;
+            denom.digiflazz_checked_at = nowIso();
+            syncGameProducts(game);
+            saveDb();
+            return {
+              ok: false,
+              sku_problem: true,
+              current_balance: Number(doc?.cached_balance || 0),
+              item_modal: resolveTopupItemModalPrice(game, denom, Number(product?.price || 0)),
+              reserved_modal: 0,
+              active_orders: 0,
+              total_required: 0,
+              buyer_message: skuDisruptionMsg,
+            };
+          }
+        }
+      }
+    } catch {
+      // Proceed to balance check if price-list request times out
+    }
+  }
+
+  // Re-check if denom was marked problem during price-list sync
+  if (denom?.digiflazz_problem === true) {
+    return {
+      ok: false,
+      sku_problem: true,
+      current_balance: Number(doc?.cached_balance || 0),
+      item_modal: resolveTopupItemModalPrice(game, denom, Number(product?.price || 0)),
+      reserved_modal: 0,
+      active_orders: 0,
+      total_required: 0,
+      buyer_message: skuDisruptionMsg,
+    };
+  }
+
+  // 2. Pre-Checkout Digiflazz Deposit Balance Check (modal SKU + pesanan aktif lain)
+  const itemModal = resolveTopupItemModalPrice(game, denom, Number(product?.price || 0));
+  const { reserved_modal: reservedModal, active_count: activeOrders } = computeReservedTopupModal();
+  const totalRequired = itemModal + reservedModal;
 
   let currentBalance: number | null =
     typeof doc?.cached_balance === "number" && !Number.isNaN(doc.cached_balance)
@@ -11306,10 +11903,12 @@ async function verifyDigiflazzBalanceForTopupCheckout(
         game_name: game?.name || "",
         game_slug: game?.slug || "",
         sku: String(denom?.vendor_sku || denom?.code || ""),
+        item_label: String(denom?.label || denom?.code || ""),
         label: String(denom?.label || denom?.code || ""),
         item_modal: itemModal,
         reserved_modal: reservedModal,
         active_orders: activeOrders,
+        required_total: totalRequired,
         total_required: totalRequired,
         current_balance: effectiveBalance,
         unconfigured: isDemoDigiflazzCredential(username, apiKey),
@@ -11378,16 +11977,18 @@ api.post("/payments/topup/checkout", async (req, res) => {
         : Object.fromEntries((game.fields || []).map((f: any) => [f.key, body[f.key]]));
     const [ok, destination, errMsg] = validateDestination(game, values);
     if (!ok) return res.status(400).json({ detail: errMsg });
-    const buyer = parseBuyer(body);
+
+    const user = getUserOptional(req);
+    const buyer = parseBuyer({
+      ...body,
+      buyer_email: body.buyer_email || user?.email || "",
+    });
     const method = String(body.method || body.gateway_id || "paykita").trim().toLowerCase();
     if (method === "manual" || method === "crypto") {
       return res.status(400).json({
-        detail: "Metode pembayaran manual tidak tersedia untuk produk Top Up. Silakan pilih metode pembayaran otomatis.",
+        detail: "Metode pembayaran manual hanya tersedia untuk Top Up Saldo Akun. Silakan gunakan Saldo Akun atau metode pembayaran otomatis.",
       });
     }
-
-    const pgGateways = db.settings.payment_gateways?.gateways || {};
-    const paykitaSettings = db.settings.paykita || {};
 
     const rawChannel = String(
       body.duitku_channel || body.payment_method || body.channel_code || ""
@@ -11395,43 +11996,67 @@ api.post("/payments/topup/checkout", async (req, res) => {
       .trim()
       .toUpperCase();
 
+    const isWalletPayment = method === "wallet" || rawChannel === "WALLET";
+    const priceIdr = Math.round(Number(product.price || 0));
+
+    if (isWalletPayment) {
+      if (!user) {
+        return res.status(401).json({
+          detail: "Silakan login ke akun Anda terlebih dahulu untuk membayar menggunakan Saldo Akun.",
+        });
+      }
+      const userBalance = Math.max(0, Math.round(Number(user.balance || 0)));
+      if (userBalance < priceIdr) {
+        return res.status(400).json({
+          detail: `Saldo Akun Anda (Rp ${new Intl.NumberFormat("id-ID").format(userBalance)}) belum cukup untuk nominal ini (Rp ${new Intl.NumberFormat("id-ID").format(priceIdr)}). Silakan Top Up Saldo Akun terlebih dahulu.`,
+          code: "INSUFFICIENT_WALLET_BALANCE",
+          current_balance: userBalance,
+          required_amount: priceIdr,
+        });
+      }
+    }
+
+    const pgGateways = db.settings.payment_gateways?.gateways || {};
+    const paykitaSettings = db.settings.paykita || {};
+
     const {
       gatewayId: resolvedGatewayId,
       gatewayName: resolvedGatewayName,
       chMeta,
     } = resolveTopupChannelAndGateway(rawChannel, method);
 
-    const targetGwCfg = pgGateways[resolvedGatewayId] || {};
-    if (resolvedGatewayId === "paykita") {
-      if (paykitaSettings.enabled === false || targetGwCfg.enabled === false) {
-        return res.status(400).json({
-          detail: "Pembayaran QRIS Otomatis (PayKita) sedang dinonaktifkan oleh admin. Silakan pilih metode pembayaran lainnya.",
-        });
-      }
-    } else {
-      if (targetGwCfg.enabled === false) {
-        return res.status(400).json({
-          detail: `Pembayaran otomatis ${resolvedGatewayName} sedang dinonaktifkan oleh admin. Silakan pilih metode pembayaran lainnya.`,
-        });
+    if (!isWalletPayment) {
+      const targetGwCfg = pgGateways[resolvedGatewayId] || {};
+      if (resolvedGatewayId === "paykita") {
+        if (paykitaSettings.enabled === false || targetGwCfg.enabled === false) {
+          return res.status(400).json({
+            detail: "Pembayaran QRIS Otomatis sedang dinonaktifkan oleh admin. Silakan pilih metode pembayaran lainnya.",
+          });
+        }
+      } else {
+        if (targetGwCfg.enabled === false) {
+          return res.status(400).json({
+            detail: "Metode pembayaran otomatis ini sedang dinonaktifkan oleh admin. Silakan pilih metode pembayaran lainnya.",
+          });
+        }
       }
     }
 
-    const user = getUserOptional(req);
     const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
     if (!enforceSingleActiveOrderPerProduct(req, res, product, buyer, user, origin)) return;
 
-    // Check Digiflazz deposit balance first (SKU modal + active ongoing Top Up orders) before creating payment
+    // Pre-checkout verification: 1) Check SKU health/gangguan at Digiflazz, 2) Check Digiflazz deposit balance
     const balanceCheck = await verifyDigiflazzBalanceForTopupCheckout(game, denom, product);
     if (!balanceCheck.ok) {
       return res.status(400).json({
         detail: balanceCheck.buyer_message,
-        code: "SERVICE_TEMPORARILY_UNAVAILABLE",
+        code: balanceCheck.sku_problem ? "SKU_TEMPORARILY_DISRUPTED" : "SERVICE_TEMPORARILY_UNAVAILABLE",
+        sku_problem: Boolean(balanceCheck.sku_problem),
       });
     }
 
     const orderId = genOrderId("NXG-T");
     const label = denom.label || denom.code;
-    const priceIdr = Math.round(Number(product.price || 0));
     const priceUsd =
       product.price_usd && Number(product.price_usd) > 0
         ? Number(product.price_usd)
@@ -11443,8 +12068,111 @@ api.post("/payments/topup/checkout", async (req, res) => {
     }
     const verifiedNickname = String(body.verified_nickname || verification.nickname || "").trim();
     const customerNo = verification.customer_no || buildDigiflazzCustomerNo(game, destination);
-
     const productTitle = product.title || `${game.name} — ${label}`;
+    const baseDeliveryInfo = renderDeliveryInfo(product, game, destination);
+
+    if (isWalletPayment && user) {
+      const balanceBefore = Math.max(0, Math.round(Number(user.balance || 0)));
+      const balanceAfter = balanceBefore - priceIdr;
+      user.balance = balanceAfter;
+      user.updated_at = nowIso();
+
+      const tx = {
+        ...buyer,
+        session_id: orderId,
+        paykita_ref: orderId,
+        gateway_id: "wallet",
+        gateway_name: "Saldo Akun",
+        duitku_channel: "WALLET",
+        duitku_channel_name: "Saldo Akun",
+        duitku_payment_flow: "wallet",
+        va_number: null,
+        provider: "wallet",
+        payment_type: "wallet",
+        destination_id: "wallet-balance",
+        destination_name: "Saldo Akun",
+        qris_string: null,
+        qris_image: null,
+        pay_url: null,
+        base_amount: priceIdr,
+        pay_amount: priceIdr,
+        unique_code: 0,
+        fee_amount: 0,
+        qris_provider: "Saldo Akun",
+        paykita_mode: "live",
+        paykita_error: null,
+        paykita_error_code: null,
+        expired_at: null,
+        product_id: product.id,
+        product_title: productTitle,
+        product_type: PRODUCT_TYPE,
+        category: TOPUP_CATEGORY,
+        game_id: game.id,
+        game_slug: game.slug,
+        game_name: game.name,
+        denomination_code: String(denom.code),
+        denomination_label: label,
+        vendor_sku: denom.vendor_sku || `${game.vendor_prefix || ""}${denom.code}`,
+        vendor_kind: "digiflazz",
+        modal_price: balanceCheck.item_modal,
+        customer_no: customerNo,
+        verified_nickname: verifiedNickname,
+        destination,
+        delivery_info: verifiedNickname
+          ? `${baseDeliveryInfo} • Nickname: ${verifiedNickname}`
+          : baseDeliveryInfo,
+        user_id: user.id,
+        amount: priceIdr,
+        amount_usd: priceUsd,
+        price_strike: product.price_strike,
+        currency: "idr",
+        status: "processing",
+        payment_status: "paid",
+        paykita_confirmed: true,
+        paykita_confirmed_by: "wallet_balance",
+        paykita_confirmed_at: nowIso(),
+        wallet_debited: true,
+        wallet_debited_amount: priceIdr,
+        wallet_refunded: false,
+        payment_proof: null,
+        has_proof: false,
+        stock_deducted: true,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      db.transactions.push(tx);
+      recordWalletLedgerEntry({
+        user,
+        type: "payment",
+        amount: priceIdr,
+        balanceBefore,
+        balanceAfter,
+        sessionId: orderId,
+        description: `Top Up Game: ${productTitle} (${customerNo})`,
+      });
+      saveDb();
+
+      const dfProvider =
+        db.topup_providers.find((v) => v.kind === "digiflazz") || db.topup_providers[0];
+      if (!dfProvider || dfProvider.auto_dispatch !== false) {
+        void dispatchOrCheckDigiflazzTransaction(tx, { reason: "wallet_instant_paid" });
+      }
+      void sendOrderFulfillmentEmail(tx, req);
+
+      return res.json({
+        order_id: orderId,
+        session_id: orderId,
+        gateway_id: "wallet",
+        gateway_name: "Saldo Akun",
+        duitku_channel: "WALLET",
+        duitku_channel_name: "Saldo Akun",
+        duitku_payment_flow: "wallet",
+        payment_status: "paid",
+        balance_after: balanceAfter,
+        checkout_url: `${origin}/payment/success?session_id=${orderId}`,
+      });
+    }
+
     const remoteOrder = await tryCreateRemotePaykitaOrder({
       orderId,
       amount: priceIdr,
@@ -11456,7 +12184,6 @@ api.post("/payments/topup/checkout", async (req, res) => {
       duitkuMethod: resolvedGatewayId === "paykita" ? undefined : chMeta.code,
     });
     const expiredAt = remoteOrder.expired_at || new Date(Date.now() + 15 * 60 * 1000).toISOString();
-    const baseDeliveryInfo = renderDeliveryInfo(product, game, destination);
     const tx = {
       ...buyer,
       session_id: orderId,
@@ -11475,8 +12202,8 @@ api.post("/payments/topup/checkout", async (req, res) => {
           : `${resolvedGatewayId}-${chMeta.code.toLowerCase()}`,
       destination_name:
         resolvedGatewayId === "paykita"
-          ? "PayKita — QRIS Otomatis"
-          : `${resolvedGatewayName} — ${chMeta.name}`,
+          ? "QRIS Otomatis"
+          : chMeta.name,
       qris_string: remoteOrder.qris_string,
       qris_image: remoteOrder.qris_image,
       pay_url: remoteOrder.pay_url || null,
@@ -11486,9 +12213,7 @@ api.post("/payments/topup/checkout", async (req, res) => {
       fee_amount: remoteOrder.fee_amount || 0,
       qris_provider:
         remoteOrder.qris_provider ||
-        (resolvedGatewayId === "paykita"
-          ? "PayKita QRIS"
-          : `${chMeta.short_name} (${resolvedGatewayName})`),
+        (resolvedGatewayId === "paykita" ? "QRIS Otomatis" : chMeta.short_name),
       paykita_mode: remoteOrder.mode,
       paykita_error: remoteOrder.error_message || null,
       paykita_error_code: remoteOrder.error_code || null,
@@ -11659,6 +12384,9 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
   const paid =
     tx.payment_status === "paid" &&
     (tx.provider !== "paykita" || Boolean(tx.paykita_confirmed));
+  if (paid) {
+    creditWalletTopupIfNeeded(tx, "status_poll");
+  }
   if (
     paid &&
     tx.product_type === PRODUCT_TYPE &&
@@ -12058,6 +12786,7 @@ admin.post("/orders/:session_id/approve", async (req, res) => {
   const tx = db.transactions.find((t) => t.session_id === req.params.session_id);
   if (!tx) return res.status(404).json({ detail: "Transaksi tidak ditemukan" });
   if (tx.payment_status === "paid" && (tx.provider !== "paykita" || tx.paykita_confirmed)) {
+    creditWalletTopupIfNeeded(tx, "admin_approve");
     if (!tx.fulfillment_email_sent_at) {
       await sendOrderFulfillmentEmail(tx, req);
     }
@@ -12094,6 +12823,7 @@ admin.post("/orders/:session_id/approve", async (req, res) => {
   if (prod && prod.product_type !== PRODUCT_TYPE && Number(prod.stock ?? 0) <= 0) {
     cancelOngoingTransactionsForOutOfStockProduct(prod.id, tx.session_id);
   }
+  creditWalletTopupIfNeeded(tx, "admin_approve");
   saveDb();
   if (tx.product_type === PRODUCT_TYPE) {
     const dfProvider =

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -36,6 +36,12 @@ import {
   SlidersHorizontal,
   ShieldAlert,
   Camera,
+  QrCode,
+  CreditCard,
+  Coins,
+  PlusCircle,
+  ArrowUpRight,
+  ArrowDownLeft,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -49,6 +55,7 @@ import {
   PROFILE_AVATARS,
   resolveUserAvatar,
   saveLocalUserAvatar,
+  formatApiError,
 } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -183,8 +190,11 @@ const formatAuditAction = (action) => {
   return map[action] || action;
 };
 
+const WALLET_PRESET_AMOUNTS = [20000, 50000, 100000, 250000, 500000, 1000000];
+
 export default function Account() {
-  const { user, initializing, openAuth, logout, toggleWishlist, updateProfile } = useAuth();
+  const { user, initializing, openAuth, logout, toggleWishlist, updateProfile, refreshUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [securityData, setSecurityData] = useState({
@@ -199,7 +209,9 @@ export default function Account() {
   const [reviewTarget, setReviewTarget] = useState(null);
 
   // Dynamic UI states
-  const [activeTab, setActiveTab] = useState("orders"); // "orders" | "wishlist"
+  const [activeTab, setActiveTab] = useState(() =>
+    searchParams.get("tab") === "wallet" ? "wallet" : "orders"
+  ); // "wallet" | "orders" | "wishlist" | "security"
   const [orderStatusFilter, setOrderStatusFilter] = useState("all"); // "all" | "paid" | "pending" | "failed"
   const [orderTypeFilter, setOrderTypeFilter] = useState("all"); // "all" | "topup" | "store"
   const [orderSearch, setOrderSearch] = useState("");
@@ -207,6 +219,21 @@ export default function Account() {
   const [expandedOrders, setExpandedOrders] = useState({});
   const [maskedAccess, setMaskedAccess] = useState({});
   const [copiedId, setCopiedId] = useState("");
+
+  // Wallet & Top Up Saldo states
+  const [walletData, setWalletData] = useState({
+    balance: Math.max(0, Math.round(Number(user?.balance || 0))),
+    min_topup: 20000,
+    ledger: [],
+    topup_orders: [],
+  });
+  const [walletAmountInput, setWalletAmountInput] = useState("50000");
+  const [walletMethods, setWalletMethods] = useState([]);
+  const [walletPaymentType, setWalletPaymentType] = useState("manual");
+  const [manualDests, setManualDests] = useState([]);
+  const [selectedManualDestId, setSelectedManualDestId] = useState("");
+  const [selectedCryptoDestId, setSelectedCryptoDestId] = useState("");
+  const [submittingWalletTopup, setSubmittingWalletTopup] = useState(false);
 
   // Inline / Profile editing states
   const [editingName, setEditingName] = useState(false);
@@ -226,6 +253,13 @@ export default function Account() {
 
   const userKey = user?.id || user?.email || "";
 
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "wallet" || tabParam === "orders" || tabParam === "wishlist" || tabParam === "security") {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
   const fetchAccountData = useCallback(
     async (isSilent = false) => {
       if (!userKey) {
@@ -236,11 +270,14 @@ export default function Account() {
       else setLoading(true);
 
       try {
-        const [o, w, r, sec] = await Promise.allSettled([
+        const [o, w, r, sec, wal, wMethods, mDests] = await Promise.allSettled([
           api.get("/me/orders"),
           api.get("/me/wishlist"),
           api.get("/reviews/mine"),
           api.get("/me/security"),
+          api.get("/me/wallet"),
+          api.get("/payments/methods", { params: { scope: "wallet" } }),
+          api.get("/payments/manual-destinations"),
         ]);
 
         if (o.status === "fulfilled") {
@@ -260,17 +297,43 @@ export default function Account() {
         if (sec.status === "fulfilled" && sec.value?.data) {
           setSecurityData(sec.value.data);
         }
+        if (wal.status === "fulfilled" && wal.value?.data) {
+          setWalletData({
+            balance: Math.max(0, Math.round(Number(wal.value.data.balance || 0))),
+            min_topup: Number(wal.value.data.min_topup || 20000),
+            ledger: Array.isArray(wal.value.data.ledger) ? wal.value.data.ledger : [],
+            topup_orders: Array.isArray(wal.value.data.topup_orders) ? wal.value.data.topup_orders : [],
+          });
+        }
+        if (wMethods.status === "fulfilled" && Array.isArray(wMethods.value?.data)) {
+          const list = wMethods.value.data;
+          setWalletMethods(list);
+          if (list.length > 0) {
+            setWalletPaymentType((cur) =>
+              list.some((m) => m.id === cur) ? cur : list[0].id
+            );
+          }
+        }
+        if (mDests.status === "fulfilled" && Array.isArray(mDests.value?.data)) {
+          const dests = mDests.value.data;
+          setManualDests(dests);
+          const firstFiat = dests.find((d) => d.type !== "crypto");
+          const firstCrypto = dests.find((d) => d.type === "crypto");
+          if (firstFiat) setSelectedManualDestId((cur) => cur || firstFiat.id);
+          if (firstCrypto) setSelectedCryptoDestId((cur) => cur || firstCrypto.id);
+        }
+        await refreshUser?.();
         if (o.status === "rejected" && w.status === "rejected") {
           toast.error("Gagal memuat data akun. Coba muat ulang halaman.");
         } else if (isSilent) {
-          toast.success("Data akun berhasil diperbarui");
+          toast.success("Data akun & saldo berhasil diperbarui");
         }
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [userKey]
+    [userKey, refreshUser]
   );
 
   useEffect(() => {
@@ -288,6 +351,64 @@ export default function Account() {
     }
   }, [user?.id, user?.email, user?.avatar]);
 
+  const currentWalletBalance = useMemo(() => {
+    if (typeof walletData.balance === "number") return walletData.balance;
+    return Math.max(0, Math.round(Number(user?.balance || 0)));
+  }, [walletData.balance, user?.balance]);
+
+  const fiatManualDests = useMemo(
+    () => manualDests.filter((d) => d.type !== "crypto"),
+    [manualDests]
+  );
+  const cryptoManualDests = useMemo(
+    () => manualDests.filter((d) => d.type === "crypto"),
+    [manualDests]
+  );
+
+  const parsedWalletAmount = useMemo(() => {
+    const cleaned = String(walletAmountInput || "").replace(/[^0-9]/g, "");
+    return Math.round(Number(cleaned || 0));
+  }, [walletAmountInput]);
+
+  const handleWalletTopupSubmit = async (e) => {
+    e?.preventDefault();
+    const minTopup = Number(walletData.min_topup || 20000);
+    if (!Number.isFinite(parsedWalletAmount) || parsedWalletAmount < minTopup) {
+      toast.error(`Nominal Top Up Saldo minimal ${formatIDR(minTopup)}`);
+      return;
+    }
+    if (walletPaymentType === "manual" && !selectedManualDestId) {
+      toast.error("Pilih rekening / QRIS manual tujuan transfer terlebih dahulu");
+      return;
+    }
+    if (walletPaymentType === "crypto" && !selectedCryptoDestId) {
+      toast.error("Pilih koin / jaringan crypto tujuan terlebih dahulu");
+      return;
+    }
+    setSubmittingWalletTopup(true);
+    try {
+      const { data } = await api.post("/payments/wallet/topup", {
+        amount: parsedWalletAmount,
+        payment_type: walletPaymentType,
+        destination_id:
+          walletPaymentType === "crypto"
+            ? selectedCryptoDestId
+            : walletPaymentType === "manual"
+            ? selectedManualDestId
+            : undefined,
+        buyer_email: user?.email || "",
+        origin_url: window.location.origin,
+      });
+      toast.success("Tagihan Top Up Saldo berhasil dibuat!");
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      toast.error(
+        formatApiError(err.response?.data?.detail) || "Gagal membuat tagihan Top Up Saldo"
+      );
+      setSubmittingWalletTopup(false);
+    }
+  };
+
   // Computed metrics
   const stats = useMemo(() => {
     const paidOrders = orders.filter((o) => o.payment_status === "paid");
@@ -298,8 +419,12 @@ export default function Account() {
       (o) => o.payment_status === "failed" || o.payment_status === "cancelled"
     );
     const topupOrders = orders.filter((o) => o.order_type === "topup" || o.denomination_id);
-    const storeOrders = orders.filter((o) => o.order_type !== "topup" && !o.denomination_id);
-    const totalSpent = paidOrders.reduce((sum, o) => sum + Number(o.amount || 0), 0);
+    const storeOrders = orders.filter(
+      (o) => o.order_type !== "topup" && o.order_type !== "wallet_topup" && !o.denomination_id
+    );
+    const totalSpent = paidOrders
+      .filter((o) => o.order_type !== "wallet_topup")
+      .reduce((sum, o) => sum + Number(o.amount || 0), 0);
     const reviewCount = Object.keys(reviewed).length / 2;
 
     return {
@@ -776,6 +901,31 @@ export default function Account() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" data-testid="account-stats-grid">
               <button
                 type="button"
+                onClick={() => setActiveTab("wallet")}
+                data-testid="account-kpi-wallet"
+                className={`text-left rounded-xl bg-panel/90 border p-4 transition-all duration-200 group ${
+                  activeTab === "wallet"
+                    ? "border-lime/70 bg-lime/[0.06] shadow-[0_0_25px_rgba(163,230,53,0.12)]"
+                    : "border-line hover:border-lime/50"
+                }`}
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-1.5">
+                  <span className="text-[11px] font-medium text-slate-300">Saldo Akun</span>
+                  <Wallet size={15} className="text-lime group-hover:scale-110 transition-transform" />
+                </div>
+                <p
+                  data-testid="account-wallet-balance"
+                  className="font-display font-black text-lg sm:text-xl text-lime font-mono tabular-nums truncate"
+                >
+                  {formatIDR(currentWalletBalance)}
+                </p>
+                <p className="text-[11px] font-mono text-neon mt-1 inline-flex items-center gap-1">
+                  <PlusCircle size={11} /> Top Up Saldo (Min. 20rb)
+                </p>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   setActiveTab("orders");
                   setOrderStatusFilter("all");
@@ -795,30 +945,6 @@ export default function Account() {
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
                   {stats.paidCount} lunas · {stats.pendingCount} diproses
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab("orders");
-                  setOrderStatusFilter("paid");
-                }}
-                className={`text-left rounded-xl bg-panel/90 border p-4 transition-all duration-200 group ${
-                  activeTab === "orders" && orderStatusFilter === "paid"
-                    ? "border-lime/60 bg-lime/[0.04] shadow-[0_0_25px_rgba(163,230,53,0.08)]"
-                    : "border-line hover:border-lime/40"
-                }`}
-              >
-                <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                  <span className="text-[11px] font-medium text-slate-400">Total Belanja</span>
-                  <Wallet size={15} className="text-lime group-hover:scale-110 transition-transform" />
-                </div>
-                <p className="font-display font-black text-lg sm:text-xl text-lime font-mono tabular-nums truncate">
-                  {formatIDR(stats.totalSpent)}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
-                  {stats.topupCount} Top-Up · {stats.storeCount} Akun
                 </p>
               </button>
 
@@ -871,6 +997,7 @@ export default function Account() {
             <div className="bg-panel/90 border border-line rounded-xl p-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-1 overflow-x-auto">
                 {[
+                  { id: "wallet", label: "Saldo Akun & Top Up", icon: Wallet, count: null },
                   { id: "orders", label: "Riwayat Pesanan", icon: Package, count: orders.length },
                   { id: "wishlist", label: "Wishlist", icon: Heart, count: wishlist.length },
                   { id: "security", label: "Keamanan & Sandi", icon: Lock, count: null },
@@ -914,6 +1041,11 @@ export default function Account() {
 
               {/* Contextual quick status in tab bar */}
               <div className="hidden md:flex items-center gap-2 px-2 text-[11px] font-mono text-slate-400 shrink-0">
+                {activeTab === "wallet" && (
+                  <span className="inline-flex items-center gap-1.5 text-lime">
+                    <Wallet size={13} /> Saldo Aktif: <strong>{formatIDR(currentWalletBalance)}</strong>
+                  </span>
+                )}
                 {activeTab === "orders" && (
                   <span className="tabular-nums">
                     Menampilkan <strong className="text-slate-200">{filteredOrders.length}</strong> dari{" "}
@@ -954,6 +1086,435 @@ export default function Account() {
             ) : (
               <div>
                 <AnimatePresence mode="wait">
+                  {/* WALLET & TOP UP SALDO SECTION */}
+                  {activeTab === "wallet" && (
+                    <motion.section
+                      key="wallet"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.2 }}
+                      data-testid="account-wallet-section"
+                      className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start"
+                    >
+                      {/* Left Column: Form Top Up Saldo Akun */}
+                      <div className="lg:col-span-7 rounded-xl bg-panel/90 border border-line p-5 sm:p-6 space-y-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-line">
+                          <div>
+                            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-lime">
+                              TOP UP SALDO AKUN
+                            </p>
+                            <h2 className="font-display font-bold text-base sm:text-lg text-slate-100 mt-0.5">
+                              Isi Saldo Akun (Minimal Rp 20.000)
+                            </h2>
+                            <p className="text-xs font-mono text-slate-400 mt-1">
+                              Saldo Akun dapat digunakan untuk membeli Produk Akun di Beranda maupun Top Up Game Otomatis 24/7.
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-void/90 border border-lime/40 px-3.5 py-2 text-right">
+                            <span className="block text-[10px] font-mono uppercase text-slate-400">
+                              Saldo Saat Ini
+                            </span>
+                            <strong
+                              data-testid="wallet-form-current-balance"
+                              className="font-mono font-extrabold text-sm sm:text-base text-lime tabular-nums"
+                            >
+                              {formatIDR(currentWalletBalance)}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <form onSubmit={handleWalletTopupSubmit} className="space-y-5">
+                          {/* Step 1: Nominal Top Up Saldo */}
+                          <div className="space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <label
+                                htmlFor="wallet-topup-amount-input"
+                                className="text-xs font-mono uppercase tracking-wider text-slate-300"
+                              >
+                                1. Masukkan Nominal Top Up Saldo <span className="text-neon">*</span>
+                              </label>
+                              <span className="text-[11px] font-mono text-lime">
+                                Minimal {formatIDR(walletData.min_topup || 20000)}
+                              </span>
+                            </div>
+
+                            <div className="relative">
+                              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400">
+                                Rp
+                              </span>
+                              <input
+                                id="wallet-topup-amount-input"
+                                data-testid="wallet-topup-amount-input"
+                                type="number"
+                                min={walletData.min_topup || 20000}
+                                step={1000}
+                                value={walletAmountInput}
+                                onChange={(e) => setWalletAmountInput(e.target.value)}
+                                placeholder="Contoh: 50000"
+                                className="w-full rounded-xl bg-void border border-line focus:border-neon pl-10 pr-4 py-3 text-sm sm:text-base font-mono font-bold text-slate-100 placeholder:text-slate-600 focus:outline-none transition-colors"
+                              />
+                            </div>
+
+                            {parsedWalletAmount > 0 && parsedWalletAmount < (walletData.min_topup || 20000) && (
+                              <p
+                                data-testid="wallet-min-amount-error"
+                                className="text-[11px] font-mono text-coral flex items-center gap-1.5"
+                              >
+                                <AlertCircle size={12} /> Nominal minimal Top Up Saldo adalah{" "}
+                                {formatIDR(walletData.min_topup || 20000)}.
+                              </p>
+                            )}
+
+                            {/* Quick Preset Nominal Buttons */}
+                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                              {WALLET_PRESET_AMOUNTS.map((amt) => {
+                                const active = parsedWalletAmount === amt;
+                                return (
+                                  <button
+                                    key={amt}
+                                    type="button"
+                                    onClick={() => setWalletAmountInput(String(amt))}
+                                    data-testid={`wallet-preset-${amt}`}
+                                    className={`rounded-lg py-2 px-2 text-[11px] font-mono font-bold border transition-all cursor-pointer ${
+                                      active
+                                        ? "border-neon bg-neon/15 text-neon shadow-[0_0_12px_rgba(0,240,255,0.2)]"
+                                        : "border-line bg-void/70 text-slate-300 hover:border-neon/50 hover:text-neon"
+                                    }`}
+                                  >
+                                    {amt >= 1000000
+                                      ? `${amt / 1000000} Jt`
+                                      : `${amt / 1000}rb`}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Step 2: Pilih Metode Pembayaran Top Up Saldo (Manual / QRIS Otomatis / Crypto) */}
+                          <div className="space-y-3">
+                            <label className="block text-xs font-mono uppercase tracking-wider text-slate-300">
+                              2. Pilih Metode Pembayaran Top Up Saldo
+                            </label>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                              {fiatManualDests.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setWalletPaymentType("manual")}
+                                  data-testid="wallet-method-manual"
+                                  className={`flex items-center gap-2.5 rounded-xl p-3 border text-left transition-all cursor-pointer ${
+                                    walletPaymentType === "manual"
+                                      ? "border-neon bg-neon/10 text-neon"
+                                      : "border-line bg-void/70 text-slate-300 hover:border-neon/40"
+                                  }`}
+                                >
+                                  <CreditCard size={16} className="shrink-0" />
+                                  <div className="min-w-0">
+                                    <span className="block text-xs font-display font-bold truncate">
+                                      Transfer / QRIS Manual
+                                    </span>
+                                    <span className="block text-[10px] font-mono text-slate-400 truncate">
+                                      Upload bukti transfer
+                                    </span>
+                                  </div>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => setWalletPaymentType("paykita")}
+                                data-testid="wallet-method-paykita"
+                                className={`flex items-center gap-2.5 rounded-xl p-3 border text-left transition-all cursor-pointer ${
+                                  walletPaymentType === "paykita"
+                                    ? "border-neon bg-neon/10 text-neon"
+                                    : "border-line bg-void/70 text-slate-300 hover:border-neon/40"
+                                }`}
+                              >
+                                <QrCode size={16} className="shrink-0" />
+                                <div className="min-w-0">
+                                  <span className="block text-xs font-display font-bold truncate">
+                                    QRIS Otomatis
+                                  </span>
+                                  <span className="block text-[10px] font-mono text-slate-400 truncate">
+                                    Cek lunas otomatis 24/7
+                                  </span>
+                                </div>
+                              </button>
+
+                              {cryptoManualDests.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setWalletPaymentType("crypto")}
+                                  data-testid="wallet-method-crypto"
+                                  className={`flex items-center gap-2.5 rounded-xl p-3 border text-left transition-all cursor-pointer ${
+                                    walletPaymentType === "crypto"
+                                      ? "border-lime bg-lime/10 text-lime"
+                                      : "border-line bg-void/70 text-slate-300 hover:border-lime/40"
+                                  }`}
+                                >
+                                  <Coins size={16} className="shrink-0" />
+                                  <div className="min-w-0">
+                                    <span className="block text-xs font-display font-bold truncate">
+                                      Crypto (USDT / Coin)
+                                    </span>
+                                    <span className="block text-[10px] font-mono text-slate-400 truncate">
+                                      Transfer Wallet Crypto
+                                    </span>
+                                  </div>
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Manual Bank / E-Wallet / QRIS Destination Picker */}
+                            {walletPaymentType === "manual" && fiatManualDests.length > 0 && (
+                              <div className="space-y-2 pt-1" data-testid="wallet-manual-dest-list">
+                                <p className="text-[11px] font-mono text-slate-400">
+                                  Pilih Rekening / E-Wallet / QRIS Manual Tujuan:
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {fiatManualDests.map((d) => {
+                                    const selected = selectedManualDestId === d.id;
+                                    return (
+                                      <button
+                                        key={d.id}
+                                        type="button"
+                                        onClick={() => setSelectedManualDestId(d.id)}
+                                        data-testid={`wallet-manual-dest-${d.id}`}
+                                        className={`flex items-center justify-between gap-2 rounded-xl p-3 border text-left transition-all cursor-pointer ${
+                                          selected
+                                            ? "border-neon bg-neon/10"
+                                            : "border-line bg-void/60 hover:border-neon/40"
+                                        }`}
+                                      >
+                                        <div className="min-w-0">
+                                          <p className="text-xs font-display font-bold text-slate-100 truncate">
+                                            {d.name}
+                                          </p>
+                                          <p className="text-[10px] font-mono text-slate-400 truncate">
+                                            {d.type === "qris"
+                                              ? "Scan Gambar QRIS Manual"
+                                              : `${d.account_number || ""} ${
+                                                  d.account_holder ? `a.n ${d.account_holder}` : ""
+                                                }`}
+                                          </p>
+                                        </div>
+                                        <span
+                                          className={`w-4 h-4 rounded-full border grid place-items-center shrink-0 ${
+                                            selected ? "border-neon bg-neon text-void" : "border-slate-600"
+                                          }`}
+                                        >
+                                          {selected && <Check size={10} strokeWidth={3} />}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Crypto Destination Picker */}
+                            {walletPaymentType === "crypto" && cryptoManualDests.length > 0 && (
+                              <div className="space-y-2 pt-1" data-testid="wallet-crypto-dest-list">
+                                <p className="text-[11px] font-mono text-slate-400">
+                                  Pilih Koin & Jaringan Crypto Tujuan (Estimasi:{" "}
+                                  <strong className="text-lime">
+                                    {formatUSD(null, parsedWalletAmount || 20000)} USD
+                                  </strong>
+                                  ):
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {cryptoManualDests.map((d) => {
+                                    const selected = selectedCryptoDestId === d.id;
+                                    return (
+                                      <button
+                                        key={d.id}
+                                        type="button"
+                                        onClick={() => setSelectedCryptoDestId(d.id)}
+                                        data-testid={`wallet-crypto-dest-${d.id}`}
+                                        className={`flex items-center justify-between gap-2 rounded-xl p-3 border text-left transition-all cursor-pointer ${
+                                          selected
+                                            ? "border-lime bg-lime/10"
+                                            : "border-line bg-void/60 hover:border-lime/40"
+                                        }`}
+                                      >
+                                        <div className="min-w-0">
+                                          <p className="text-xs font-display font-bold text-slate-100 truncate">
+                                            {d.name} ({d.symbol || "USDT"})
+                                          </p>
+                                          <p className="text-[10px] font-mono text-lime truncate">
+                                            Network: {d.network || "TRC20 / BEP20"}
+                                          </p>
+                                        </div>
+                                        <span
+                                          className={`w-4 h-4 rounded-full border grid place-items-center shrink-0 ${
+                                            selected ? "border-lime bg-lime text-void" : "border-slate-600"
+                                          }`}
+                                        >
+                                          {selected && <Check size={10} strokeWidth={3} />}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {walletPaymentType === "paykita" && (
+                              <div className="rounded-xl bg-void/70 border border-line p-3 text-xs font-mono text-slate-300">
+                                Scan kode QRIS dari M-Banking atau E-Wallet (DANA, GoPay, OVO, ShopeePay). Saldo otomatis masuk begitu pembayaran terdeteksi lunas.
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Summary & Submit */}
+                          <div className="rounded-xl bg-void/90 border border-neon/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                              <span className="text-[10px] font-mono uppercase text-slate-400">
+                                Total Top Up Saldo
+                              </span>
+                              <p
+                                data-testid="wallet-topup-total-preview"
+                                className="font-mono font-extrabold text-lg text-neon tabular-nums"
+                              >
+                                {formatIDR(parsedWalletAmount || 0)}
+                              </p>
+                            </div>
+                            <button
+                              type="submit"
+                              disabled={
+                                submittingWalletTopup ||
+                                parsedWalletAmount < (walletData.min_topup || 20000)
+                              }
+                              data-testid="wallet-topup-submit-button"
+                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-neon to-lime text-void font-display font-extrabold text-xs uppercase tracking-wider px-6 py-3.5 hover:opacity-95 transition-all disabled:opacity-50 cursor-pointer"
+                            >
+                              {submittingWalletTopup ? (
+                                <>
+                                  <Loader2 size={14} className="animate-spin" />
+                                  <span>Memproses...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Wallet size={14} />
+                                  <span>Top Up Saldo Sekarang</span>
+                                  <ArrowRight size={14} />
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+
+                      {/* Right Column: Tagihan Top Up Aktif & Riwayat Mutasi Saldo */}
+                      <div className="lg:col-span-5 space-y-4">
+                        {/* Pending Top Up Orders */}
+                        {walletData.topup_orders?.filter((o) => o.payment_status === "pending").length > 0 && (
+                          <div className="rounded-xl bg-panel/90 border border-neon/40 p-4 space-y-2.5">
+                            <h3 className="font-display font-bold text-xs uppercase tracking-wider text-neon flex items-center gap-1.5">
+                              <Clock size={13} /> Tagihan Top Up Saldo Menunggu Pembayaran
+                            </h3>
+                            <div className="space-y-2">
+                              {walletData.topup_orders
+                                .filter((o) => o.payment_status === "pending")
+                                .slice(0, 4)
+                                .map((o) => (
+                                  <div
+                                    key={o.session_id}
+                                    className="flex items-center justify-between gap-2 rounded-lg bg-void/80 border border-line p-2.5 text-xs font-mono"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-lime">{formatIDR(o.amount)}</p>
+                                      <p className="text-[10px] text-slate-400 truncate">
+                                        {o.manual_destination_label || "QRIS Otomatis"} ·{" "}
+                                        {o.status === "waiting_approval"
+                                          ? "Menunggu Verifikasi"
+                                          : "Belum Dibayar"}
+                                      </p>
+                                    </div>
+                                    <Link
+                                      to={`/payment/success?session_id=${o.session_id}`}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-neon/50 bg-neon/10 text-neon hover:bg-neon hover:text-void px-2.5 py-1.5 text-[10px] font-bold shrink-0 transition-colors"
+                                    >
+                                      Bayar <ArrowRight size={11} />
+                                    </Link>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Riwayat Mutasi Saldo */}
+                        <div className="rounded-xl bg-panel/90 border border-line p-5 space-y-3.5">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-display font-bold text-sm text-slate-100 flex items-center gap-2">
+                              <Activity size={15} className="text-lime" /> Riwayat Mutasi Saldo
+                            </h3>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {walletData.ledger?.length || 0} mutasi
+                            </span>
+                          </div>
+
+                          {!walletData.ledger || walletData.ledger.length === 0 ? (
+                            <div className="rounded-lg bg-void/60 border border-line p-6 text-center text-xs font-mono text-slate-400">
+                              Belum ada mutasi saldo. Riwayat pengisian dan penggunaan Saldo Akun akan tercatat otomatis di sini.
+                            </div>
+                          ) : (
+                            <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                              {walletData.ledger.map((entry) => {
+                                const isCredit = entry.direction === "credit";
+                                return (
+                                  <div
+                                    key={entry.id}
+                                    data-testid="wallet-ledger-item"
+                                    className="rounded-lg bg-void/75 border border-line p-3 flex items-start justify-between gap-3 text-xs font-mono"
+                                  >
+                                    <div className="flex items-start gap-2.5 min-w-0">
+                                      <span
+                                        className={`w-6 h-6 rounded-lg grid place-items-center shrink-0 mt-0.5 ${
+                                          isCredit
+                                            ? "bg-lime/15 text-lime border border-lime/30"
+                                            : "bg-neon/15 text-neon border border-neon/30"
+                                        }`}
+                                      >
+                                        {isCredit ? (
+                                          <ArrowDownLeft size={13} />
+                                        ) : (
+                                          <ArrowUpRight size={13} />
+                                        )}
+                                      </span>
+                                      <div className="min-w-0">
+                                        <p className="text-slate-100 font-semibold break-words">
+                                          {entry.description || (isCredit ? "Top Up Saldo" : "Pembayaran Saldo")}
+                                        </p>
+                                        <p className="text-[10px] text-slate-500 mt-0.5">
+                                          {fmtDate(entry.created_at)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <p
+                                        className={`font-bold tabular-nums ${
+                                          isCredit ? "text-lime" : "text-coral"
+                                        }`}
+                                      >
+                                        {isCredit ? "+" : "-"}
+                                        {formatIDR(entry.amount)}
+                                      </p>
+                                      <p className="text-[10px] text-slate-500 tabular-nums">
+                                        Sisa: {formatIDR(entry.balance_after || 0)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.section>
+                  )}
+
                   {/* ORDERS SECTION */}
                   {activeTab === "orders" && (
                     <motion.section
@@ -1094,6 +1655,7 @@ export default function Account() {
                             {filteredOrders.map((o) => {
                               const key = o.session_id || o.order_id;
                               const orderCode = o.order_id || o.session_id;
+                              const isWalletTopup = o.order_type === "wallet_topup";
                               const isTopup = o.order_type === "topup" || Boolean(o.denomination_id);
                               const isExpanded = Boolean(expandedOrders[key]);
                               const isMasked = Boolean(maskedAccess[key]);
@@ -1118,8 +1680,20 @@ export default function Account() {
                                       <div className="flex-1 min-w-0">
                                         {/* Clean Unboxed Metadata Line */}
                                         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-slate-400 mb-1">
-                                          <span className={isTopup ? "text-neon font-semibold" : "text-lime font-semibold"}>
-                                            {isTopup ? "Top-Up" : "Store Akun"}
+                                          <span
+                                            className={
+                                              isWalletTopup
+                                                ? "text-lime font-semibold"
+                                                : isTopup
+                                                ? "text-neon font-semibold"
+                                                : "text-lime font-semibold"
+                                            }
+                                          >
+                                            {isWalletTopup
+                                              ? "Top-Up Saldo"
+                                              : isTopup
+                                              ? "Top-Up"
+                                              : "Store Akun"}
                                           </span>
                                           {o.game_name && (
                                             <>
@@ -1216,7 +1790,7 @@ export default function Account() {
                                             </Link>
                                           )}
 
-                                          {o.payment_status === "paid" && (
+                                          {o.payment_status === "paid" && !isWalletTopup && (
                                             <div data-testid="account-order-review" className="inline-flex">
                                               {reviewed[o.session_id] ? (
                                                 <span
@@ -1332,7 +1906,9 @@ export default function Account() {
                                                 <span>
                                                   Metode:{" "}
                                                   <strong className="text-slate-200">
-                                                    {o.provider === "paykita"
+                                                    {o.provider === "wallet"
+                                                      ? "Saldo Akun"
+                                                      : o.provider === "paykita"
                                                       ? "QRIS Otomatis"
                                                       : o.manual_destination_label || "Transfer Manual"}
                                                   </strong>

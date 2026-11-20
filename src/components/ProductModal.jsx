@@ -52,7 +52,7 @@ export const ProductModal = ({
   onSelectProduct,
   onClose,
 }) => {
-  const { user } = useAuth();
+  const { user, openAuth, refreshUser } = useAuth();
   const { t, translateDesc, translateCategory, translateBadge } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [buyerContact, setBuyerContact] = useState("");
@@ -60,24 +60,20 @@ export const ProductModal = ({
   const [buyerWa, setBuyerWa] = useState("");
   const [showExtraContact, setShowExtraContact] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
-  const [manualDestinations, setManualDestinations] = useState([]);
-  const [selectedDest, setSelectedDest] = useState("");
   const [selectedAutoGateway, setSelectedAutoGateway] = useState("paykita");
   const [methods, setMethods] = useState([
-    { id: "manual", label: "Transfer / QRIS" },
-    { id: "crypto", label: "Crypto (USDT / Coin)" },
+    { id: "wallet", label: "Saldo Akun" },
+    { id: "paykita", label: "QRIS Otomatis" },
   ]);
-  const [method, setMethod] = useState("manual");
+  const [method, setMethod] = useState("wallet");
   const [imageFit, setImageFit] = useState("contain");
   const [activeOrderConflict, setActiveOrderConflict] = useState(null);
   const [cancellingConflict, setCancellingConflict] = useState(false);
 
   void selectedAutoGateway;
+  void buyerContact;
 
   const pPayCfg = product?.payment_config || {};
-  const disabledDestIds = Array.isArray(pPayCfg.disabled_destinations)
-    ? pPayCfg.disabled_destinations
-    : [];
   const disabledGwIds = Array.isArray(pPayCfg.disabled_gateways)
     ? pPayCfg.disabled_gateways
     : [];
@@ -94,30 +90,12 @@ export const ProductModal = ({
     Boolean(paykitaMethodObj) &&
     pPayCfg.paykita !== false &&
     availableAutoGateways.length > 0;
-  const fiatDestinations =
-    pPayCfg.manual !== false
-      ? manualDestinations.filter(
-          (d) => d.type !== "crypto" && !disabledDestIds.includes(d.id)
-        )
-      : [];
-  const cryptoDestinations =
-    pPayCfg.crypto !== false
-      ? manualDestinations.filter(
-          (d) => d.type === "crypto" && !disabledDestIds.includes(d.id)
-        )
-      : [];
-  const manualAvailable =
-    pPayCfg.manual !== false &&
-    (methods.some((m) => m.id === "manual") || fiatDestinations.length > 0);
-  const cryptoAvailable =
-    pPayCfg.crypto !== false &&
-    (methods.some((m) => m.id === "crypto") || cryptoDestinations.length > 0);
-  const availableTabCount =
-    (paykitaAvailable ? 1 : 0) +
-    (manualAvailable ? 1 : 0) +
-    (cryptoAvailable ? 1 : 0);
+  const walletAvailable = true;
+  const availableTabCount = (walletAvailable ? 1 : 0) + (paykitaAvailable ? 1 : 0);
+  const userBalance = Math.max(0, Math.round(Number(user?.balance || 0)));
+  const productPrice = Math.max(0, Math.round(Number(product?.price || 0)));
+  const isWalletSufficient = Boolean(user && userBalance >= productPrice);
 
-  const activeChannelList = method === "crypto" ? cryptoDestinations : fiatDestinations;
   const [active, setActive] = useState(0);
   const [zoom, setZoom] = useState(false);
 
@@ -187,27 +165,11 @@ export const ProductModal = ({
     setBuyerEmail(defaultEmail);
     setBuyerWa("");
     setBuyerContact(defaultEmail);
+    if (user && typeof refreshUser === "function") {
+      void refreshUser();
+    }
 
     const cfg = product?.payment_config || {};
-    const dis = Array.isArray(cfg.disabled_destinations) ? cfg.disabled_destinations : [];
-    api
-      .get("/payments/manual-destinations", { params: { product_id: product?.id } })
-      .then((r) => {
-        const rawList = Array.isArray(r.data) ? r.data : [];
-        const list = rawList.filter((d) => !dis.includes(d.id));
-        setManualDestinations(list);
-        const fiats = cfg.manual !== false ? list.filter((d) => d.type !== "crypto") : [];
-        const cryptos = cfg.crypto !== false ? list.filter((d) => d.type === "crypto") : [];
-        const firstList = fiats.length > 0 ? fiats : cryptos;
-        if (firstList.length > 0) {
-          setSelectedDest((cur) =>
-            firstList.some((d) => d.id === cur) ? cur : firstList[0].id
-          );
-        } else {
-          setSelectedDest("");
-        }
-      })
-      .catch(() => {});
     api
       .get("/payments/methods", { params: { product_id: product?.id } })
       .then((r) => {
@@ -215,14 +177,16 @@ export const ProductModal = ({
           setMethods(r.data);
           const pkItem = r.data.find((m) => m.id === "paykita");
           const pkOk = Boolean(pkItem) && cfg.paykita !== false;
-          const mnOk = r.data.some((m) => m.id === "manual") && cfg.manual !== false;
-          const crOk = r.data.some((m) => m.id === "crypto") && cfg.crypto !== false;
           if (pkItem) {
             setSelectedAutoGateway("paykita");
           }
-          if (pkOk) setMethod("paykita");
-          else if (mnOk) setMethod("manual");
-          else if (crOk) setMethod("crypto");
+          if (user && Number(user?.balance || 0) >= Number(product?.price || 0)) {
+            setMethod("wallet");
+          } else if (pkOk) {
+            setMethod("paykita");
+          } else {
+            setMethod("wallet");
+          }
         }
       })
       .catch(() => {});
@@ -230,40 +194,12 @@ export const ProductModal = ({
 
   useEffect(() => {
     if (method === "paykita" && !paykitaAvailable) {
-      if (manualAvailable) setMethod("manual");
-      else if (cryptoAvailable) setMethod("crypto");
-    } else if (method === "manual" && !manualAvailable) {
-      if (paykitaAvailable) setMethod("paykita");
-      else if (cryptoAvailable) setMethod("crypto");
-    } else if (method === "crypto" && !cryptoAvailable) {
-      if (paykitaAvailable) setMethod("paykita");
-      else if (manualAvailable) setMethod("manual");
+      setMethod("wallet");
     }
-  }, [method, paykitaAvailable, manualAvailable, cryptoAvailable]);
-
-  useEffect(() => {
-    if (method === "crypto") {
-      if (!cryptoDestinations.some((d) => d.id === selectedDest)) {
-        setSelectedDest(cryptoDestinations[0]?.id || "");
-      }
-    } else if (method === "manual") {
-      if (!fiatDestinations.some((d) => d.id === selectedDest)) {
-        setSelectedDest(fiatDestinations[0]?.id || "");
-      }
-    }
-  }, [method, cryptoDestinations, fiatDestinations, selectedDest]);
+  }, [method, paykitaAvailable]);
 
   const switchPaymentMethod = (nextMethod) => {
     setMethod(nextMethod);
-    if (nextMethod === "crypto") {
-      if (!cryptoDestinations.some((d) => d.id === selectedDest) && cryptoDestinations[0]) {
-        setSelectedDest(cryptoDestinations[0].id);
-      }
-    } else if (nextMethod === "manual") {
-      if (!fiatDestinations.some((d) => d.id === selectedDest) && fiatDestinations[0]) {
-        setSelectedDest(fiatDestinations[0].id);
-      }
-    }
   };
 
   const handleEmailChange = (val) => {
@@ -305,6 +241,29 @@ export const ProductModal = ({
   };
 
   const handleBuy = async () => {
+    if (method === "wallet") {
+      if (!user) {
+        toast.info(
+          t(
+            "Silakan login terlebih dahulu untuk membayar dengan Saldo Akun.",
+            "Please log in first to pay using Account Balance."
+          )
+        );
+        if (typeof openAuth === "function") openAuth("login");
+        return;
+      }
+      if (!isWalletSufficient) {
+        toast.error(
+          t(
+            "Saldo Akun belum mencukupi. Silakan isi (Top Up) Saldo Akun terlebih dahulu.",
+            "Insufficient Account Balance. Please top up your Account Balance first."
+          )
+        );
+        window.location.href = "/account?tab=wallet";
+        return;
+      }
+    }
+
     const buyer = resolveBuyerPayload();
     if (!buyer.buyer_email) {
       toast.error("Wajib memasukkan alamat email aktif sebelum melakukan pembelian");
@@ -322,27 +281,25 @@ export const ProductModal = ({
     setActiveOrderConflict(null);
     try {
       const activeSessions = getActiveClientSessions();
-      if (method === "paykita") {
-        const { data } = await api.post("/payments/paykita/checkout", {
+      if (method === "wallet") {
+        const { data } = await api.post("/payments/wallet/checkout", {
           ...buyer,
           product_id: product.id,
-          gateway_id: "paykita",
           origin_url: window.location.origin,
           active_session_ids: activeSessions,
         });
+        if (typeof refreshUser === "function") {
+          void refreshUser();
+        }
         rememberActiveClientSession(data.session_id || data.order_id);
         window.location.href = data.checkout_url;
         return;
       }
-      if (!selectedDest) {
-        toast.error("Pilih tujuan pembayaran terlebih dahulu");
-        setLoading(false);
-        return;
-      }
-      const { data } = await api.post("/payments/manual/checkout", {
+
+      const { data } = await api.post("/payments/paykita/checkout", {
         ...buyer,
         product_id: product.id,
-        destination_id: selectedDest,
+        gateway_id: "paykita",
         origin_url: window.location.origin,
         active_session_ids: activeSessions,
       });
@@ -785,14 +742,25 @@ export const ProductModal = ({
                     {availableTabCount > 0 ? (
                       <div
                         className={`grid ${
-                          availableTabCount === 3
-                            ? "grid-cols-3"
-                            : availableTabCount === 2
-                            ? "grid-cols-2"
-                            : "grid-cols-1"
+                          availableTabCount === 2 ? "grid-cols-2" : "grid-cols-1"
                         } gap-1 p-1 bg-void/90 border border-line`}
                         data-testid="payment-method-tabs"
                       >
+                        {walletAvailable && (
+                          <button
+                            type="button"
+                            onClick={() => switchPaymentMethod("wallet")}
+                            data-testid="method-wallet"
+                            className={`flex items-center justify-center gap-1 text-[11px] font-medium py-1.5 px-2 transition-all duration-150 whitespace-nowrap shrink-0 ${
+                              method === "wallet"
+                                ? "bg-lime text-void font-semibold"
+                                : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
+                            }`}
+                          >
+                            <Wallet size={12} />
+                            <span>{t("Saldo Akun", "Account Balance")}</span>
+                          </button>
+                        )}
                         {paykitaAvailable && (
                           <button
                             type="button"
@@ -805,37 +773,7 @@ export const ProductModal = ({
                             }`}
                           >
                             <QrCode size={12} />
-                            <span>{t("QRIS Instan", "Instant QRIS")}</span>
-                          </button>
-                        )}
-                        {manualAvailable && (
-                          <button
-                            type="button"
-                            onClick={() => switchPaymentMethod("manual")}
-                            data-testid="method-manual"
-                            className={`flex items-center justify-center gap-1 text-[11px] font-medium py-1.5 px-2 transition-all duration-150 whitespace-nowrap shrink-0 ${
-                              method === "manual"
-                                ? "bg-neon text-void font-semibold"
-                                : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
-                            }`}
-                          >
-                            <Wallet size={12} />
-                            <span>{t("Transfer / QRIS", "Transfer / QRIS")}</span>
-                          </button>
-                        )}
-                        {cryptoAvailable && (
-                          <button
-                            type="button"
-                            onClick={() => switchPaymentMethod("crypto")}
-                            data-testid="method-crypto"
-                            className={`flex items-center justify-center gap-1 text-[11px] font-medium py-1.5 px-2 transition-all duration-150 whitespace-nowrap shrink-0 ${
-                              method === "crypto"
-                                ? "bg-lime text-void font-semibold"
-                                : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
-                            }`}
-                          >
-                            <Coins size={12} />
-                            <span>Crypto</span>
+                            <span>{t("QRIS Otomatis", "Auto QRIS")}</span>
                           </button>
                         )}
                       </div>
@@ -850,7 +788,78 @@ export const ProductModal = ({
 
                     {/* Compact Sub-Panel per Method */}
                     <AnimatePresence mode="wait" initial={false}>
-                      {method === "paykita" ? (
+                      {method === "wallet" ? (
+                        <motion.div
+                          key="panel-wallet"
+                          initial={{ opacity: 0, y: 2 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -2 }}
+                          transition={{ duration: 0.12 }}
+                          className={`border px-2.5 py-2 space-y-1.5 ${
+                            user
+                              ? isWalletSufficient
+                                ? "bg-lime/5 border-lime/40"
+                                : "bg-coral/5 border-coral/40"
+                              : "bg-void/60 border-line/80"
+                          }`}
+                          data-testid="wallet-info-box"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Wallet
+                                size={14}
+                                className={
+                                  user && isWalletSufficient
+                                    ? "text-lime shrink-0"
+                                    : "text-neon shrink-0"
+                                }
+                              />
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-semibold text-slate-100 truncate">
+                                  {user
+                                    ? `${t("Saldo Akun:", "Balance:")} ${formatIDR(userBalance)}`
+                                    : t("Bayar Instan Pakai Saldo Akun", "Instant Pay with Account Balance")}
+                                </p>
+                                <p className="text-[10px] font-mono text-slate-400 truncate">
+                                  {!user
+                                    ? t(
+                                        "Login untuk menggunakan Saldo Akun atau Top Up Saldo",
+                                        "Log in to use Account Balance or Top Up"
+                                    )
+                                    : isWalletSufficient
+                                    ? t(
+                                        "Saldo mencukupi — langsung lunas & data akses terkirim",
+                                        "Balance sufficient — instant payment & delivery"
+                                      )
+                                    : t(
+                                        `Kurang ${formatIDR(Math.max(0, productPrice - userBalance))} — silakan Top Up Saldo dulu`,
+                                        `Short by ${formatIDR(Math.max(0, productPrice - userBalance))} — please Top Up first`
+                                      )}
+                                </p>
+                              </div>
+                            </div>
+
+                            {!user ? (
+                              <button
+                                type="button"
+                                onClick={() => typeof openAuth === "function" && openAuth("login")}
+                                data-testid="modal-wallet-login-btn"
+                                className="shrink-0 text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 bg-neon text-void hover:bg-lime transition-colors cursor-pointer"
+                              >
+                                Login
+                              </button>
+                            ) : (
+                              <a
+                                href="/account?tab=wallet"
+                                data-testid="modal-wallet-topup-link"
+                                className="shrink-0 text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 border border-lime/60 text-lime hover:bg-lime hover:text-void transition-colors"
+                              >
+                                + {t("Isi Saldo", "Top Up")}
+                              </a>
+                            )}
+                          </div>
+                        </motion.div>
+                      ) : (
                         <motion.div
                           key="panel-paykita"
                           initial={{ opacity: 0, y: 2 }}
@@ -872,129 +881,6 @@ export const ProductModal = ({
                           <span className="text-[10px] font-mono text-lime shrink-0">
                             {t("Otomatis", "Automatic")}
                           </span>
-                        </motion.div>
-                      ) : method === "crypto" ? (
-                        <motion.div
-                          key="panel-crypto"
-                          initial={{ opacity: 0, y: 2 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -2 }}
-                          transition={{ duration: 0.12 }}
-                          data-testid="crypto-payment-panel"
-                        >
-                          {cryptoDestinations.length > 0 ? (
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {cryptoDestinations.map((d) => {
-                                const isSelected = d.id === selectedDest;
-                                return (
-                                  <button
-                                    key={d.id}
-                                    type="button"
-                                    onClick={() => setSelectedDest(d.id)}
-                                    data-testid={`crypto-dest-${d.id}`}
-                                    className={`flex items-center justify-between gap-1.5 px-2.5 py-1.5 border text-left transition-all duration-150 ${
-                                      isSelected
-                                        ? "border-lime bg-lime/10 text-slate-100"
-                                        : "border-line bg-void/60 text-slate-400 hover:border-slate-600 hover:text-slate-200"
-                                    }`}
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="text-[11px] font-semibold truncate">
-                                        {d.symbol || "USDT"} · {d.name}
-                                      </p>
-                                      <p className="text-[9px] font-mono text-slate-400 truncate">
-                                        {d.network || d.account_number}
-                                      </p>
-                                    </div>
-                                    <CheckCircle2
-                                      size={13}
-                                      className={`shrink-0 transition-opacity ${
-                                        isSelected ? "text-lime opacity-100" : "opacity-0"
-                                      }`}
-                                    />
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-coral py-1">
-                              {t(
-                                "Wallet crypto belum tersedia.",
-                                "Crypto wallet is not available yet."
-                              )}
-                            </p>
-                          )}
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="panel-manual"
-                          initial={{ opacity: 0, y: 2 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -2 }}
-                          transition={{ duration: 0.12 }}
-                        >
-                          {activeChannelList.length > 0 ? (
-                            <>
-                              <div className="grid grid-cols-2 gap-1.5">
-                                {activeChannelList.map((d) => {
-                                  const isSelected = d.id === selectedDest;
-                                  return (
-                                    <button
-                                      key={d.id}
-                                      type="button"
-                                      onClick={() => setSelectedDest(d.id)}
-                                      className={`flex items-center justify-between gap-1.5 px-2.5 py-1.5 border text-left transition-all duration-150 ${
-                                        isSelected
-                                          ? "border-neon bg-neon/10 text-slate-100"
-                                          : "border-line bg-void/60 text-slate-400 hover:border-slate-600 hover:text-slate-200"
-                                      }`}
-                                    >
-                                      <div className="min-w-0">
-                                        <p className="text-[11px] font-semibold truncate">
-                                          {d.name}
-                                        </p>
-                                        <p className="text-[9px] font-mono text-slate-400 truncate">
-                                          {d.account_number && d.account_number !== "-"
-                                            ? d.account_number
-                                            : d.type?.toUpperCase() || "QRIS"}
-                                        </p>
-                                      </div>
-                                      <CheckCircle2
-                                        size={13}
-                                        className={`shrink-0 transition-opacity ${
-                                          isSelected ? "text-neon opacity-100" : "opacity-0"
-                                        }`}
-                                      />
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              <select
-                                value={selectedDest}
-                                onChange={(e) => setSelectedDest(e.target.value)}
-                                data-testid="manual-destination-select"
-                                aria-label={t(
-                                  "Pilih Tujuan Transfer",
-                                  "Select Transfer Destination"
-                                )}
-                                className="sr-only"
-                              >
-                                {manualDestinations.map((d) => (
-                                  <option key={d.id} value={d.id}>
-                                    {d.name} ({d.type})
-                                  </option>
-                                ))}
-                              </select>
-                            </>
-                          ) : (
-                            <p className="text-xs text-coral py-1">
-                              {t(
-                                "Tujuan transfer belum tersedia.",
-                                "Transfer destination is not available yet."
-                              )}
-                            </p>
-                          )}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1073,22 +959,18 @@ export const ProductModal = ({
                     <div className="flex items-stretch gap-1.5">
                       <button
                         onClick={handleBuy}
-                        disabled={
-                          loading ||
-                          product.stock < 1 ||
-                          ((method === "manual" || method === "crypto") && !selectedDest)
-                        }
+                        disabled={loading || product.stock < 1}
                         data-testid="modal-buy-button"
                         className={`flex-1 flex items-center justify-center gap-1.5 ${
-                          method === "crypto"
+                          method === "wallet"
                             ? "bg-lime text-void hover:bg-neon"
                             : "bg-neon text-void hover:bg-lime"
                         } font-display font-bold text-xs uppercase tracking-wider py-2.5 px-3 transition-all duration-200 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap`}
                       >
                         {loading ? (
                           <Loader2 size={14} className="animate-spin" />
-                        ) : method === "crypto" ? (
-                          <Coins size={14} />
+                        ) : method === "wallet" ? (
+                          <Wallet size={14} />
                         ) : (
                           <Zap size={14} />
                         )}
@@ -1097,8 +979,10 @@ export const ProductModal = ({
                             ? t("Stok Habis", "Out of Stock")
                             : loading
                             ? t("Memproses...", "Processing...")
-                            : method === "crypto"
-                            ? `${t("Beli", "Buy")} · ${formatUSD(product)} USD`
+                            : method === "wallet" && !user
+                            ? t("Login & Bayar Pakai Saldo", "Login & Pay with Balance")
+                            : method === "wallet" && !isWalletSufficient
+                            ? t("Top Up Saldo Akun Dulu", "Top Up Account Balance First")
                             : `${t("Beli Sekarang", "Buy Now")} · ${formatIDR(
                                 product.price
                               )}`}
