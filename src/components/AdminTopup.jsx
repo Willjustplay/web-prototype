@@ -2570,15 +2570,28 @@ const IntegrationSummary = ({ integration, onCheckBalance, onCheckSkuHealth, onI
           </p>
         </div>
 
-        <div className="border border-line bg-panel p-4" data-testid="integration-balance">
+        <div
+          className={`border p-4 ${
+            balance.low_balance_alert ? "border-coral/50 bg-coral/5" : "border-line bg-panel"
+          }`}
+          data-testid="integration-balance"
+        >
           <p className="text-[10px] uppercase tracking-widest text-slate-500">Saldo Supplier</p>
           <p className="font-display font-bold text-lg mt-1 text-slate-100">
             {balance.supported && balance.ok
-              ? new Intl.NumberFormat("id-ID").format(Number(balance.balance) || 0)
+              ? `Rp ${new Intl.NumberFormat("id-ID").format(Number(balance.balance) || 0)}`
               : "—"}
           </p>
-          <p className={`text-[10px] font-mono mt-1 ${balance.supported && balance.ok ? "text-lime" : "text-slate-500"}`}>
-            {balance.supported ? (balance.ok ? "Tersinkron" : balance.message || "Tidak tersedia") : "Tidak didukung"}
+          {balance.supported && (
+            <p className="text-[10px] font-mono text-slate-400 mt-1" data-testid="integration-reserved-modal">
+              Terkunci ({Number(balance.active_orders) || 0} pesanan aktif):{" "}
+              <span className="text-neon">
+                Rp {new Intl.NumberFormat("id-ID").format(Number(balance.reserved_modal) || 0)}
+              </span>
+            </p>
+          )}
+          <p className={`text-[10px] font-mono mt-0.5 ${balance.supported && balance.ok ? "text-lime" : "text-slate-500"}`}>
+            {balance.supported ? (balance.ok ? "Tersinkron (proteksi checkout aktif)" : balance.message || "Tidak tersedia") : "Tidak didukung"}
           </p>
           {balance.supported && (
             <button
@@ -2648,6 +2661,29 @@ const IntegrationSummary = ({ integration, onCheckBalance, onCheckSkuHealth, onI
           </div>
         </div>
       </div>
+
+      {balance.low_balance_alert && (
+        <div
+          className="border border-coral/50 bg-coral/10 px-4 py-3 text-xs font-mono text-coral flex flex-wrap items-center justify-between gap-2"
+          data-testid="digiflazz-low-balance-alert"
+        >
+          <div>
+            <strong>Peringatan Saldo Digiflazz Tidak Cukup:</strong> Checkout Top Up terakhir ({balance.low_balance_alert.game_name} — {balance.low_balance_alert.item_label}, kode SKU <span className="text-slate-100">{balance.low_balance_alert.sku}</span>) otomatis dibatalkan sebelum membuat tagihan karena total modal dibutuhkan{" "}
+            <strong className="text-slate-100">
+              Rp {new Intl.NumberFormat("id-ID").format(Number(balance.low_balance_alert.required_total) || 0)}
+            </strong>{" "}
+            (modal item Rp {new Intl.NumberFormat("id-ID").format(Number(balance.low_balance_alert.item_modal) || 0)} + terkunci pesanan aktif Rp {new Intl.NumberFormat("id-ID").format(Number(balance.low_balance_alert.reserved_modal) || 0)}) melebihi saldo Digiflazz saat itu{" "}
+            <strong className="text-slate-100">
+              Rp {new Intl.NumberFormat("id-ID").format(Number(balance.low_balance_alert.current_balance) || 0)}
+            </strong>.
+          </div>
+          {balance.low_balance_alert.at && (
+            <span className="text-[10px] text-slate-300 shrink-0">
+              {new Date(balance.low_balance_alert.at).toLocaleString("id-ID")}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Digiflazz Webhook & Callback Endpoint Box */}
       <div className="border border-neon/30 bg-panel p-4 space-y-2.5" data-testid="digiflazz-webhook-panel">

@@ -11181,6 +11181,168 @@ const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
 api.post("/payments/manual/checkout", handleManualOrCryptoCheckout);
 api.post("/payments/crypto/checkout", handleManualOrCryptoCheckout);
 
+function resolveTopupItemModalPrice(game: any, denom: any, fallbackPrice = 0): number {
+  const explicitModal = Number(denom?.modal_price || 0);
+  if (explicitModal > 0) return Math.round(explicitModal);
+  const sellPrice = Number(denom?.price || fallbackPrice || 0);
+  if (sellPrice > 0) return Math.round(sellPrice);
+  return 500;
+}
+
+function computeReservedTopupModal(excludeSessionId?: string): {
+  reserved_modal: number;
+  active_count: number;
+} {
+  const nowMs = Date.now();
+  let reserved = 0;
+  let count = 0;
+  for (const tx of db.transactions || []) {
+    if (!tx || tx.product_type !== PRODUCT_TYPE) continue;
+    if (excludeSessionId && tx.session_id === excludeSessionId) continue;
+
+    const isPendingActive =
+      tx.payment_status === "pending" &&
+      tx.status !== "cancelled_by_buyer" &&
+      tx.status !== "cancelled_out_of_stock" &&
+      tx.status !== "rejected" &&
+      tx.status !== "expired" &&
+      (!tx.expired_at || new Date(tx.expired_at).getTime() > nowMs);
+
+    // Paid orders that have NOT yet been dispatched to Digiflazz still need balance reserved
+    const isPaidUndispatched =
+      tx.payment_status === "paid" &&
+      !tx.digiflazz_dispatched_at &&
+      tx.status !== "delivered" &&
+      tx.digiflazz_status !== "Sukses" &&
+      tx.digiflazz_status !== "Gagal";
+
+    if (!isPendingActive && !isPaidUndispatched) continue;
+
+    let txModal = Number(tx.modal_price || 0);
+    if (txModal <= 0) {
+      const g = (db.games || []).find((x) => x.slug === tx.game_slug || x.id === tx.game_id);
+      const d = g ? findDenomination(g, tx.denomination_code) : null;
+      txModal = resolveTopupItemModalPrice(g, d, Number(tx.base_amount || tx.amount || 0));
+    }
+    reserved += txModal;
+    count++;
+  }
+  return { reserved_modal: reserved, active_count: count };
+}
+
+async function verifyDigiflazzBalanceForTopupCheckout(
+  game: any,
+  denom: any,
+  product: any
+): Promise<{
+  ok: boolean;
+  current_balance: number;
+  item_modal: number;
+  reserved_modal: number;
+  active_orders: number;
+  total_required: number;
+  buyer_message: string;
+}> {
+  const itemModal = resolveTopupItemModalPrice(game, denom, Number(product?.price || 0));
+  const { reserved_modal: reservedModal, active_count: activeOrders } = computeReservedTopupModal();
+  const totalRequired = itemModal + reservedModal;
+
+  const doc =
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+  const username = String(doc?.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const apiKey = String(
+    (doc?.config?.use_dev ? doc?.config?.dev_key : doc?.config?.api_key) ||
+      doc?.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
+
+  const buyerDisruptionMsg =
+    "Maaf, stok atau layanan untuk produk ini sedang mengalami gangguan sementara. Silakan pilih nominal lain atau coba beberapa saat lagi.";
+
+  let currentBalance: number | null =
+    typeof doc?.cached_balance === "number" && !Number.isNaN(doc.cached_balance)
+      ? Number(doc.cached_balance)
+      : null;
+
+  const cacheAgeMs = doc?.cached_balance_at
+    ? Date.now() - new Date(doc.cached_balance_at).getTime()
+    : Infinity;
+
+  if (!isDemoDigiflazzCredential(username, apiKey)) {
+    if (currentBalance === null || cacheAgeMs > 10 * 1000) {
+      try {
+        const sign = crypto.createHash("md5").update(username + apiKey + "depo").digest("hex");
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 5000);
+        const resp = await fetch("https://api.digiflazz.com/v1/cek-saldo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cmd: "depo", username, sign }),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        const json: any = await resp.json().catch(() => null);
+        if (json?.data && typeof json.data.deposit === "number") {
+          currentBalance = Number(json.data.deposit);
+          if (doc) {
+            doc.cached_balance = currentBalance;
+            doc.cached_balance_at = nowIso();
+          }
+        }
+      } catch {
+        // Fallback to doc.cached_balance if network hiccup occurs
+      }
+    }
+  }
+
+  const effectiveBalance = currentBalance !== null ? currentBalance : 0;
+
+  if (currentBalance === null || effectiveBalance < totalRequired) {
+    if (doc) {
+      doc.low_balance_alert = {
+        at: nowIso(),
+        game_name: game?.name || "",
+        game_slug: game?.slug || "",
+        sku: String(denom?.vendor_sku || denom?.code || ""),
+        label: String(denom?.label || denom?.code || ""),
+        item_modal: itemModal,
+        reserved_modal: reservedModal,
+        active_orders: activeOrders,
+        total_required: totalRequired,
+        current_balance: effectiveBalance,
+        unconfigured: isDemoDigiflazzCredential(username, apiKey),
+      };
+      saveDb();
+    }
+    return {
+      ok: false,
+      current_balance: effectiveBalance,
+      item_modal: itemModal,
+      reserved_modal: reservedModal,
+      active_orders: activeOrders,
+      total_required: totalRequired,
+      buyer_message: buyerDisruptionMsg,
+    };
+  }
+
+  if (doc && doc.low_balance_alert) {
+    doc.low_balance_alert = null;
+    saveDb();
+  }
+
+  return {
+    ok: true,
+    current_balance: effectiveBalance,
+    item_modal: itemModal,
+    reserved_modal: reservedModal,
+    active_orders: activeOrders,
+    total_required: totalRequired,
+    buyer_message: "",
+  };
+}
+
 api.post("/payments/topup/checkout", async (req, res) => {
   try {
     if (!enforceCheckoutRateLimit(req, res, "topup")) return;
@@ -11257,6 +11419,16 @@ api.post("/payments/topup/checkout", async (req, res) => {
     const user = getUserOptional(req);
     const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
     if (!enforceSingleActiveOrderPerProduct(req, res, product, buyer, user, origin)) return;
+
+    // Check Digiflazz deposit balance first (SKU modal + active ongoing Top Up orders) before creating payment
+    const balanceCheck = await verifyDigiflazzBalanceForTopupCheckout(game, denom, product);
+    if (!balanceCheck.ok) {
+      return res.status(400).json({
+        detail: balanceCheck.buyer_message,
+        code: "SERVICE_TEMPORARILY_UNAVAILABLE",
+      });
+    }
+
     const orderId = genOrderId("NXG-T");
     const label = denom.label || denom.code;
     const priceIdr = Math.round(Number(product.price || 0));
@@ -11332,6 +11504,7 @@ api.post("/payments/topup/checkout", async (req, res) => {
       denomination_label: label,
       vendor_sku: denom.vendor_sku || `${game.vendor_prefix || ""}${denom.code}`,
       vendor_kind: "digiflazz",
+      modal_price: balanceCheck.item_modal,
       customer_no: customerNo,
       verified_nickname: verifiedNickname,
       destination,
@@ -13745,6 +13918,10 @@ admin.get("/topup/integration", (_req, res) => {
           : "Belum ada SKU yang ditarik dari Digiflazz",
   };
 
+  const { reserved_modal: reservedModal, active_count: activeModalOrders } = computeReservedTopupModal();
+  const rawBalanceVal = hasBalance ? Number(activeRow.cached_balance) : 0;
+  const effectiveAvailableBalance = Math.max(0, rawBalanceVal - reservedModal);
+
   res.json({
     active: {
       kind: "digiflazz",
@@ -13768,7 +13945,11 @@ admin.get("/topup/integration", (_req, res) => {
     balance: {
       supported: true,
       ok: hasBalance,
-      balance: hasBalance ? Number(activeRow.cached_balance) : 0,
+      balance: rawBalanceVal,
+      reserved_modal: reservedModal,
+      active_orders: activeModalOrders,
+      effective_balance: effectiveAvailableBalance,
+      low_balance_alert: activeRow.low_balance_alert || null,
       message: hasBalance
         ? "Tersinkronisasi dengan Digiflazz"
         : hasRealCreds
