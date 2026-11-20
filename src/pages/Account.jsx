@@ -94,6 +94,9 @@ const statusAccentBar = (o) => {
 
 const statusLabel = (o) => {
   const s = o.payment_status;
+  if (o.wallet_refunded || (s === "paid" && o.digiflazz_status === "Gagal")) {
+    return "Dikonversi ke Saldo";
+  }
   if (s === "paid") return "Lunas";
   if (s === "failed") return o.status === "rejected" ? "Ditolak" : "Gagal";
   if (s === "cancelled") return "Dibatalkan";
@@ -826,36 +829,29 @@ export default function Account() {
             </div>
 
             {/* Interactive KPI Summary Strip */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" data-testid="account-stats-grid">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3" data-testid="account-stats-grid">
               <Link
                 to="/isi-saldo"
+                state={{ from: "/akun" }}
                 data-testid="account-kpi-wallet"
-                className="text-left rounded-xl bg-panel/90 border border-line hover:border-lime/60 p-4 transition-all duration-200 group cursor-pointer flex flex-col justify-between"
+                className="text-left rounded-xl bg-panel/90 border border-line hover:border-lime/60 p-3.5 transition-all duration-200 group cursor-pointer flex items-center justify-between gap-2"
               >
-                <div>
-                  <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                    <span className="text-[11px] font-medium text-slate-300">Saldo Akun</span>
-                    <Wallet size={15} className="text-lime group-hover:scale-110 transition-transform" />
-                  </div>
+                <div className="min-w-0">
+                  <span className="text-[11px] font-mono text-slate-400 block">Saldo Akun</span>
                   <p
                     data-testid="account-wallet-balance"
-                    className="font-display font-black text-lg sm:text-xl text-lime font-mono tabular-nums truncate"
+                    className="font-display font-black text-base sm:text-lg text-lime font-mono tabular-nums truncate mt-0.5"
                   >
                     {formatIDR(currentWalletBalance)}
                   </p>
                 </div>
-                <div className="mt-2.5 pt-2 border-t border-line/70 flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-mono text-slate-400 truncate">
-                    Min. Rp 20.000
-                  </span>
-                  <span
-                    data-testid="account-kpi-wallet-topup-btn"
-                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-lime/15 text-lime border border-lime/50 group-hover:bg-lime group-hover:text-void transition-all shrink-0"
-                  >
-                    <PlusCircle size={11} />
-                    <span>+ Isi Saldo</span>
-                  </span>
-                </div>
+                <span
+                  data-testid="account-kpi-wallet-topup-btn"
+                  className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider bg-lime/15 text-lime border border-lime/40 group-hover:bg-lime group-hover:text-void transition-all shrink-0"
+                >
+                  <PlusCircle size={11} />
+                  <span>Isi</span>
+                </span>
               </Link>
 
               <button
@@ -864,136 +860,100 @@ export default function Account() {
                   setActiveTab("orders");
                   setOrderStatusFilter("all");
                 }}
-                className={`text-left rounded-xl bg-panel/90 border p-4 transition-all duration-200 group ${
-                  activeTab === "orders" && orderStatusFilter === "all"
-                    ? "border-neon/60 bg-neon/[0.04] shadow-[0_0_25px_rgba(0,216,255,0.08)]"
+                className={`text-left rounded-xl bg-panel/90 border p-3.5 transition-all duration-200 group flex items-center justify-between gap-2 ${
+                  activeTab === "orders"
+                    ? "border-neon/60 bg-neon/[0.04]"
                     : "border-line hover:border-neon/40"
                 }`}
               >
-                <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                  <span className="text-[11px] font-medium text-slate-400">Total Pesanan</span>
-                  <Package size={15} className="text-neon group-hover:scale-110 transition-transform" />
+                <div className="min-w-0">
+                  <span className="text-[11px] font-mono text-slate-400 block">Pesanan</span>
+                  <p className="font-display font-black text-lg sm:text-xl text-slate-100 font-mono tabular-nums mt-0.5">
+                    {stats.total}
+                  </p>
                 </div>
-                <p className="font-display font-black text-2xl text-slate-100 font-mono tabular-nums">
-                  {stats.total}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
-                  {stats.paidCount} lunas · {stats.pendingCount} diproses
-                </p>
+                <Package size={16} className="text-neon shrink-0" />
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab("wishlist")}
-                className={`text-left rounded-xl bg-panel/90 border p-4 transition-all duration-200 group ${
+                className={`text-left rounded-xl bg-panel/90 border p-3.5 transition-all duration-200 group flex items-center justify-between gap-2 ${
                   activeTab === "wishlist"
-                    ? "border-coral/60 bg-coral/[0.04] shadow-[0_0_25px_rgba(251,113,133,0.08)]"
+                    ? "border-coral/60 bg-coral/[0.04]"
                     : "border-line hover:border-coral/40"
                 }`}
               >
-                <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                  <span className="text-[11px] font-medium text-slate-400">Wishlist Tersimpan</span>
-                  <Heart size={15} className="text-coral group-hover:scale-110 transition-transform" />
+                <div className="min-w-0">
+                  <span className="text-[11px] font-mono text-slate-400 block">Wishlist</span>
+                  <p className="font-display font-black text-lg sm:text-xl text-slate-100 font-mono tabular-nums mt-0.5">
+                    {wishlist.length}
+                  </p>
                 </div>
-                <p className="font-display font-black text-2xl text-slate-100 font-mono tabular-nums">
-                  {wishlist.length}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
-                  {stats.reviewCount} ulasan telah dikirim
-                </p>
+                <Heart size={16} className="text-coral shrink-0" />
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab("security")}
-                className={`text-left rounded-xl bg-panel/90 border p-4 transition-all duration-200 group ${
+                className={`text-left rounded-xl bg-panel/90 border p-3.5 transition-all duration-200 group flex items-center justify-between gap-2 ${
                   activeTab === "security"
-                    ? "border-neon/60 bg-neon/[0.04] shadow-[0_0_25px_rgba(0,216,255,0.08)]"
+                    ? "border-neon/60 bg-neon/[0.04]"
                     : "border-line hover:border-neon/40"
                 }`}
               >
-                <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                  <span className="text-[11px] font-medium text-slate-400">Keamanan & Sandi</span>
-                  <ShieldCheck size={15} className="text-neon group-hover:scale-110 transition-transform" />
+                <div className="min-w-0">
+                  <span className="text-[11px] font-mono text-slate-400 block">Keamanan</span>
+                  <p className="font-display font-black text-lg sm:text-xl text-slate-100 font-mono tabular-nums mt-0.5">
+                    {securityData.active_sessions_count || 1} Sesi
+                  </p>
                 </div>
-                <p className="font-display font-black text-xl sm:text-2xl text-slate-100 font-mono tabular-nums">
-                  {securityData.active_sessions_count || 1} Sesi
-                </p>
-                <p className="text-[11px] text-slate-500 mt-1 truncate">
-                  {securityData.password_changed_at
-                    ? `Diubah ${fmtShortDate(securityData.password_changed_at)}`
-                    : "Kelola sandi & perangkat"}
-                </p>
+                <ShieldCheck size={16} className="text-neon shrink-0" />
               </button>
             </div>
 
             {/* Dynamic Section Switcher Tabs */}
-            <div className="bg-panel/90 border border-line rounded-xl p-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-1 overflow-x-auto">
-                {[
-                  { id: "orders", label: "Riwayat Pesanan", icon: Package, count: orders.length },
-                  { id: "wishlist", label: "Wishlist", icon: Heart, count: wishlist.length },
-                  { id: "security", label: "Keamanan & Sandi", icon: Lock, count: null },
-                ].map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      data-testid={`account-tab-${tab.id}`}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`relative inline-flex items-center gap-2 px-4 py-2 text-xs font-display font-bold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                        isActive ? "text-void" : "text-slate-300 hover:text-slate-100 hover:bg-void/50"
-                      }`}
-                    >
-                      {isActive && (
-                        <motion.span
-                          layoutId="accountActiveTabIndicator"
-                          transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                          className="absolute inset-0 bg-neon rounded-lg"
-                        />
-                      )}
-                      <span className="relative z-10 inline-flex items-center gap-2">
-                        <Icon size={14} />
-                        <span>{tab.label}</span>
-                        {tab.count !== null && (
-                          <span
-                            className={`px-1.5 py-0.5 text-[10px] font-mono rounded tabular-nums ${
-                              isActive ? "bg-void/20 text-void font-bold" : "bg-void text-slate-400"
-                            }`}
-                          >
-                            {tab.count}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Contextual quick status in tab bar */}
-              <div className="hidden md:flex items-center gap-2 px-2 text-[11px] font-mono text-slate-400 shrink-0">
-                {activeTab === "orders" && (
-                  <span className="tabular-nums">
-                    Menampilkan <strong className="text-slate-200">{filteredOrders.length}</strong> dari{" "}
-                    {orders.length} transaksi
-                  </span>
-                )}
-                {activeTab === "wishlist" && (
-                  <Link
-                    to="/#katalog"
-                    className="inline-flex items-center gap-1 text-neon hover:text-lime transition-colors"
+            <div className="bg-panel/90 border border-line rounded-xl p-1 flex items-center gap-1 overflow-x-auto">
+              {[
+                { id: "orders", label: "Pesanan", icon: Package, count: orders.length },
+                { id: "wishlist", label: "Wishlist", icon: Heart, count: wishlist.length },
+                { id: "security", label: "Keamanan", icon: Lock, count: null },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    data-testid={`account-tab-${tab.id}`}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`relative inline-flex items-center gap-2 px-3.5 py-2 text-xs font-display font-bold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                      isActive ? "text-void" : "text-slate-300 hover:text-slate-100 hover:bg-void/50"
+                    }`}
                   >
-                    Jelajahi Katalog <ArrowRight size={12} />
-                  </Link>
-                )}
-                {activeTab === "security" && (
-                  <span className="inline-flex items-center gap-1.5 text-lime">
-                    <ShieldCheck size={13} /> Proteksi Akun Aktif
-                  </span>
-                )}
-              </div>
+                    {isActive && (
+                      <motion.span
+                        layoutId="accountActiveTabIndicator"
+                        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                        className="absolute inset-0 bg-neon rounded-lg"
+                      />
+                    )}
+                    <span className="relative z-10 inline-flex items-center gap-1.5">
+                      <Icon size={13} />
+                      <span>{tab.label}</span>
+                      {tab.count !== null && (
+                        <span
+                          className={`px-1.5 py-0.5 text-[10px] font-mono rounded tabular-nums ${
+                            isActive ? "bg-void/20 text-void font-bold" : "bg-void text-slate-400"
+                          }`}
+                        >
+                          {tab.count}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {loading ? (
@@ -1023,85 +983,44 @@ export default function Account() {
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.14 }}
                       data-testid="account-orders-section"
-                      className="space-y-4"
+                      className="space-y-3"
                     >
-                      {/* Streamlined Filter & Search Bar */}
+                      {/* Streamlined Single-Row Filter & Search Bar */}
                       {orders.length > 0 && (
-                        <div className="bg-panel/90 border border-line rounded-xl p-3 sm:p-3.5 space-y-3">
-                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-                            {/* Status Filter Pills */}
-                            <div className="flex items-center gap-1 overflow-x-auto pb-1 lg:pb-0">
-                              {[
-                                { id: "all", label: "Semua", count: stats.total },
-                                { id: "paid", label: "Lunas", count: stats.paidCount },
-                                { id: "pending", label: "Menunggu", count: stats.pendingCount },
-                                { id: "failed", label: "Gagal", count: stats.failedCount },
-                              ].map((f) => (
-                                <button
-                                  key={f.id}
-                                  type="button"
-                                  onClick={() => setOrderStatusFilter(f.id)}
-                                  className={`px-3 py-1.5 rounded-lg text-[11px] font-mono transition-colors whitespace-nowrap shrink-0 ${
-                                    orderStatusFilter === f.id
-                                      ? "bg-neon/15 text-neon border border-neon/50 font-bold"
-                                      : "bg-void/60 text-slate-400 border border-transparent hover:text-slate-200"
-                                  }`}
-                                >
-                                  {f.label}{" "}
-                                  <span className="opacity-70 tabular-nums">({f.count})</span>
-                                </button>
-                              ))}
-                            </div>
-
-                            {/* Type & Sort Controls */}
-                            <div className="flex items-center gap-2 shrink-0">
-                              <div className="flex items-center rounded-lg border border-line bg-void p-0.5">
-                                {[
-                                  { id: "all", label: "Semua" },
-                                  { id: "topup", label: "Top-Up" },
-                                  { id: "store", label: "Akun" },
-                                ].map((t) => (
-                                  <button
-                                    key={t.id}
-                                    type="button"
-                                    onClick={() => setOrderTypeFilter(t.id)}
-                                    className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors whitespace-nowrap shrink-0 ${
-                                      orderTypeFilter === t.id
-                                        ? "bg-panel text-neon font-bold"
-                                        : "text-slate-400 hover:text-slate-200"
-                                    }`}
-                                  >
-                                    {t.label}
-                                  </button>
-                                ))}
-                              </div>
-
+                        <div className="bg-panel/90 border border-line rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-1 overflow-x-auto">
+                            {[
+                              { id: "all", label: "Semua", count: stats.total },
+                              { id: "paid", label: "Lunas", count: stats.paidCount },
+                              { id: "pending", label: "Menunggu", count: stats.pendingCount },
+                              { id: "failed", label: "Gagal", count: stats.failedCount },
+                            ].map((f) => (
                               <button
+                                key={f.id}
                                 type="button"
-                                onClick={() =>
-                                  setOrderSort((s) => (s === "newest" ? "highest" : "newest"))
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-void hover:border-neon/40 px-3 py-1.5 text-[11px] font-mono text-slate-300 transition-colors whitespace-nowrap shrink-0"
-                                title="Urutkan pesanan"
+                                onClick={() => setOrderStatusFilter(f.id)}
+                                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-colors whitespace-nowrap shrink-0 ${
+                                  orderStatusFilter === f.id
+                                    ? "bg-neon/15 text-neon border border-neon/50 font-bold"
+                                    : "bg-void/60 text-slate-400 border border-transparent hover:text-slate-200"
+                                }`}
                               >
-                                <SlidersHorizontal size={12} className="text-neon" />
-                                {orderSort === "newest" ? "Terbaru" : "Nominal"}
+                                {f.label} <span className="opacity-70 tabular-nums">({f.count})</span>
                               </button>
-                            </div>
+                            ))}
                           </div>
 
-                          {/* Search Input */}
-                          <div className="relative">
+                          <div className="relative w-full sm:w-64">
                             <Search
-                              size={14}
-                              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
+                              size={13}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
                             />
                             <input
                               type="text"
                               value={orderSearch}
                               onChange={(e) => setOrderSearch(e.target.value)}
-                              placeholder="Cari nama produk, game, kode pesanan (#ORD), atau ID tujuan..."
-                              className="w-full rounded-lg bg-void border border-line focus:border-neon/60 pl-9 pr-4 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-600 focus:outline-none transition-colors"
+                              placeholder="Cari pesanan..."
+                              className="w-full rounded-lg bg-void border border-line focus:border-neon/60 pl-8 pr-3 py-1.5 text-xs font-mono text-slate-100 placeholder:text-slate-600 focus:outline-none transition-colors"
                             />
                           </div>
                         </div>
@@ -1109,33 +1028,29 @@ export default function Account() {
 
                       {orders.length === 0 ? (
                         <div
-                          className="rounded-xl bg-panel/90 border border-line p-8 sm:p-10 text-center"
+                          className="rounded-xl bg-panel/90 border border-line p-8 text-center"
                           data-testid="account-orders-empty"
                         >
-                          <Package size={30} className="text-slate-600 mx-auto mb-3" />
-                          <p className="text-xs font-mono text-slate-400">
-                            Belum ada pesanan. Yuk jelajahi katalog atau top-up game favoritmu!
-                          </p>
-                          <div className="flex items-center justify-center gap-3 mt-5">
+                          <Package size={28} className="text-slate-600 mx-auto mb-2.5" />
+                          <p className="text-xs font-mono text-slate-400">Belum ada pesanan.</p>
+                          <div className="flex items-center justify-center gap-2.5 mt-4">
                             <Link
                               to="/#katalog"
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-neon text-void font-display font-bold text-xs px-5 py-2.5 hover:bg-lime transition-colors"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-neon text-void font-display font-bold text-xs px-4 py-2 hover:bg-lime transition-colors"
                             >
-                              Lihat Katalog <ArrowRight size={13} />
+                              Katalog <ArrowRight size={13} />
                             </Link>
                             <Link
                               to="/topup"
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-line hover:border-neon text-slate-200 hover:text-neon font-mono text-xs px-5 py-2.5 transition-colors"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-line hover:border-neon text-slate-200 hover:text-neon font-mono text-xs px-4 py-2 transition-colors"
                             >
-                              Top-Up Game <Zap size={12} />
+                              Top-Up <Zap size={12} />
                             </Link>
                           </div>
                         </div>
                       ) : filteredOrders.length === 0 ? (
-                        <div className="rounded-xl bg-panel/90 border border-line p-8 text-center">
-                          <p className="text-xs font-mono text-slate-400">
-                            Tidak ada pesanan yang cocok dengan filter pencarian Anda.
-                          </p>
+                        <div className="rounded-xl bg-panel/90 border border-line p-6 text-center">
+                          <p className="text-xs font-mono text-slate-400">Tidak ada pesanan yang cocok.</p>
                           <button
                             type="button"
                             onClick={() => {
@@ -1143,22 +1058,20 @@ export default function Account() {
                               setOrderTypeFilter("all");
                               setOrderSearch("");
                             }}
-                            className="mt-3 text-xs font-mono text-neon hover:underline"
+                            className="mt-2 text-xs font-mono text-neon hover:underline"
                           >
-                            Reset Semua Filter
+                            Reset Filter
                           </button>
                         </div>
                       ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
                           <AnimatePresence initial={false}>
                             {filteredOrders.map((o) => {
                               const key = o.session_id || o.order_id;
                               const orderCode = o.order_id || o.session_id;
                               const isWalletTopup = o.order_type === "wallet_topup";
                               const isTopup = o.order_type === "topup" || Boolean(o.denomination_id);
-                              const isExpanded = Boolean(expandedOrders[key]);
                               const isMasked = Boolean(maskedAccess[key]);
-                              const progressStep = getOrderProgressStep(o);
                               const destEntries =
                                 o.destination && typeof o.destination === "object"
                                   ? Object.entries(o.destination).filter(([, v]) => v)
@@ -1168,17 +1081,17 @@ export default function Account() {
                                 <motion.div
                                   key={key}
                                   layout
-                                  initial={{ opacity: 0, y: 6 }}
+                                  initial={{ opacity: 0, y: 4 }}
                                   animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -6 }}
+                                  exit={{ opacity: 0, y: -4 }}
                                   data-testid="account-order-item"
                                   className="rounded-xl bg-panel/90 border border-line hover:border-slate-700 transition-colors overflow-hidden"
                                 >
-                                  <div className="p-4 sm:p-5">
-                                    <div className="flex flex-col sm:flex-row sm:items-start gap-4 justify-between">
+                                  <div className="p-3.5 sm:p-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                                       <div className="flex-1 min-w-0">
                                         {/* Clean Unboxed Metadata Line */}
-                                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-slate-400 mb-1">
+                                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-slate-400">
                                           <span
                                             className={
                                               isWalletTopup
@@ -1189,10 +1102,10 @@ export default function Account() {
                                             }
                                           >
                                             {isWalletTopup
-                                              ? "Top-Up Saldo"
+                                              ? "Saldo"
                                               : isTopup
                                               ? "Top-Up"
-                                              : "Store Akun"}
+                                              : "Akun"}
                                           </span>
                                           {o.game_name && (
                                             <>
@@ -1209,221 +1122,124 @@ export default function Account() {
                                           >
                                             #{orderCode}
                                             {copiedId === String(orderCode) ? (
-                                              <Check size={11} className="text-lime" />
+                                              <Check size={10} className="text-lime" />
                                             ) : (
-                                              <Copy size={11} />
+                                              <Copy size={10} />
                                             )}
                                           </button>
                                           <span aria-hidden="true">·</span>
                                           <span className="text-slate-500 tabular-nums">{fmtDate(o.created_at)}</span>
                                         </div>
 
-                                        {/* Product Title */}
-                                        <p className="text-sm sm:text-base font-display font-bold text-slate-100 truncate">
-                                          {o.product_title || "Produk"}
-                                        </p>
-
-                                        {/* Target ID Info */}
-                                        {destEntries.length > 0 && (
-                                          <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-mono text-slate-400 tabular-nums">
-                                            {destEntries.map(([k, v], idx) => (
-                                              <span key={k}>
-                                                {idx > 0 && <span className="mr-2 text-slate-600">·</span>}
-                                                <span className="text-slate-500 uppercase">{k}:</span>{" "}
-                                                <span className="text-slate-200">{String(v)}</span>
-                                              </span>
-                                            ))}
-                                          </div>
-                                        )}
-
-                                        {/* Delivery Credentials / Access Box */}
-                                        {o.payment_status === "paid" && o.delivery_info && (
-                                          <div
-                                            className="mt-3 rounded-lg bg-lime/5 border border-lime/25 px-3.5 py-2.5"
-                                            data-testid="account-order-access"
-                                          >
-                                            <div className="flex items-center justify-between gap-2 mb-1">
-                                              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-lime">
-                                                <KeyRound size={12} /> Data Akses / Pengiriman
-                                              </p>
-                                              <div className="flex items-center gap-2.5">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => toggleMaskAccess(key)}
-                                                  className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-400 hover:text-slate-200"
-                                                >
-                                                  {isMasked ? <Eye size={11} /> : <EyeOff size={11} />}
-                                                  {isMasked ? "Tampilkan" : "Samarkan"}
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleCopy(o.delivery_info, "Data akses akun")}
-                                                  className="inline-flex items-center gap-1 text-[10px] font-mono text-lime hover:underline"
-                                                >
-                                                  <Copy size={11} /> Salin
-                                                </button>
-                                              </div>
-                                            </div>
-                                            <p
-                                              className={`text-xs font-mono text-slate-100 whitespace-pre-wrap break-words leading-relaxed transition-all ${
-                                                isMasked ? "blur-sm select-none" : ""
-                                              }`}
-                                            >
-                                              {linkify(o.delivery_info)}
-                                            </p>
-                                          </div>
-                                        )}
-
-                                        {/* Action Controls */}
-                                        <div className="flex flex-wrap items-center gap-2 mt-3">
-                                          {o.provider === "manual" && o.payment_status === "pending" && (
-                                            <Link
-                                              to={`/payment/success?session_id=${o.session_id}`}
-                                              data-testid="account-order-continue"
-                                              className="inline-flex items-center gap-1.5 rounded-lg text-[11px] font-bold text-neon border border-neon/40 hover:bg-neon/10 px-3 py-1.5 transition-colors"
-                                            >
-                                              {o.status === "waiting_approval"
-                                                ? "Lihat Status"
-                                                : "Selesaikan Pembayaran"}{" "}
-                                              <ArrowRight size={12} />
-                                            </Link>
+                                        {/* Product Title & Target ID */}
+                                        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 mt-0.5">
+                                          <p className="text-sm font-display font-bold text-slate-100 truncate">
+                                            {o.product_title || "Produk"}
+                                          </p>
+                                          {destEntries.length > 0 && (
+                                            <span className="text-[11px] font-mono text-slate-400 tabular-nums">
+                                              ({destEntries.map(([, v]) => String(v)).join(" / ")})
+                                            </span>
                                           )}
-
-                                          {o.payment_status === "paid" && !isWalletTopup && (
-                                            <div data-testid="account-order-review" className="inline-flex">
-                                              {reviewed[o.session_id] ? (
-                                                <span
-                                                  data-testid="account-order-reviewed"
-                                                  className="inline-flex items-center gap-1.5 rounded-lg text-[11px] font-mono text-lime border border-lime/30 bg-lime/5 px-2.5 py-1"
-                                                >
-                                                  <Star size={11} fill="currentColor" /> Diulas (
-                                                  {reviewed[o.session_id].rating}/5)
-                                                </span>
-                                              ) : (
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setReviewTarget(o)}
-                                                  data-testid="account-order-review-button"
-                                                  className="inline-flex items-center gap-1.5 rounded-lg text-[11px] font-bold text-void bg-lime hover:bg-neon px-3 py-1.5 transition-colors"
-                                                >
-                                                  <Star size={11} /> Beri Ulasan
-                                                </button>
-                                              )}
-                                            </div>
-                                          )}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleExpandOrder(key)}
-                                            className="inline-flex items-center gap-1 rounded-lg text-[11px] font-mono text-slate-400 hover:text-neon border border-line px-2.5 py-1 transition-colors"
-                                          >
-                                            {isExpanded ? (
-                                              <>
-                                                Tutup Detail <ChevronUp size={12} />
-                                              </>
-                                            ) : (
-                                              <>
-                                                Detail <ChevronDown size={12} />
-                                              </>
-                                            )}
-                                          </button>
                                         </div>
                                       </div>
 
-                                      {/* Right: Amount & Status */}
-                                      <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0 border-t sm:border-t-0 border-line pt-3 sm:pt-0">
-                                        <span className="text-base sm:text-lg font-display font-black text-neon font-mono tabular-nums">
+                                      {/* Right: Amount, Status & Quick Actions */}
+                                      <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 shrink-0 border-t sm:border-t-0 border-line/70 pt-2.5 sm:pt-0">
+                                        <span className="text-sm sm:text-base font-display font-black text-neon font-mono tabular-nums">
                                           {formatIDR(o.amount)}
                                         </span>
+
                                         <span
                                           data-testid="account-order-status"
-                                          className={`inline-flex items-center gap-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 border ${statusStyle(
+                                          className={`inline-flex items-center gap-1 rounded-md text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border ${statusStyle(
                                             o
                                           )}`}
                                         >
-                                          {o.payment_status === "paid" ? (
-                                            <CheckCircle2 size={11} />
-                                          ) : o.payment_status === "failed" ||
-                                            o.payment_status === "cancelled" ? (
-                                            <XCircle size={11} />
-                                          ) : (
-                                            <AlertCircle size={11} />
-                                          )}
                                           {statusLabel(o)}
                                         </span>
+
+                                        {o.provider === "manual" && o.payment_status === "pending" ? (
+                                          <Link
+                                            to={`/payment/success?session_id=${o.session_id}`}
+                                            data-testid="account-order-continue"
+                                            className="inline-flex items-center gap-1 rounded-lg text-[11px] font-bold text-neon border border-neon/40 hover:bg-neon/10 px-2.5 py-1 transition-colors"
+                                          >
+                                            {o.status === "waiting_approval" ? "Status" : "Bayar"}
+                                            <ArrowRight size={11} />
+                                          </Link>
+                                        ) : (
+                                          <Link
+                                            to={`/payment/success?session_id=${o.session_id}`}
+                                            className="inline-flex items-center gap-1 rounded-lg text-[11px] font-mono text-slate-400 hover:text-neon border border-line px-2 py-1 transition-colors"
+                                            title="Buka Invoice"
+                                          >
+                                            <span>Invoice</span>
+                                            <ExternalLink size={11} />
+                                          </Link>
+                                        )}
+
+                                        {o.payment_status === "paid" && !isWalletTopup && (
+                                          <div data-testid="account-order-review" className="inline-flex">
+                                            {reviewed[o.session_id] ? (
+                                              <span
+                                                data-testid="account-order-reviewed"
+                                                className="inline-flex items-center gap-1 rounded-lg text-[11px] font-mono text-lime border border-lime/30 bg-lime/5 px-2 py-1"
+                                              >
+                                                <Star size={10} fill="currentColor" /> {reviewed[o.session_id].rating}/5
+                                              </span>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                onClick={() => setReviewTarget(o)}
+                                                data-testid="account-order-review-button"
+                                                className="inline-flex items-center gap-1 rounded-lg text-[11px] font-bold text-void bg-lime hover:bg-neon px-2.5 py-1 transition-colors"
+                                              >
+                                                <Star size={10} /> Ulas
+                                              </button>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
 
-                                    {/* Expandable Details */}
-                                    <AnimatePresence>
-                                      {isExpanded && (
-                                        <motion.div
-                                          initial={{ height: 0, opacity: 0 }}
-                                          animate={{ height: "auto", opacity: 1 }}
-                                          exit={{ height: 0, opacity: 0 }}
-                                          transition={{ duration: 0.2 }}
-                                          className="overflow-hidden"
-                                        >
-                                          <div className="mt-4 pt-3.5 border-t border-line space-y-3">
-                                            {progressStep > 0 && (
-                                              <div className="grid grid-cols-4 gap-2">
-                                                {[
-                                                  { step: 1, label: "Dibuat" },
-                                                  { step: 2, label: "Pembayaran" },
-                                                  { step: 3, label: "Verifikasi" },
-                                                  { step: 4, label: "Selesai" },
-                                                ].map((st) => {
-                                                  const done = progressStep >= st.step;
-                                                  return (
-                                                    <div key={st.step} className="space-y-1">
-                                                      <div
-                                                        className={`h-1 rounded-full w-full ${
-                                                          done ? "bg-lime" : "bg-void border border-line"
-                                                        }`}
-                                                      />
-                                                      <p
-                                                        className={`text-[10px] font-mono ${
-                                                          done ? "text-lime font-semibold" : "text-slate-500"
-                                                        }`}
-                                                      >
-                                                        {st.step}. {st.label}
-                                                      </p>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            )}
-
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg bg-void/70 border border-line p-3 text-xs font-mono">
-                                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-400">
-                                                <span>
-                                                  Invoice:{" "}
-                                                  <strong className="text-slate-200 tabular-nums">
-                                                    {o.session_id}
-                                                  </strong>
-                                                </span>
-                                                <span>
-                                                  Metode:{" "}
-                                                  <strong className="text-slate-200">
-                                                    {o.provider === "wallet"
-                                                      ? "Saldo Akun"
-                                                      : o.provider === "paykita"
-                                                      ? "QRIS Otomatis"
-                                                      : o.manual_destination_label || "Transfer Manual"}
-                                                  </strong>
-                                                </span>
-                                              </div>
-                                              <Link
-                                                to={`/payment/success?session_id=${o.session_id}`}
-                                                className="inline-flex items-center gap-1.5 text-[11px] font-mono text-neon hover:text-lime shrink-0"
-                                              >
-                                                Buka Invoice <ExternalLink size={12} />
-                                              </Link>
-                                            </div>
+                                    {/* Delivery Credentials / Access Box */}
+                                    {o.payment_status === "paid" && o.delivery_info && (
+                                      <div
+                                        className="mt-2.5 rounded-lg bg-lime/5 border border-lime/25 px-3 py-2"
+                                        data-testid="account-order-access"
+                                      >
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-lime">
+                                            <KeyRound size={11} /> Data Akses
+                                          </span>
+                                          <div className="flex items-center gap-2.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleMaskAccess(key)}
+                                              className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-400 hover:text-slate-200"
+                                            >
+                                              {isMasked ? <Eye size={11} /> : <EyeOff size={11} />}
+                                              {isMasked ? "Tampilkan" : "Samarkan"}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCopy(o.delivery_info, "Data akses akun")}
+                                              className="inline-flex items-center gap-1 text-[10px] font-mono text-lime hover:underline"
+                                            >
+                                              <Copy size={11} /> Salin
+                                            </button>
                                           </div>
-                                        </motion.div>
-                                      )}
-                                    </AnimatePresence>
+                                        </div>
+                                        <p
+                                          className={`text-xs font-mono text-slate-100 whitespace-pre-wrap break-words leading-relaxed transition-all ${
+                                            isMasked ? "blur-sm select-none" : ""
+                                          }`}
+                                        >
+                                          {linkify(o.delivery_info)}
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
                                 </motion.div>
                               );

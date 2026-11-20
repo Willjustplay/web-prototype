@@ -471,10 +471,22 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
         if (data.status === "Sukses") {
           toast.success(`Digiflazz Sukses!${data.sn ? ` SN: ${data.sn}` : ""}`);
         } else if (data.status === "Gagal") {
-          toast.error(`Digiflazz Gagal: ${data.message || "Transaksi gagal"}`);
+          toast.error(
+            data.order?.wallet_refunded
+              ? `Digiflazz Gagal (${data.message || "Gangguan / Salah ID"}) — Pembayaran telah dikonversi ke Saldo Akun`
+              : `Digiflazz Gagal: ${data.message || "Transaksi gagal"}`
+          );
         } else {
           toast.info(`Digiflazz (${data.status || "Pending"}): ${data.message || "Sedang diproses"}`);
         }
+      }
+      if (action === "refund_to_wallet") {
+        const { data } = await api.post(
+          `/admin/topup/orders/${o.session_id}/refund-to-wallet`,
+          body,
+          { headers }
+        );
+        toast.success(data?.message || "Pembayaran berhasil dikonversi ke Saldo Akun");
       }
       if (action === "complete") {
         const { data } = await api.post(`/admin/topup/orders/${o.session_id}/complete`, body, { headers });
@@ -1054,6 +1066,16 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                             )}
                           </div>
                         )}
+                        {o.wallet_refunded && (
+                          <div className="text-[10px] font-mono">
+                            <span
+                              data-testid={`admin-topup-wallet-refunded-${o.session_id}`}
+                              className="inline-block font-bold px-1.5 py-0.5 border text-lime border-lime/40 bg-lime/10"
+                            >
+                              ✓ Dikonversi ke Saldo ({formatIDR(o.wallet_refunded_amount || o.amount)})
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
@@ -1066,7 +1088,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                               Bukti
                             </button>
                           )}
-                          {o.payment_status === "paid" && (
+                          {o.payment_status === "paid" && !o.wallet_refunded && (
                             <button
                               onClick={() => orderAction(o, "check_digiflazz")}
                               disabled={busy === o.session_id}
@@ -1077,7 +1099,25 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                               {o.digiflazz_status ? "Cek Digiflazz" : "Kirim Digiflazz"}
                             </button>
                           )}
-                          {o.payment_status === "paid" && o.status !== "delivered" && (
+                          {o.payment_status === "paid" &&
+                            o.status !== "delivered" &&
+                            o.digiflazz_status !== "Sukses" &&
+                            !o.wallet_refunded && (
+                              <button
+                                onClick={() =>
+                                  orderAction(o, "refund_to_wallet", {
+                                    category: "digiflazz_disruption",
+                                  })
+                                }
+                                disabled={busy === o.session_id}
+                                data-testid={`admin-topup-refund-wallet-${o.session_id}`}
+                                title="Ubah pembayaran lunas menjadi Saldo Akun (Gangguan Digiflazz / Salah ID)"
+                                className="text-[10px] uppercase tracking-widest border border-amber-400/50 text-amber-300 hover:bg-amber-400/15 px-2 py-1.5 transition-colors disabled:opacity-50"
+                              >
+                                Ubah ke Saldo
+                              </button>
+                            )}
+                          {o.payment_status === "paid" && o.status !== "delivered" && !o.wallet_refunded && (
                             <button
                               onClick={() => orderAction(o, "complete", { note: "Pesanan telah dikirim dan diproses", dispatch: false })}
                               disabled={busy === o.session_id}

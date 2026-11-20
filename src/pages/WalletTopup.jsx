@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Wallet,
@@ -26,9 +26,12 @@ import {
   formatIDR,
   formatUSD,
   formatApiError,
+  getUsdRate,
+  setUsdRate,
 } from "@/lib/api";
 
 const WALLET_PRESET_AMOUNTS = [20000, 50000, 100000, 250000, 500000, 1000000];
+const WALLET_CRYPTO_USD_PRESETS = [2, 5, 10, 25, 50, 100];
 
 const fmtDate = (v) => {
   if (!v) return "-";
@@ -41,17 +44,59 @@ const fmtDate = (v) => {
 
 export default function WalletTopup() {
   const { user, setUser, initializing, openAuth } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const hasLoadedRef = useRef(false);
 
+  const returnPath = useMemo(() => {
+    const fromState = location.state?.from;
+    if (
+      typeof fromState === "string" &&
+      fromState.startsWith("/") &&
+      !fromState.startsWith("/isi-saldo") &&
+      !fromState.startsWith("/topup-saldo")
+    ) {
+      return fromState;
+    }
+    const fromParam = new URLSearchParams(location.search).get("from");
+    if (
+      typeof fromParam === "string" &&
+      fromParam.startsWith("/") &&
+      !fromParam.startsWith("/isi-saldo") &&
+      !fromParam.startsWith("/topup-saldo")
+    ) {
+      return fromParam;
+    }
+    return "/akun";
+  }, [location.state, location.search]);
+
+  const handleBack = (e) => {
+    if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) {
+      return;
+    }
+    e?.preventDefault();
+    if (location.state?.from || new URLSearchParams(location.search).get("from")) {
+      navigate(returnPath);
+      return;
+    }
+    if (typeof window !== "undefined" && window.history.state?.idx > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate(returnPath);
+  };
+
   const [walletData, setWalletData] = useState({
     balance: Math.max(0, Math.round(Number(user?.balance || 0))),
     min_topup: 20000,
+    usd_to_idr_rate: getUsdRate(),
     ledger: [],
     topup_orders: [],
   });
   const [walletAmountInput, setWalletAmountInput] = useState("50000");
+  const [walletUsdInput, setWalletUsdInput] = useState("5");
   const [walletPaymentType, setWalletPaymentType] = useState("manual");
   const [manualDests, setManualDests] = useState([]);
   const [selectedManualDestId, setSelectedManualDestId] = useState("");
@@ -70,17 +115,25 @@ export default function WalletTopup() {
       else setLoading(true);
 
       try {
-        const [wal, wMethods, mDests] = await Promise.allSettled([
+        const [wal, wMethods, mDests, cRate] = await Promise.allSettled([
           api.get("/me/wallet"),
           api.get("/payments/methods", { params: { scope: "wallet" } }),
           api.get("/payments/manual-destinations"),
+          api.get("/payments/crypto-rate"),
         ]);
+
+        const fetchedRate =
+          (cRate.status === "fulfilled" && Number(cRate.value?.data?.usd_to_idr_rate)) ||
+          (wal.status === "fulfilled" && Number(wal.value?.data?.usd_to_idr_rate)) ||
+          getUsdRate();
+        const activeRate = setUsdRate(fetchedRate);
 
         if (wal.status === "fulfilled" && wal.value?.data) {
           const nextBalance = Math.max(0, Math.round(Number(wal.value.data.balance || 0)));
           setWalletData({
             balance: nextBalance,
             min_topup: Number(wal.value.data.min_topup || 20000),
+            usd_to_idr_rate: activeRate,
             ledger: Array.isArray(wal.value.data.ledger) ? wal.value.data.ledger : [],
             topup_orders: Array.isArray(wal.value.data.topup_orders)
               ? wal.value.data.topup_orders
@@ -93,6 +146,8 @@ export default function WalletTopup() {
                 : prev
             );
           }
+        } else {
+          setWalletData((prev) => ({ ...prev, usd_to_idr_rate: activeRate }));
         }
 
         if (wMethods.status === "fulfilled" && Array.isArray(wMethods.value?.data)) {
@@ -148,12 +203,54 @@ export default function WalletTopup() {
     [manualDests]
   );
 
+  const usdRate = useMemo(() => {
+    const r = Number(walletData.usd_to_idr_rate || getUsdRate());
+    return Number.isFinite(r) && r >= 1000 ? Math.round(r) : 16000;
+  }, [walletData.usd_to_idr_rate]);
+
+  const isCryptoMode = walletPaymentType === "crypto";
+  const minTopup = Number(walletData.min_topup || 20000);
+  const minUsd = useMemo(
+    () => Math.max(1, Math.ceil((minTopup / usdRate) * 100) / 100),
+    [minTopup, usdRate]
+  );
+
+  const parsedUsdAmount = useMemo(() => {
+    if (isCryptoMode) {
+      const cleaned = String(walletUsdInput || "").replace(/[^0-9.]/g, "");
+      const num = Number(cleaned || 0);
+      return Number.isFinite(num) && num > 0 ? Math.round(num * 100) / 100 : 0;
+    }
+    const cleanedIdr = String(walletAmountInput || "").replace(/[^0-9]/g, "");
+    const idrNum = Math.round(Number(cleanedIdr || 0));
+    return idrNum > 0 ? Math.round((idrNum / usdRate) * 100) / 100 : 0;
+  }, [isCryptoMode, walletUsdInput, walletAmountInput, usdRate]);
+
   const parsedWalletAmount = useMemo(() => {
+    if (isCryptoMode) {
+      return Math.round(parsedUsdAmount * usdRate);
+    }
     const cleaned = String(walletAmountInput || "").replace(/[^0-9]/g, "");
     return Math.round(Number(cleaned || 0));
-  }, [walletAmountInput]);
+  }, [isCryptoMode, parsedUsdAmount, usdRate, walletAmountInput]);
 
-  const minTopup = Number(walletData.min_topup || 20000);
+  const switchPaymentMethod = (nextMethod) => {
+    if (nextMethod === walletPaymentType) return;
+    if (nextMethod === "crypto" && walletPaymentType !== "crypto") {
+      const cleanedIdr = Math.round(Number(String(walletAmountInput || "").replace(/[^0-9]/g, "") || 0));
+      if (cleanedIdr > 0) {
+        const convertedUsd = Math.max(minUsd, Math.round((cleanedIdr / usdRate) * 100) / 100);
+        setWalletUsdInput(String(convertedUsd));
+      }
+    } else if (nextMethod !== "crypto" && walletPaymentType === "crypto") {
+      const convertedIdr = Math.max(minTopup, Math.round(parsedUsdAmount * usdRate));
+      if (convertedIdr > 0) {
+        setWalletAmountInput(String(convertedIdr));
+      }
+    }
+    setWalletPaymentType(nextMethod);
+  };
+
   const pendingTopupOrders = useMemo(
     () => (walletData.topup_orders || []).filter((o) => o.payment_status === "pending"),
     [walletData.topup_orders]
@@ -162,7 +259,11 @@ export default function WalletTopup() {
   const handleWalletTopupSubmit = async (e) => {
     e?.preventDefault();
     if (!Number.isFinite(parsedWalletAmount) || parsedWalletAmount < minTopup) {
-      toast.error(`Minimal ${formatIDR(minTopup)}`);
+      toast.error(
+        isCryptoMode
+          ? `Minimal ${formatUSD(minUsd)} USD (${formatIDR(minTopup)})`
+          : `Minimal ${formatIDR(minTopup)}`
+      );
       return;
     }
     if (walletPaymentType === "manual" && !selectedManualDestId) {
@@ -177,6 +278,8 @@ export default function WalletTopup() {
     try {
       const { data } = await api.post("/payments/wallet/topup", {
         amount: parsedWalletAmount,
+        amount_usd: isCryptoMode ? parsedUsdAmount : undefined,
+        method: walletPaymentType,
         payment_type: walletPaymentType,
         destination_id:
           walletPaymentType === "crypto"
@@ -249,11 +352,14 @@ export default function WalletTopup() {
             <div className="rounded-xl bg-panel/90 border border-line px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <Link
-                  to="/akun"
+                  to={returnPath}
+                  onClick={handleBack}
                   data-testid="wallet-back-to-account"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-transparent hover:border-neon/60 text-slate-300 hover:text-neon px-3 py-1.5 text-xs font-mono font-bold transition-colors"
+                  aria-label="Kembali"
+                  title="Kembali"
+                  className="inline-flex items-center justify-center rounded-lg border border-line bg-transparent hover:border-neon/60 text-slate-300 hover:text-neon p-2 transition-colors cursor-pointer"
                 >
-                  <ArrowLeft size={13} /> Akun
+                  <ArrowLeft size={15} />
                 </Link>
                 <h1 className="font-display font-extrabold text-base sm:text-lg text-slate-100">
                   Isi Saldo
@@ -298,32 +404,67 @@ export default function WalletTopup() {
                 {/* Left Column: Simple & Dynamic Form */}
                 <div className="lg:col-span-7 rounded-xl bg-panel/90 border border-line p-4 sm:p-5">
                   <form onSubmit={handleWalletTopupSubmit} className="space-y-4">
-                    {/* Nominal Input + Presets */}
+                    {/* Nominal Input + Presets (Dynamic IDR / USD when Crypto selected) */}
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs font-mono">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
                         <label htmlFor="wallet-topup-amount-input" className="text-slate-300 font-bold">
-                          Nominal
+                          {isCryptoMode ? "Nominal (USD)" : "Nominal"}
                         </label>
-                        <span className="text-[11px] text-slate-400">
-                          Min. <strong className="text-lime">{formatIDR(minTopup)}</strong>
-                        </span>
+                        {isCryptoMode ? (
+                          <span
+                            data-testid="wallet-crypto-rate-badge"
+                            className="text-[11px] text-slate-400"
+                          >
+                            Kurs: <strong className="text-lime">1 USD = {formatIDR(usdRate)}</strong>
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">
+                            Min. <strong className="text-lime">{formatIDR(minTopup)}</strong>
+                          </span>
+                        )}
                       </div>
 
                       <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400">
-                          Rp
+                        <span
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold ${
+                            isCryptoMode ? "text-lime" : "text-slate-400"
+                          }`}
+                        >
+                          {isCryptoMode ? "$" : "Rp"}
                         </span>
-                        <input
-                          id="wallet-topup-amount-input"
-                          data-testid="wallet-topup-amount-input"
-                          type="number"
-                          min={minTopup}
-                          step={1000}
-                          value={walletAmountInput}
-                          onChange={(e) => setWalletAmountInput(e.target.value)}
-                          placeholder="50000"
-                          className="w-full rounded-xl bg-void border border-line focus:border-neon pl-10 pr-4 py-2.5 text-base font-mono font-bold text-slate-100 placeholder:text-slate-600 focus:outline-none transition-colors tabular-nums"
-                        />
+                        {isCryptoMode ? (
+                          <input
+                            id="wallet-topup-amount-input"
+                            data-testid="wallet-topup-amount-input"
+                            type="number"
+                            min={minUsd}
+                            step="0.5"
+                            value={walletUsdInput}
+                            onChange={(e) => setWalletUsdInput(e.target.value)}
+                            placeholder="5"
+                            className="w-full rounded-xl bg-void border border-line focus:border-lime pl-8 pr-28 py-2.5 text-base font-mono font-bold text-slate-100 placeholder:text-slate-600 focus:outline-none transition-colors tabular-nums"
+                          />
+                        ) : (
+                          <input
+                            id="wallet-topup-amount-input"
+                            data-testid="wallet-topup-amount-input"
+                            type="number"
+                            min={minTopup}
+                            step={1000}
+                            value={walletAmountInput}
+                            onChange={(e) => setWalletAmountInput(e.target.value)}
+                            placeholder="50000"
+                            className="w-full rounded-xl bg-void border border-line focus:border-neon pl-10 pr-4 py-2.5 text-base font-mono font-bold text-slate-100 placeholder:text-slate-600 focus:outline-none transition-colors tabular-nums"
+                          />
+                        )}
+                        {isCryptoMode && (
+                          <span
+                            data-testid="wallet-crypto-idr-converted"
+                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-lime tabular-nums"
+                          >
+                            &asymp; {formatIDR(parsedWalletAmount || 0)}
+                          </span>
+                        )}
                       </div>
 
                       {parsedWalletAmount > 0 && parsedWalletAmount < minTopup && (
@@ -331,29 +472,51 @@ export default function WalletTopup() {
                           data-testid="wallet-min-amount-error"
                           className="text-[11px] font-mono text-coral flex items-center gap-1"
                         >
-                          <AlertCircle size={12} /> Minimal {formatIDR(minTopup)}
+                          <AlertCircle size={12} />{" "}
+                          {isCryptoMode
+                            ? `Minimal ${formatUSD(minUsd)} USD (${formatIDR(minTopup)})`
+                            : `Minimal ${formatIDR(minTopup)}`}
                         </p>
                       )}
 
                       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-0.5">
-                        {WALLET_PRESET_AMOUNTS.map((amt) => {
-                          const active = parsedWalletAmount === amt;
-                          return (
-                            <button
-                              key={amt}
-                              type="button"
-                              onClick={() => setWalletAmountInput(String(amt))}
-                              data-testid={`wallet-preset-${amt}`}
-                              className={`rounded-lg py-2 px-2 text-xs font-mono font-bold border bg-transparent transition-all cursor-pointer ${
-                                active
-                                  ? "border-neon text-neon shadow-[0_0_10px_rgba(0,240,255,0.18)]"
-                                  : "border-line text-slate-300 hover:border-neon/50 hover:text-neon"
-                              }`}
-                            >
-                              {amt >= 1000000 ? `${amt / 1000000} Jt` : `${amt / 1000}rb`}
-                            </button>
-                          );
-                        })}
+                        {isCryptoMode
+                          ? WALLET_CRYPTO_USD_PRESETS.map((usdAmt) => {
+                              const active = Math.abs(parsedUsdAmount - usdAmt) < 0.005;
+                              return (
+                                <button
+                                  key={usdAmt}
+                                  type="button"
+                                  onClick={() => setWalletUsdInput(String(usdAmt))}
+                                  data-testid={`wallet-preset-usd-${usdAmt}`}
+                                  className={`rounded-lg py-2 px-2 text-xs font-mono font-bold border bg-transparent transition-all cursor-pointer ${
+                                    active
+                                      ? "border-lime text-lime shadow-[0_0_10px_rgba(163,230,53,0.18)]"
+                                      : "border-line text-slate-300 hover:border-lime/50 hover:text-lime"
+                                  }`}
+                                >
+                                  ${usdAmt}
+                                </button>
+                              );
+                            })
+                          : WALLET_PRESET_AMOUNTS.map((amt) => {
+                              const active = parsedWalletAmount === amt;
+                              return (
+                                <button
+                                  key={amt}
+                                  type="button"
+                                  onClick={() => setWalletAmountInput(String(amt))}
+                                  data-testid={`wallet-preset-${amt}`}
+                                  className={`rounded-lg py-2 px-2 text-xs font-mono font-bold border bg-transparent transition-all cursor-pointer ${
+                                    active
+                                      ? "border-neon text-neon shadow-[0_0_10px_rgba(0,240,255,0.18)]"
+                                      : "border-line text-slate-300 hover:border-neon/50 hover:text-neon"
+                                  }`}
+                                >
+                                  {amt >= 1000000 ? `${amt / 1000000} Jt` : `${amt / 1000}rb`}
+                                </button>
+                              );
+                            })}
                       </div>
                     </div>
 
@@ -367,7 +530,7 @@ export default function WalletTopup() {
                         {fiatManualDests.length > 0 && (
                           <button
                             type="button"
-                            onClick={() => setWalletPaymentType("manual")}
+                            onClick={() => switchPaymentMethod("manual")}
                             data-testid="wallet-method-manual"
                             className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 border bg-transparent text-xs font-display font-bold transition-all cursor-pointer ${
                               walletPaymentType === "manual"
@@ -382,7 +545,7 @@ export default function WalletTopup() {
 
                         <button
                           type="button"
-                          onClick={() => setWalletPaymentType("paykita")}
+                          onClick={() => switchPaymentMethod("paykita")}
                           data-testid="wallet-method-paykita"
                           className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 border bg-transparent text-xs font-display font-bold transition-all cursor-pointer ${
                             walletPaymentType === "paykita"
@@ -397,7 +560,7 @@ export default function WalletTopup() {
                         {cryptoManualDests.length > 0 && (
                           <button
                             type="button"
-                            onClick={() => setWalletPaymentType("crypto")}
+                            onClick={() => switchPaymentMethod("crypto")}
                             data-testid="wallet-method-crypto"
                             className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 border bg-transparent text-xs font-display font-bold transition-all cursor-pointer ${
                               walletPaymentType === "crypto"
@@ -491,7 +654,9 @@ export default function WalletTopup() {
                                         {d.name} ({d.symbol || "USDT"})
                                       </p>
                                       <p className="text-[10px] font-mono text-lime truncate">
-                                        {d.network || "TRC20 / BEP20"} · ~{formatUSD(null, parsedWalletAmount || minTopup)} USD
+                                        {d.network || "TRC20 / BEP20"} &middot;{" "}
+                                        {formatUSD(parsedUsdAmount || minUsd)} USD (&asymp;{" "}
+                                        {formatIDR(parsedWalletAmount || minTopup)})
                                       </p>
                                     </div>
                                     <span
@@ -514,14 +679,28 @@ export default function WalletTopup() {
                     <div className="rounded-xl bg-void/80 border border-line px-4 py-3 flex items-center justify-between gap-3">
                       <div>
                         <span className="block text-[10px] font-mono uppercase text-slate-400">
-                          Total Bayar
+                          {isCryptoMode ? "Total Bayar (USD → IDR)" : "Total Bayar"}
                         </span>
-                        <p
-                          data-testid="wallet-topup-total-preview"
-                          className="font-mono font-extrabold text-base sm:text-lg text-neon tabular-nums"
-                        >
-                          {formatIDR(parsedWalletAmount || 0)}
-                        </p>
+                        {isCryptoMode ? (
+                          <div className="flex flex-wrap items-baseline gap-2">
+                            <p
+                              data-testid="wallet-topup-total-preview"
+                              className="font-mono font-extrabold text-base sm:text-lg text-lime tabular-nums"
+                            >
+                              {formatUSD(parsedUsdAmount || 0)} USD
+                            </p>
+                            <span className="text-xs font-mono font-bold text-neon tabular-nums">
+                              &asymp; {formatIDR(parsedWalletAmount || 0)}
+                            </span>
+                          </div>
+                        ) : (
+                          <p
+                            data-testid="wallet-topup-total-preview"
+                            className="font-mono font-extrabold text-base sm:text-lg text-neon tabular-nums"
+                          >
+                            {formatIDR(parsedWalletAmount || 0)}
+                          </p>
+                        )}
                       </div>
 
                       <button

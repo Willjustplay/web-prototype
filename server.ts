@@ -185,6 +185,12 @@ let db: DbState = {
   topup_providers: [],
 };
 
+const getCryptoUsdRate = (): number => {
+  const raw = Number(db?.settings?.crypto_usd_rate || 16000);
+  if (!Number.isFinite(raw) || raw < 1000) return 16000;
+  return Math.round(raw);
+};
+
 let mongoDb: MongoDb | null = null;
 let pgPool: InstanceType<typeof PgPool> | null = null;
 let pgSyncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -376,7 +382,80 @@ const POSTGRES_DDL_STATEMENTS = [
     data JSONB NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );`,
+  `CREATE TABLE IF NOT EXISTS wjp_files (
+    path TEXT PRIMARY KEY,
+    content_type TEXT NOT NULL DEFAULT 'image/jpeg',
+    filename TEXT DEFAULT '',
+    data_base64 TEXT NOT NULL,
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );`,
 ];
+
+function normalizeUploadFilePath(rawUrlOrPath: string): string {
+  const s = String(rawUrlOrPath || "").trim();
+  if (!s) return "";
+  const match = s.match(/(?:^|\/api\/files\/)(uploads\/[a-zA-Z0-9._-]+)/);
+  if (match && match[1]) return match[1];
+  if (s.startsWith("uploads/")) return s;
+  return "";
+}
+
+function cleanBase64Payload(raw: string): string {
+  const str = String(raw || "").trim();
+  if (!str) return "";
+  const commaIdx = str.indexOf("base64,");
+  const payload = commaIdx !== -1 ? str.slice(commaIdx + 7) : str;
+  return payload.replace(/[\r\n\s]+/g, "");
+}
+
+function collectEmbeddedFilesForUrls(urls: Array<string | undefined | null>): Record<string, any> | undefined {
+  if (!db.files || typeof db.files !== "object") return undefined;
+  const embedded: Record<string, any> = {};
+  for (const u of urls) {
+    const key = normalizeUploadFilePath(String(u || ""));
+    if (!key) continue;
+    const rec = db.files[key];
+    if (rec && rec.dataBase64) {
+      embedded[key] = {
+        path: key,
+        dataBase64: cleanBase64Payload(rec.dataBase64),
+        content_type: rec.content_type || "image/jpeg",
+        filename: rec.filename || path.basename(key),
+        created_at: rec.created_at || nowIso(),
+      };
+    }
+  }
+  return Object.keys(embedded).length > 0 ? embedded : undefined;
+}
+
+function extractAndStripEmbeddedFiles<T extends Record<string, any>>(item: T): T {
+  if (!item || typeof item !== "object") return item;
+  if (!db.files || typeof db.files !== "object") db.files = {};
+  const embedded = (item as any)._embedded_files;
+  if (embedded && typeof embedded === "object") {
+    for (const [k, v] of Object.entries(embedded)) {
+      const rec = v as any;
+      const fileKey = normalizeUploadFilePath(k) || String(rec?.path || k || "").replace(/^\/+/, "");
+      const b64 = cleanBase64Payload(rec?.dataBase64 || rec?.data_base64 || "");
+      if (fileKey && b64) {
+        db.files[fileKey] = {
+          path: fileKey,
+          dataBase64: b64,
+          content_type: String(rec?.content_type || "image/jpeg"),
+          filename: String(rec?.filename || path.basename(fileKey)),
+          created_at: String(rec?.created_at || nowIso()),
+        };
+      }
+    }
+  }
+  if ("_embedded_files" in item) {
+    const copy = { ...item };
+    delete (copy as any)._embedded_files;
+    return copy;
+  }
+  return item;
+}
 
 async function ensurePostgresSchema(pool: InstanceType<typeof PgPool>) {
   const client = await pool.connect();
@@ -403,6 +482,7 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
     await client.query("DELETE FROM wjp_users");
     for (const u of db.users || []) {
       const id = String(u.id || uuidHex(12));
+      const embedded = collectEmbeddedFilesForUrls([u.avatar]);
       await client.query(
         `INSERT INTO wjp_users (id, email, name, role, status, is_verified, data, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())
@@ -414,7 +494,7 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
           String(u.role || "buyer"),
           String(u.status || "active"),
           u.is_verified !== false,
-          JSON.stringify({ ...u, id }),
+          JSON.stringify({ ...u, id, ...(embedded ? { _embedded_files: embedded } : {}) }),
         ]
       );
     }
@@ -423,6 +503,10 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
     await client.query("DELETE FROM wjp_products");
     for (const p of db.products || []) {
       const id = String(p.id || uuidHex(12));
+      const embedded = collectEmbeddedFilesForUrls([
+        p.image,
+        ...(Array.isArray(p.images) ? p.images : []),
+      ]);
       await client.query(
         `INSERT INTO wjp_products (id, game, category, title, price, stock, condition, data, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW())`,
@@ -434,7 +518,7 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
           Number(p.price || 0),
           Number(p.stock ?? 0),
           String(p.condition || "ready"),
-          JSON.stringify({ ...p, id }),
+          JSON.stringify({ ...p, id, ...(embedded ? { _embedded_files: embedded } : {}) }),
         ]
       );
     }
@@ -445,6 +529,7 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
       const id = String(g.id || g.slug || uuidHex(12));
       const iconUrl = String(g.icon || "").trim();
       const bannerUrl = String(g.banner || "").trim();
+      const embedded = collectEmbeddedFilesForUrls([iconUrl, bannerUrl]);
       await client.query(
         `INSERT INTO wjp_games (id, slug, name, publisher, currency, icon, banner, is_active, data, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, NOW())
@@ -467,7 +552,13 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
           iconUrl,
           bannerUrl,
           g.is_active !== false,
-          JSON.stringify({ ...g, id, icon: iconUrl, banner: bannerUrl }),
+          JSON.stringify({
+            ...g,
+            id,
+            icon: iconUrl,
+            banner: bannerUrl,
+            ...(embedded ? { _embedded_files: embedded } : {}),
+          }),
         ]
       );
     }
@@ -495,10 +586,17 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
     await client.query("DELETE FROM wjp_testimonials");
     for (const t of db.testimonials || []) {
       const id = String(t.id || uuidHex(12));
+      const embedded = collectEmbeddedFilesForUrls([t.image]);
       await client.query(
         `INSERT INTO wjp_testimonials (id, name, game, rating, data, created_at)
          VALUES ($1, $2, $3, $4, $5::jsonb, NOW())`,
-        [id, String(t.name || "Buyer"), String(t.game || ""), Number(t.rating || 5), JSON.stringify({ ...t, id })]
+        [
+          id,
+          String(t.name || "Buyer"),
+          String(t.game || ""),
+          Number(t.rating || 5),
+          JSON.stringify({ ...t, id, ...(embedded ? { _embedded_files: embedded } : {}) }),
+        ]
       );
     }
 
@@ -506,10 +604,17 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
     await client.query("DELETE FROM wjp_manual_destinations");
     for (const d of db.manual_destinations || []) {
       const id = String(d.id || uuidHex(12));
+      const embedded = collectEmbeddedFilesForUrls([d.image]);
       await client.query(
         `INSERT INTO wjp_manual_destinations (id, type, name, is_active, data)
          VALUES ($1, $2, $3, $4, $5::jsonb)`,
-        [id, String(d.type || "bank"), String(d.name || "Manual"), d.is_active !== false, JSON.stringify({ ...d, id })]
+        [
+          id,
+          String(d.type || "bank"),
+          String(d.name || "Manual"),
+          d.is_active !== false,
+          JSON.stringify({ ...d, id, ...(embedded ? { _embedded_files: embedded } : {}) }),
+        ]
       );
     }
 
@@ -617,6 +722,34 @@ async function pushToPostgres(pool: InstanceType<typeof PgPool> | null = pgPool)
       );
     }
 
+    // 14. Uploaded Files & Photos (db.files) — Upsert without destructive wipe so uploaded photos persist across pulls/pushes
+    for (const [rawKey, rec] of Object.entries(db.files || {})) {
+      if (!rec || !rec.dataBase64) continue;
+      const cleanPath = normalizeUploadFilePath(rawKey || rec.path) || String(rec.path || rawKey || "").replace(/^\/+/, "");
+      const cleanB64 = cleanBase64Payload(rec.dataBase64);
+      if (!cleanPath || !cleanB64) continue;
+      const contentType = String(rec.content_type || "image/jpeg");
+      const filename = String(rec.filename || path.basename(cleanPath));
+      const createdAt = String(rec.created_at || nowIso());
+      const fileDoc = {
+        path: cleanPath,
+        dataBase64: cleanB64,
+        content_type: contentType,
+        filename,
+        created_at: createdAt,
+      };
+      await client.query(
+        `INSERT INTO wjp_files (path, content_type, filename, data_base64, data, created_at)
+         VALUES ($1, $2, $3, $4, $5::jsonb, NOW())
+         ON CONFLICT (path) DO UPDATE SET
+           content_type = EXCLUDED.content_type,
+           filename = EXCLUDED.filename,
+           data_base64 = EXCLUDED.data_base64,
+           data = EXCLUDED.data`,
+        [cleanPath, contentType, filename, cleanB64, JSON.stringify(fileDoc)]
+      );
+    }
+
     await client.query("COMMIT");
     const stamp = nowIso();
     pgRuntime.last_sync_at = stamp;
@@ -669,6 +802,14 @@ async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPoo
         .filter((g) => g.id || g.slug);
     };
 
+    const qFiles = async () => {
+      const res = await pool.query(
+        `SELECT path, content_type, filename, data_base64, data, created_at FROM wjp_files`
+      );
+      loadedRows += res.rows.length;
+      return res.rows;
+    };
+
     const [
       users,
       products,
@@ -683,6 +824,7 @@ async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPoo
       auditLogs,
       emailEvents,
       settingsRes,
+      fileRows,
     ] = await Promise.all([
       qData("wjp_users"),
       qData("wjp_products"),
@@ -697,17 +839,35 @@ async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPoo
       qData("wjp_audit_logs"),
       qData("wjp_email_events"),
       pool.query("SELECT id, data FROM wjp_settings"),
+      qFiles(),
     ]);
 
-    if (users.length > 0) db.users = users;
-    if (products.length > 0) db.products = products;
+    if (!db.files || typeof db.files !== "object") db.files = {};
+    for (const r of fileRows) {
+      const base = r.data && typeof r.data === "object" ? r.data : {};
+      const cleanPath =
+        normalizeUploadFilePath(r.path || base.path) ||
+        String(r.path || base.path || "").replace(/^\/+/, "");
+      const cleanB64 = cleanBase64Payload(r.data_base64 || base.dataBase64 || base.data_base64 || "");
+      if (!cleanPath || !cleanB64) continue;
+      db.files[cleanPath] = {
+        path: cleanPath,
+        dataBase64: cleanB64,
+        content_type: String(r.content_type || base.content_type || "image/jpeg"),
+        filename: String(r.filename || base.filename || path.basename(cleanPath)),
+        created_at: String(base.created_at || r.created_at || nowIso()),
+      };
+    }
+
+    if (users.length > 0) db.users = users.map((u) => extractAndStripEmbeddedFiles(u));
+    if (products.length > 0) db.products = products.map((p) => extractAndStripEmbeddedFiles(p));
     if (games.length > 0) {
-      db.games = games;
+      db.games = games.map((g) => extractAndStripEmbeddedFiles(g));
       upgradeLocalGameIcons();
     }
     if (transactions.length > 0) db.transactions = transactions;
-    if (testimonials.length > 0) db.testimonials = testimonials;
-    if (manualDests.length > 0) db.manual_destinations = manualDests;
+    if (testimonials.length > 0) db.testimonials = testimonials.map((t) => extractAndStripEmbeddedFiles(t));
+    if (manualDests.length > 0) db.manual_destinations = manualDests.map((d) => extractAndStripEmbeddedFiles(d));
     if (socialLinks.length > 0) db.social_links = socialLinks;
     if (topupProviders.length > 0) db.topup_providers = topupProviders;
     if (sessions.length > 0) db.sessions = sessions;
@@ -725,6 +885,11 @@ async function pullFromPostgres(pool: InstanceType<typeof PgPool> | null = pgPoo
     }
 
     ensureDefaultTopupClearedOnce();
+
+    // Sync topup denomination products with pulled game icons/banners without touching non-topup products
+    for (const g of db.games || []) {
+      syncGameProducts(g, false);
+    }
 
     pgRuntime.last_sync_at = nowIso();
     pgRuntime.last_error = null;
@@ -896,6 +1061,27 @@ function generatePostgresSqlDump(): string {
     if (!k) continue;
     lines.push(
       `INSERT INTO wjp_settings (id, data, updated_at) VALUES (${sqlLiteral(k)}, ${sqlLiteral(JSON.stringify({ id: k, ...(v || {}) }))}::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW();`
+    );
+  }
+  lines.push("");
+
+  for (const [rawKey, rec] of Object.entries(db.files || {})) {
+    if (!rec || !rec.dataBase64) continue;
+    const cleanPath = normalizeUploadFilePath(rawKey || rec.path) || String(rec.path || rawKey || "").replace(/^\/+/, "");
+    const cleanB64 = cleanBase64Payload(rec.dataBase64);
+    if (!cleanPath || !cleanB64) continue;
+    const contentType = String(rec.content_type || "image/jpeg");
+    const filename = String(rec.filename || path.basename(cleanPath));
+    const createdAt = String(rec.created_at || nowIso());
+    const fileDoc = {
+      path: cleanPath,
+      dataBase64: cleanB64,
+      content_type: contentType,
+      filename,
+      created_at: createdAt,
+    };
+    lines.push(
+      `INSERT INTO wjp_files (path, content_type, filename, data_base64, data, created_at) VALUES (${sqlLiteral(cleanPath)}, ${sqlLiteral(contentType)}, ${sqlLiteral(filename)}, ${sqlLiteral(cleanB64)}, ${sqlLiteral(JSON.stringify(fileDoc))}::jsonb, NOW()) ON CONFLICT (path) DO UPDATE SET content_type = EXCLUDED.content_type, filename = EXCLUDED.filename, data_base64 = EXCLUDED.data_base64, data = EXCLUDED.data;`
     );
   }
 
@@ -2259,8 +2445,8 @@ function ensureDefaultTopupClearedOnce() {
         existing.name = mg.name;
         existing.publisher = mg.publisher;
         existing.currency = mg.currency;
-        existing.icon = mg.icon;
-        existing.banner = mg.banner;
+        if (!String(existing.icon || "").trim()) existing.icon = mg.icon;
+        if (!String(existing.banner || "").trim()) existing.banner = mg.banner;
         existing.notes = mg.notes;
         existing.delivery_info = mg.delivery_info;
         existing.vendor_prefix = mg.vendor_prefix;
@@ -2560,7 +2746,7 @@ function initDatabase() {
       price_usd:
         p.price_usd != null && Number(p.price_usd) > 0
           ? Number(p.price_usd)
-          : Math.max(1, Math.round((Number(p.price || 0) / 16000) * 100) / 100),
+          : Math.max(1, Math.round((Number(p.price || 0) / getCryptoUsdRate()) * 100) / 100),
       payment_config: {
         paykita: p.payment_config?.paykita !== false,
         manual: p.payment_config?.manual !== false,
@@ -5081,22 +5267,100 @@ function creditWalletTopupIfNeeded(tx: any, confirmedBy = "system"): boolean {
   return true;
 }
 
-function refundWalletOrderIfNeeded(tx: any, reason = "Pengembalian dana pesanan gagal"): boolean {
-  if (!tx) return false;
+function classifyTopupFailureReason(
+  rcInput?: string,
+  messageInput?: string,
+  explicitCategory?: string
+): { category: "wrong_id" | "digiflazz_disruption"; reasonLabel: string } {
+  const rc = String(rcInput || "").trim();
+  const msg = String(messageInput || "").trim();
+  if (explicitCategory === "wrong_id") {
+    return {
+      category: "wrong_id",
+      reasonLabel: "Kesalahan memasukkan ID tujuan",
+    };
+  }
+  if (explicitCategory === "digiflazz_disruption") {
+    return {
+      category: "digiflazz_disruption",
+      reasonLabel: "Gangguan dari Digiflazz",
+    };
+  }
+  const isWrongId =
+    ["40", "41", "42", "43", "44", "45", "47", "56", "62", "63"].includes(rc) ||
+    /nomor\s+tujuan|tujuan\s+salah|id\s+salah|user\s*id|zone\s*id|tidak\s+ditemukan|invalid|wrong\s+id|blocked|format\s+salah|pelanggan\s+tidak|akun\s+tidak|no\s+pelanggan/i.test(
+      msg
+    );
+  if (isWrongId) {
+    return {
+      category: "wrong_id",
+      reasonLabel: "Kesalahan memasukkan ID tujuan",
+    };
+  }
+  return {
+    category: "digiflazz_disruption",
+    reasonLabel: "Gangguan dari Digiflazz",
+  };
+}
+
+function refundWalletOrderIfNeeded(
+  tx: any,
+  reason = "",
+  fallbackUser: any = null
+): boolean {
+  if (!tx || tx.wallet_refunded) return false;
+  const isConfirmedPaid =
+    tx.payment_status === "paid" &&
+    (tx.provider !== "paykita" || Boolean(tx.paykita_confirmed));
+  if (!isConfirmedPaid) return false;
+
+  const isTopupTx =
+    tx.product_type === PRODUCT_TYPE ||
+    tx.order_type === "topup" ||
+    Boolean(tx.denomination_code) ||
+    Boolean(tx.vendor_sku);
   const isWalletPaid = tx.provider === "wallet" || tx.payment_type === "wallet";
-  if (!isWalletPaid || !tx.wallet_debited || tx.wallet_refunded) return false;
+
+  const isTopupFailed =
+    isTopupTx &&
+    (tx.digiflazz_status === "Gagal" ||
+      tx.status === "digiflazz_failed" ||
+      tx.status === "refunded_to_wallet");
+
+  if (!isTopupFailed && !(isWalletPaid && tx.wallet_debited)) {
+    return false;
+  }
 
   const user =
     (tx.user_id && db.users.find((u) => u.id === tx.user_id)) ||
     (tx.buyer_email &&
       db.users.find(
         (u) => String(u.email || "").toLowerCase() === String(tx.buyer_email).toLowerCase()
-      ));
+      )) ||
+    fallbackUser ||
+    null;
+
+  const classified = classifyTopupFailureReason(
+    tx.digiflazz_rc,
+    tx.digiflazz_message || reason,
+    tx.wallet_refund_category
+  );
+  const resolvedReason =
+    reason ||
+    tx.wallet_refund_reason ||
+    `Konversi Saldo Otomatis (${classified.reasonLabel})`;
+
+  tx.wallet_refund_category = classified.category;
+  tx.wallet_refund_reason = resolvedReason;
+
   if (!user) return false;
+  if (!tx.user_id && user.id) {
+    tx.user_id = user.id;
+  }
 
   const refundAmount = Math.max(
     0,
-    Math.round(Number(tx.wallet_debited_amount || tx.amount || 0))
+    Math.round(Number(tx.wallet_debited_amount || tx.base_amount || tx.amount || 0))
   );
   if (refundAmount <= 0) return false;
 
@@ -5108,7 +5372,13 @@ function refundWalletOrderIfNeeded(tx: any, reason = "Pengembalian dana pesanan 
   tx.wallet_refunded = true;
   tx.wallet_refunded_amount = refundAmount;
   tx.wallet_refunded_at = nowIso();
-  tx.wallet_refund_reason = reason;
+  if (tx.status !== "delivered") {
+    tx.status = "digiflazz_failed";
+  }
+  const fmtRefund = new Intl.NumberFormat("id-ID").format(refundAmount);
+  const fmtAfter = new Intl.NumberFormat("id-ID").format(after);
+  tx.delivery_info = `Pembayaran Top Up telah dikonversi menjadi Saldo Akun sebesar +Rp ${fmtRefund} karena ${classified.reasonLabel}. Saldo Akun sekarang: Rp ${fmtAfter}`;
+  tx.updated_at = nowIso();
 
   recordWalletLedgerEntry({
     user,
@@ -5117,7 +5387,7 @@ function refundWalletOrderIfNeeded(tx: any, reason = "Pengembalian dana pesanan 
     balanceBefore: before,
     balanceAfter: after,
     sessionId: tx.session_id,
-    description: `${reason} (${tx.product_title || tx.session_id})`,
+    description: `${resolvedReason} — ${tx.product_title || tx.session_id}`,
   });
 
   saveDb();
@@ -6248,7 +6518,7 @@ async function pullGamesFromMerchant(opts: {
   const totalProductsSynced = syncAllGames(true);
   for (const p of db.products) {
     if (isTopupProduct(p)) {
-      p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / 16000) * 100) / 100);
+      p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / getCryptoUsdRate()) * 100) / 100);
     }
   }
   saveDb();
@@ -7553,6 +7823,7 @@ api.get("/me/orders", (req, res) => {
     .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
     .map((o) => {
       creditWalletTopupIfNeeded(o);
+      refundWalletOrderIfNeeded(o, "", user);
       const copy = { ...o };
       delete copy.payment_proof;
       if (copy.payment_status !== "paid") delete copy.delivery_info;
@@ -7571,6 +7842,7 @@ api.get("/me/wallet", (req, res) => {
       (userEmailLower && String(tx.buyer_email || "").toLowerCase() === userEmailLower)
     ) {
       creditWalletTopupIfNeeded(tx);
+      refundWalletOrderIfNeeded(tx, "", user);
     }
   }
   const balance = Math.max(0, Math.round(Number(user.balance || 0)));
@@ -7592,6 +7864,7 @@ api.get("/me/wallet", (req, res) => {
   res.json({
     balance,
     min_topup: 20000,
+    usd_to_idr_rate: getCryptoUsdRate(),
     ledger,
     topup_orders: topupOrders,
   });
@@ -7726,12 +7999,45 @@ api.get("/me/security", (req, res) => {
   });
 });
 
-api.get("/files/*", (req, res) => {
-  const filePath = (req.params as any)[0];
-  const rec = db.files[filePath];
-  if (!rec) return res.status(404).json({ detail: "File tidak ditemukan" });
-  const buf = Buffer.from(rec.dataBase64, "base64");
-  res.setHeader("Content-Type", rec.content_type);
+api.get("/files/*", async (req, res) => {
+  const rawParam = String((req.params as any)[0] || "").replace(/^\/+/, "");
+  const filePath = normalizeUploadFilePath(rawParam) || rawParam;
+  if (!db.files || typeof db.files !== "object") db.files = {};
+  let rec = db.files[filePath] || db.files[rawParam];
+
+  // Fallback: lazy-load from PostgreSQL wjp_files table if not yet in memory
+  if (!rec && pgPool && pgRuntime.connected && filePath) {
+    try {
+      const pgRes = await pgPool.query(
+        `SELECT path, content_type, filename, data_base64, data, created_at FROM wjp_files WHERE path = $1 LIMIT 1`,
+        [filePath]
+      );
+      const row = pgRes.rows?.[0];
+      if (row) {
+        const base = row.data && typeof row.data === "object" ? row.data : {};
+        const b64 = cleanBase64Payload(row.data_base64 || base.dataBase64 || base.data_base64 || "");
+        if (b64) {
+          rec = {
+            path: filePath,
+            dataBase64: b64,
+            content_type: String(row.content_type || base.content_type || "image/jpeg"),
+            filename: String(row.filename || base.filename || path.basename(filePath)),
+            created_at: String(base.created_at || row.created_at || nowIso()),
+          };
+          db.files[filePath] = rec;
+        }
+      }
+    } catch {
+      // ignore lazy-load query error
+    }
+  }
+
+  if (!rec || !rec.dataBase64) {
+    return res.status(404).json({ detail: "File tidak ditemukan" });
+  }
+  const cleanB64 = cleanBase64Payload(rec.dataBase64);
+  const buf = Buffer.from(cleanB64, "base64");
+  res.setHeader("Content-Type", rec.content_type || "image/jpeg");
   res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   res.send(buf);
 });
@@ -8972,6 +9278,10 @@ const handleManualDestinationsList = (req: Request, res: Response) => {
 api.get("/payments/manual-destinations", handleManualDestinationsList);
 api.get("/payments/manual/destinations", handleManualDestinationsList);
 
+api.get("/payments/crypto-rate", (_req, res) => {
+  res.json({ usd_to_idr_rate: getCryptoUsdRate() });
+});
+
 const isDefaultDemoPaykitaKey = (key: string) =>
   !key || key === "pk_live_wjp_qris_99281746";
 
@@ -10141,7 +10451,7 @@ api.post("/payments/paykita/checkout", async (req, res) => {
     const priceUsd =
       product.price_usd && Number(product.price_usd) > 0
         ? Number(product.price_usd)
-        : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
+        : Math.max(1, Math.round((priceIdr / getCryptoUsdRate()) * 100) / 100);
 
     const remoteOrder = await tryCreateRemotePaykitaOrder({
       orderId,
@@ -10346,7 +10656,12 @@ const applyDigiflazzTransactionUpdate = (tx: any, data: any, source = "digiflazz
     if (isSkuProblem && sku) {
       markDigiflazzSkuProblemByCode(sku, message || `Gangguan Digiflazz (RC ${rc})`);
     }
-    refundWalletOrderIfNeeded(tx, "Refund otomatis Top Up gagal di pusat");
+    const classified = classifyTopupFailureReason(rc, message);
+    tx.wallet_refund_category = classified.category;
+    refundWalletOrderIfNeeded(
+      tx,
+      `Konversi Saldo Otomatis (${classified.reasonLabel})`
+    );
   }
 
   saveDb();
@@ -10400,10 +10715,41 @@ const dispatchOrCheckDigiflazzTransaction = async (
     (game ? buildDigiflazzCustomerNo(game, tx.destination || {}) : "");
   const refId = String(tx.digiflazz_ref_id || tx.session_id || "").trim();
 
-  if (!sku || !customerNo) {
-    tx.digiflazz_status = tx.digiflazz_status || "Pending";
-    tx.digiflazz_message = "SKU Digiflazz atau Nomor Tujuan (customer_no) belum lengkap.";
+  if (!customerNo) {
+    tx.digiflazz_status = "Gagal";
+    tx.status = "digiflazz_failed";
+    tx.digiflazz_message = "Kesalahan memasukkan ID tujuan (Nomor tujuan kosong atau tidak valid).";
     tx.digiflazz_checked_at = nowIso();
+    tx.wallet_refund_category = "wrong_id";
+    refundWalletOrderIfNeeded(tx, "Konversi Saldo Otomatis (Kesalahan memasukkan ID tujuan)");
+    saveDb();
+    return { ok: false, status: tx.digiflazz_status, message: tx.digiflazz_message };
+  }
+
+  if (!sku) {
+    tx.digiflazz_status = "Gagal";
+    tx.status = "digiflazz_failed";
+    tx.digiflazz_message = "Gangguan produk Digiflazz (SKU produk sedang tidak tersedia).";
+    tx.digiflazz_checked_at = nowIso();
+    tx.wallet_refund_category = "digiflazz_disruption";
+    refundWalletOrderIfNeeded(tx, "Konversi Saldo Otomatis (Gangguan dari Digiflazz)");
+    saveDb();
+    return { ok: false, status: tx.digiflazz_status, message: tx.digiflazz_message };
+  }
+
+  const matchedDenom = (game?.denominations || []).find(
+    (d: any) =>
+      (d.code && d.code === tx.denomination_code) ||
+      (d.vendor_sku && d.vendor_sku === sku)
+  );
+  if (matchedDenom && (matchedDenom.digiflazz_problem || matchedDenom.digiflazz_status === "gangguan")) {
+    tx.digiflazz_status = "Gagal";
+    tx.status = "digiflazz_failed";
+    tx.digiflazz_message =
+      matchedDenom.digiflazz_status_note || "Produk sedang mengalami gangguan dari Digiflazz.";
+    tx.digiflazz_checked_at = nowIso();
+    tx.wallet_refund_category = "digiflazz_disruption";
+    refundWalletOrderIfNeeded(tx, "Konversi Saldo Otomatis (Gangguan dari Digiflazz)");
     saveDb();
     return { ok: false, status: tx.digiflazz_status, message: tx.digiflazz_message };
   }
@@ -11351,7 +11697,7 @@ const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
     const priceUsd =
       product.price_usd && Number(product.price_usd) > 0
         ? Number(product.price_usd)
-        : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
+        : Math.max(1, Math.round((priceIdr / getCryptoUsdRate()) * 100) / 100);
     const tx = {
       ...buyer,
       session_id: orderId,
@@ -11406,7 +11752,13 @@ api.post("/payments/wallet/topup", async (req, res) => {
     if (!user) return;
 
     const body = req.body || {};
-    const rawAmount = Math.round(Number(body.amount || 0));
+    const usdRate = getCryptoUsdRate();
+    const method = String(body.method || body.payment_type || "manual").trim().toLowerCase();
+    const rawUsdInput = Number(body.amount_usd || 0);
+    const hasUsdInput = (method === "crypto" || rawUsdInput > 0) && Number.isFinite(rawUsdInput) && rawUsdInput > 0;
+    const rawAmount = hasUsdInput
+      ? Math.round(rawUsdInput * usdRate)
+      : Math.round(Number(body.amount || 0));
     if (!Number.isFinite(rawAmount) || rawAmount < 20000) {
       return res.status(400).json({
         detail: "Nominal Top Up Saldo Akun minimal Rp 20.000",
@@ -11418,10 +11770,11 @@ api.post("/payments/wallet/topup", async (req, res) => {
       });
     }
 
-    const method = String(body.method || "manual").trim().toLowerCase();
     const origin = body.origin_url || req.headers.origin || getAppOrigin(req);
     const amountIdr = rawAmount;
-    const amountUsd = Math.max(1, Math.round((amountIdr / 16000) * 100) / 100);
+    const amountUsd = hasUsdInput
+      ? Math.round(rawUsdInput * 100) / 100
+      : Math.max(0.5, Math.round((amountIdr / usdRate) * 100) / 100);
     const formattedIdr = new Intl.NumberFormat("id-ID").format(amountIdr);
     const productTitle = `Top Up Saldo Akun — Rp ${formattedIdr}`;
 
@@ -11592,7 +11945,7 @@ api.post("/payments/wallet/checkout", async (req, res) => {
     const priceUsd =
       product.price_usd && Number(product.price_usd) > 0
         ? Number(product.price_usd)
-        : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
+        : Math.max(1, Math.round((priceIdr / getCryptoUsdRate()) * 100) / 100);
 
     const balanceBefore = currentBalance;
     const balanceAfter = balanceBefore - priceIdr;
@@ -12060,7 +12413,7 @@ api.post("/payments/topup/checkout", async (req, res) => {
     const priceUsd =
       product.price_usd && Number(product.price_usd) > 0
         ? Number(product.price_usd)
-        : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
+        : Math.max(1, Math.round((priceIdr / getCryptoUsdRate()) * 100) / 100);
 
     const verification = await verifyGameAccountId(game, destination);
     if (verification.format_valid === false || verification.code === "ACCOUNT_NOT_FOUND") {
@@ -12405,6 +12758,16 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
       await dispatchOrCheckDigiflazzTransaction(tx, { reason: "buyer_status_check" });
     }
   }
+  if (
+    paid &&
+    tx.product_type === PRODUCT_TYPE &&
+    (tx.digiflazz_status === "Gagal" ||
+      tx.status === "digiflazz_failed" ||
+      tx.status === "refunded_to_wallet") &&
+    !tx.wallet_refunded
+  ) {
+    refundWalletOrderIfNeeded(tx, "", getUserOptional(req));
+  }
   const effectivePaymentStatus =
     tx.provider === "paykita" && tx.payment_status === "paid" && !tx.paykita_confirmed
       ? "pending"
@@ -12425,7 +12788,7 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
   const amountUsd =
     tx.amount_usd && Number(tx.amount_usd) > 0
       ? Number(tx.amount_usd)
-      : Math.max(1, Math.round((Number(tx.amount || 0) / 16000) * 100) / 100);
+      : Math.max(0.5, Math.round((Number(tx.amount || 0) / getCryptoUsdRate()) * 100) / 100);
   const resolvedGwId =
     tx.gateway_id || (tx.product_type === PRODUCT_TYPE ? "duitku" : "paykita");
   const resolvedGwName =
@@ -12494,6 +12857,11 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
     digiflazz_message: tx.digiflazz_message || null,
     digiflazz_ref_id: tx.digiflazz_ref_id || tx.vendor_ref || null,
     digiflazz_checked_at: tx.digiflazz_checked_at || null,
+    wallet_refunded: Boolean(tx.wallet_refunded),
+    wallet_refunded_amount: tx.wallet_refunded_amount || null,
+    wallet_refunded_at: tx.wallet_refunded_at || null,
+    wallet_refund_reason: tx.wallet_refund_reason || null,
+    wallet_refund_category: tx.wallet_refund_category || null,
     admin_note: paid ? tx.admin_note || null : null,
     destination_id: tx.destination_id,
     destination_name: tx.destination_name,
@@ -12662,7 +13030,7 @@ admin.post("/products", (req, res) => {
   const priceUsd =
     data.price_usd !== undefined && data.price_usd !== "" && Number(data.price_usd) > 0
       ? Number(data.price_usd)
-      : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
+      : Math.max(1, Math.round((priceIdr / getCryptoUsdRate()) * 100) / 100);
   const product = {
     ...data,
     id: uuidHex(8),
@@ -12695,7 +13063,7 @@ admin.put("/products/:product_id", (req, res) => {
       ? Number(data.price_usd)
       : existing.price_usd && Number(existing.price_usd) > 0
       ? Number(existing.price_usd)
-      : Math.max(1, Math.round((priceIdr / 16000) * 100) / 100);
+      : Math.max(1, Math.round((priceIdr / getCryptoUsdRate()) * 100) / 100);
   const nextPaymentConfig =
     "payment_config" in data
       ? normalizeProductPaymentConfig(data.payment_config)
@@ -12758,7 +13126,7 @@ admin.post("/reset", (_req, res) => {
       price_usd:
         p.price_usd != null && Number(p.price_usd) > 0
           ? Number(p.price_usd)
-          : Math.max(1, Math.round((Number(p.price || 0) / 16000) * 100) / 100),
+          : Math.max(1, Math.round((Number(p.price || 0) / getCryptoUsdRate()) * 100) / 100),
     }));
   for (const g of db.games) syncGameProducts(g, false);
   saveDb();
@@ -13356,7 +13724,27 @@ admin.post("/upload", upload.single("file"), (req, res) => {
   res.json({ url: `/api/files/${filePath}` });
 });
 
-// --- Admin Manual Payment Destinations ---
+// --- Admin Manual Payment Destinations & Crypto Rate ---
+admin.get("/payments/crypto-rate", (_req, res) => {
+  res.json({ usd_to_idr_rate: getCryptoUsdRate() });
+});
+
+admin.put("/payments/crypto-rate", (req, res) => {
+  const raw = Math.round(Number(req.body?.usd_to_idr_rate || 0));
+  if (!Number.isFinite(raw) || raw < 1000 || raw > 1000000) {
+    return res.status(400).json({
+      detail: "Kurs USD ke IDR harus antara Rp 1.000 hingga Rp 1.000.000",
+    });
+  }
+  db.settings = db.settings || {};
+  db.settings.crypto_usd_rate = raw;
+  saveDb();
+  res.json({
+    usd_to_idr_rate: raw,
+    message: "Kurs Crypto USD ke IDR berhasil diperbarui",
+  });
+});
+
 admin.get("/payments/manual-destinations", (_req, res) => {
   res.json([...db.manual_destinations].sort((a, b) => (a.seq || 0) - (b.seq || 0)));
 });
@@ -14249,7 +14637,7 @@ admin.post("/topup/games/:game_id/import", async (req, res) => {
     const count = syncGameProducts(game);
     for (const p of db.products) {
       if (isTopupProduct(p)) {
-        p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / 16000) * 100) / 100);
+        p.price_usd = Math.max(0.5, Math.round((Number(p.price || 0) / getCryptoUsdRate()) * 100) / 100);
       }
     }
     saveDb();
@@ -14568,6 +14956,60 @@ admin.post("/topup/orders/:session_id/check-digiflazz", async (req, res) => {
     rc: dfRes.rc || null,
     sn: dfRes.sn || null,
     message: dfRes.message,
+    order: tx,
+  });
+});
+
+admin.post("/topup/orders/:session_id/refund-to-wallet", (req, res) => {
+  const tx = db.transactions.find(
+    (t) => t.session_id === req.params.session_id && t.product_type === PRODUCT_TYPE
+  );
+  if (!tx) return res.status(404).json({ detail: "Pesanan top up tidak ditemukan" });
+  if (tx.payment_status !== "paid") {
+    return res.status(400).json({ detail: "Hanya pesanan yang sudah lunas yang dapat dikonversi menjadi Saldo Akun." });
+  }
+  if (tx.wallet_refunded) {
+    return res.status(400).json({ detail: "Pembayaran pesanan ini sudah dikonversi ke Saldo Akun." });
+  }
+  if (tx.digiflazz_status === "Sukses" || tx.status === "delivered") {
+    return res.status(400).json({ detail: "Pesanan yang sudah sukses terkirim tidak dapat dikonversi menjadi saldo." });
+  }
+
+  const rawCategory = String(req.body?.category || "").trim();
+  const customReason = String(req.body?.reason || "").trim();
+  const classified = classifyTopupFailureReason(
+    tx.digiflazz_rc,
+    customReason || tx.digiflazz_message,
+    rawCategory === "wrong_id" ? "wrong_id" : rawCategory === "digiflazz_disruption" ? "digiflazz_disruption" : undefined
+  );
+
+  tx.digiflazz_status = "Gagal";
+  tx.status = "digiflazz_failed";
+  tx.wallet_refund_category = classified.category;
+  tx.digiflazz_message =
+    customReason ||
+    tx.digiflazz_message ||
+    (classified.category === "wrong_id"
+      ? "Kesalahan memasukkan ID tujuan — Pembayaran dikonversi ke Saldo Akun"
+      : "Gangguan dari Digiflazz — Pembayaran dikonversi ke Saldo Akun");
+  tx.updated_at = nowIso();
+
+  const credited = refundWalletOrderIfNeeded(
+    tx,
+    customReason || `Konversi Saldo (${classified.reasonLabel})`
+  );
+  saveDb();
+
+  res.json({
+    ok: true,
+    credited,
+    wallet_refunded: Boolean(tx.wallet_refunded),
+    wallet_refunded_amount: tx.wallet_refunded_amount || tx.base_amount || tx.amount,
+    wallet_refund_category: tx.wallet_refund_category,
+    wallet_refund_reason: tx.wallet_refund_reason,
+    message: credited
+      ? `Pembayaran Rp ${Number(tx.wallet_refunded_amount || tx.amount || 0).toLocaleString("id-ID")} berhasil dikonversi ke Saldo Akun pelanggan.`
+      : "Status pesanan diubah menjadi Gagal & siap otomatis masuk ke Saldo Akun saat pembeli login.",
     order: tx,
   });
 });
@@ -15539,6 +15981,7 @@ admin.get("/database/status", (_req, res) => {
     { name: "wjp_audit_logs", label: "Log Audit Keamanan", count: (db.audit_logs || []).length, primary_key: "id (TEXT)" },
     { name: "wjp_email_events", label: "Riwayat Pengiriman Email", count: (db.email_events || []).length, primary_key: "id (TEXT)" },
     { name: "wjp_settings", label: "Konfigurasi Sistem & Gateway", count: Object.keys(db.settings || {}).length, primary_key: "id (TEXT)" },
+    { name: "wjp_files", label: "File & Foto Upload (Binary Base64)", count: Object.keys(db.files || {}).length, primary_key: "path (TEXT)" },
   ];
 
   res.json({
@@ -15619,7 +16062,7 @@ admin.post("/database/postgres/config", async (req, res) => {
     ok: true,
     connected: true,
     version: connRes.version,
-    message: `Berhasil terhubung ke PostgreSQL (${pgRuntime.host}/${pgRuntime.database}) & menginisialisasi 13 tabel relasional!`,
+    message: `Berhasil terhubung ke PostgreSQL (${pgRuntime.host}/${pgRuntime.database}) & menginisialisasi 14 tabel relasional (termasuk wjp_files)!`,
     postgres: pgRuntime,
   });
 });
@@ -15654,7 +16097,7 @@ admin.post("/database/postgres/sync", async (req, res) => {
       direction: "pull",
       loaded_rows: pullRes.loaded_rows,
       synced_at: pgRuntime.last_sync_at,
-      message: `Berhasil memuat ${pullRes.loaded_rows} baris data dari PostgreSQL ke aplikasi!`,
+      message: `Berhasil memuat ${pullRes.loaded_rows} baris data & file foto dari PostgreSQL ke aplikasi!`,
     });
   }
 
@@ -15672,7 +16115,7 @@ admin.post("/database/postgres/sync", async (req, res) => {
     ok: true,
     direction: "push",
     synced_at: pushRes.synced_at,
-    message: "Seluruh 13 tabel relasional berhasil disinkronkan ke PostgreSQL!",
+    message: "Seluruh 14 tabel relasional (termasuk file foto upload) berhasil disinkronkan ke PostgreSQL!",
   });
 });
 

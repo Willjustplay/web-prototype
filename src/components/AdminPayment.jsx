@@ -15,7 +15,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, imgSrc } from "@/lib/api";
+import { api, imgSrc, formatIDR, getUsdRate, setUsdRate } from "@/lib/api";
 
 const CRYPTO_PRESETS = [
   { name: "USDT (Tether)", symbol: "USDT", network: "TRC20 (Tron)" },
@@ -44,6 +44,8 @@ export function AdminPayment({ defaultMode = "fiat" }) {
   const [filterMode, setFilterMode] = useState(
     defaultMode === "crypto" ? "crypto" : "fiat"
   );
+  const [usdRateInput, setUsdRateInput] = useState(String(getUsdRate()));
+  const [savingRate, setSavingRate] = useState(false);
 
   useEffect(() => {
     if (defaultMode === "crypto" || defaultMode === "fiat") {
@@ -53,8 +55,16 @@ export function AdminPayment({ defaultMode = "fiat" }) {
 
   const load = async () => {
     try {
-      const { data } = await api.get("/admin/payments/manual-destinations");
-      setDestinations(Array.isArray(data) ? data : []);
+      const [destRes, rateRes] = await Promise.all([
+        api.get("/admin/payments/manual-destinations"),
+        api.get("/admin/payments/crypto-rate").catch(() => ({ data: null })),
+      ]);
+      setDestinations(Array.isArray(destRes.data) ? destRes.data : []);
+      const loadedRate = Number(rateRes?.data?.usd_to_idr_rate);
+      if (loadedRate >= 1000) {
+        setUsdRateInput(String(loadedRate));
+        setUsdRate(loadedRate);
+      }
     } catch {
       toast.error("Gagal memuat metode pembayaran");
     } finally {
@@ -65,6 +75,29 @@ export function AdminPayment({ defaultMode = "fiat" }) {
   useEffect(() => {
     load();
   }, []);
+
+  const handleSaveUsdRate = async (e) => {
+    e.preventDefault();
+    const numericRate = Math.round(Number(usdRateInput || 0));
+    if (!Number.isFinite(numericRate) || numericRate < 1000) {
+      toast.error("Kurs minimal Rp 1.000 per 1 USD");
+      return;
+    }
+    setSavingRate(true);
+    try {
+      const { data } = await api.put("/admin/payments/crypto-rate", {
+        usd_to_idr_rate: numericRate,
+      });
+      const updatedRate = Number(data?.usd_to_idr_rate || numericRate);
+      setUsdRateInput(String(updatedRate));
+      setUsdRate(updatedRate);
+      toast.success(`Kurs Crypto diperbarui: 1 USD = ${formatIDR(updatedRate)}`);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Gagal menyimpan kurs Crypto");
+    } finally {
+      setSavingRate(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -313,6 +346,65 @@ export function AdminPayment({ defaultMode = "fiat" }) {
           />
         </div>
       </div>
+
+      {/* Crypto Exchange Rate Setting Bar (1 USD -> IDR) */}
+      <form
+        onSubmit={handleSaveUsdRate}
+        data-testid="admin-crypto-rate-form"
+        className="rounded-xl border border-lime/30 bg-lime/[0.04] px-3.5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-8 h-8 rounded-lg bg-lime/15 border border-lime/30 text-lime grid place-items-center shrink-0">
+            <Coins size={15} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-display font-bold text-slate-100">
+                Kurs Crypto (1 USD &rarr; IDR)
+              </span>
+              <span className="text-[11px] font-mono text-lime font-bold tabular-nums">
+                $1 = {formatIDR(Number(usdRateInput) || 16000)} &middot; $10 ={" "}
+                {formatIDR((Number(usdRateInput) || 16000) * 10)}
+              </span>
+            </div>
+            <p className="text-[11px] font-mono text-slate-400 truncate">
+              Otomatis mengonversi nominal top up USD ke saldo IDR pengguna.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="relative w-36 sm:w-40">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-lime">
+              Rp
+            </span>
+            <input
+              type="number"
+              min={1000}
+              step={50}
+              required
+              value={usdRateInput}
+              onChange={(e) => setUsdRateInput(e.target.value)}
+              data-testid="admin-crypto-rate-input"
+              placeholder="16000"
+              className="w-full rounded-lg bg-void border border-lime/40 focus:border-lime outline-none pl-8 pr-2.5 py-1.5 text-xs font-mono font-bold text-white tabular-nums"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={savingRate}
+            data-testid="admin-crypto-rate-save"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-lime text-void hover:bg-neon text-xs font-display font-extrabold uppercase tracking-wider px-3 py-1.5 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {savingRate ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Save size={13} />
+            )}
+            <span>Simpan Kurs</span>
+          </button>
+        </div>
+      </form>
 
       {/* Add / Edit Modal-like Form Card */}
       {editing && (

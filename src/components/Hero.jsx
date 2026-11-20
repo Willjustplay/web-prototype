@@ -358,35 +358,6 @@ export const Hero = ({ featured, products = [], onSelect }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-12 gap-7 md:gap-8 lg:gap-10 items-center relative w-full overflow-hidden sm:overflow-visible">
         {/* LEFT COLUMN: Dynamic Responsive Headline + CTAs + Metrics */}
         <div className="md:col-span-6 lg:col-span-7 min-w-0 w-full max-w-full">
-          {/* Dynamic Eyebrow Status Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="inline-flex flex-wrap items-center gap-2 bg-transparent mb-4 sm:mb-6 max-w-full"
-          >
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-lime" />
-            </span>
-            <p
-              className="text-[9px] min-[380px]:text-[10px] sm:text-xs uppercase tracking-[0.08em] min-[420px]:tracking-[0.14em] sm:tracking-[0.2em] text-neon/95 font-mono font-semibold leading-tight break-words min-w-0"
-              data-testid="hero-eyebrow"
-            >
-              {t(
-                "Store Game Indonesia • 100% Garansi Aman",
-                "Indonesia Game Store • 100% Safe Guarantee"
-              )}
-            </p>
-            <span className="hidden sm:inline-flex items-center gap-1 pl-2 border-l border-line text-[10px] font-mono text-lime font-semibold">
-              <Sparkles size={10} />{" "}
-              {t(
-                `Ready ${safeProducts.length || 12}+ Produk`,
-                `Ready ${safeProducts.length || 12}+ Products`
-              )}
-            </span>
-          </motion.div>
-
           {/* Fluid Responsive Kinetic Headline */}
           <h1
             className="font-display font-black uppercase tracking-tighter leading-[0.96] text-[clamp(1.6rem,7.2vw,2.45rem)] sm:text-[clamp(2.1rem,4.8vw,3.15rem)] md:text-[clamp(1.95rem,3.5vw,4.1rem)] break-words max-w-full"

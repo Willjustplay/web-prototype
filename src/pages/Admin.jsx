@@ -533,6 +533,9 @@ export default function Admin() {
   };
 
   const orderStatusLabel = (o) => {
+    if (o.wallet_refunded || (o.payment_status === "paid" && o.digiflazz_status === "Gagal")) {
+      return "Dikonversi ke Saldo";
+    }
     if (o.payment_status === "paid") return "Lunas";
     if (o.status === "cancelled_by_buyer") return "Dibatalkan";
     if (o.status === "cancelled_out_of_stock") return "Stok Habis";
@@ -2415,6 +2418,42 @@ export default function Admin() {
                                       )}
                                     </div>
                                   )}
+                                  {o.product_type === "topup" &&
+                                    o.payment_status === "paid" &&
+                                    o.status !== "delivered" &&
+                                    o.digiflazz_status !== "Sukses" &&
+                                    !o.wallet_refunded && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          try {
+                                            const { data } = await api.post(
+                                              `/admin/topup/orders/${o.session_id}/refund-to-wallet`,
+                                              {
+                                                category: "digiflazz_disruption",
+                                                reason:
+                                                  o.digiflazz_message ||
+                                                  "Dikonversi ke Saldo Akun oleh Admin",
+                                              }
+                                            );
+                                            toast.success(
+                                              data?.message ||
+                                                "Pembayaran top up berhasil dikonversi menjadi Saldo Akun pembeli"
+                                            );
+                                            load(false);
+                                          } catch (e) {
+                                            toast.error(
+                                              formatApiError(e.response?.data?.detail) ||
+                                                "Gagal mengubah pembayaran menjadi saldo"
+                                            );
+                                          }
+                                        }}
+                                        data-testid={`refund-to-wallet-${o.session_id.slice(-6)}`}
+                                        className="inline-flex items-center gap-1 rounded-lg text-[10px] font-bold text-neon border border-neon/40 bg-neon/10 hover:bg-neon hover:text-void px-2.5 py-1 uppercase tracking-wider transition-colors cursor-pointer"
+                                      >
+                                        Ubah ke Saldo
+                                      </button>
+                                    )}
                                   {o.payment_status === "paid" && o.buyer_email && (
                                     <button
                                       type="button"

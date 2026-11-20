@@ -225,7 +225,11 @@ export const ProductModal = ({
             "Insufficient balance. Please top up first."
           )
         );
-        window.location.href = "/isi-saldo";
+        const curPath =
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search || ""}`
+            : "/";
+        window.location.href = `/isi-saldo?from=${encodeURIComponent(curPath)}`;
         return;
       }
     }
@@ -709,6 +713,12 @@ export const ProductModal = ({
                         ) : (
                           <Link
                             to="/isi-saldo"
+                            state={{
+                              from:
+                                typeof window !== "undefined"
+                                  ? `${window.location.pathname}${window.location.search || ""}`
+                                  : "/",
+                            }}
                             onClick={onClose}
                             data-testid="modal-wallet-topup-link"
                             className="shrink-0 rounded border border-lime/60 text-lime hover:bg-lime hover:text-void px-2.5 py-1 text-[10px] font-mono font-bold uppercase transition-colors"

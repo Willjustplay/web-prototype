@@ -1305,6 +1305,7 @@ export default function TopupGameDetail() {
                     {user ? (
                       <Link
                         to="/isi-saldo"
+                        state={{ from: `/topup/${game.slug}` }}
                         data-testid="topup-wallet-topup-link"
                         className="rounded-lg border border-lime/50 hover:bg-lime hover:text-void text-lime px-2 py-1 text-[10px] font-mono font-bold transition-colors"
                       >

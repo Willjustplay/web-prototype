@@ -266,6 +266,9 @@ export default function PaymentSuccess() {
         setStatus("paid");
         setDelivery(data.delivery_info || "");
         setPaymentType(data.payment_type || "");
+        if (data.wallet_refunded || data.order_type === "wallet_topup" || data.product_type === "wallet_topup") {
+          refreshUser?.();
+        }
         if (
           data.product_type === "topup" &&
           data.digiflazz_status === "Pending" &&
@@ -663,6 +666,10 @@ export default function PaymentSuccess() {
                 <>
                   Top Up Saldo <span className="text-lime">Berhasil</span>
                 </>
+              ) : isTopupOrder && (txData?.digiflazz_status === "Gagal" || txData?.wallet_refunded) ? (
+                <>
+                  Pembayaran Dikonversi ke <span className="text-lime">Saldo Akun</span>
+                </>
               ) : (
                 <>
                   Pembayaran <span className="text-lime">Berhasil</span>
@@ -672,10 +679,74 @@ export default function PaymentSuccess() {
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
               {isWalletTopupOrder
                 ? `Saldo sebesar ${formatIDR(txData?.amount || 0)} telah berhasil ditambahkan ke Saldo Akun Anda.`
+                : isTopupOrder && (txData?.digiflazz_status === "Gagal" || txData?.wallet_refunded)
+                ? `Pembayaran Anda telah lunas, namun karena terjadi ${
+                    txData?.wallet_refund_category === "wrong_id"
+                      ? "kesalahan memasukkan ID tujuan"
+                      : "gangguan dari Digiflazz"
+                  }, dana sebesar ${formatIDR(
+                    txData?.wallet_refunded_amount || txData?.base_amount || txData?.amount || 0
+                  )} otomatis diubah menjadi Saldo Akun.`
                 : isTopupOrder
                 ? "Pembayaran Top Up kamu telah lunas dan invoice resmi telah dikirim ke email."
                 : "Pembayaran terkonfirmasi! Akses data akun telah dikirim ke email kamu & tersedia di bawah ini."}
             </p>
+
+            {/* Automatic Wallet Conversion Banner for Failed Paid Top Up */}
+            {isTopupOrder && (txData?.digiflazz_status === "Gagal" || txData?.wallet_refunded) && (
+              <div
+                data-testid="topup-refunded-to-wallet-card"
+                className="mt-4 text-left border border-lime/50 bg-lime/10 p-4 space-y-2.5"
+              >
+                <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                  <span className="text-lime font-bold uppercase tracking-wider">
+                    Saldo Akun Ditambahkan
+                  </span>
+                  <strong className="text-lime text-sm font-extrabold tabular-nums">
+                    +{formatIDR(txData?.wallet_refunded_amount || txData?.base_amount || txData?.amount || 0)}
+                  </strong>
+                </div>
+                <div className="text-xs font-mono text-slate-200 space-y-1">
+                  <p>
+                    <span className="text-slate-400">Penyebab:</span>{" "}
+                    <strong className="text-amber-300">
+                      {txData?.wallet_refund_category === "wrong_id"
+                        ? "Kesalahan Memasukkan ID Tujuan"
+                        : "Gangguan dari Pusat / Digiflazz"}
+                    </strong>
+                  </p>
+                  {txData?.digiflazz_message && (
+                    <p className="text-[11px] text-slate-300 break-words">
+                      Keterangan: {txData.digiflazz_message}
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {(txData?.game?.slug || txData?.game_slug) && (
+                    <Link
+                      to={`/topup/${txData?.game?.slug || txData?.game_slug}`}
+                      data-testid="topup-reorder-with-wallet-link"
+                      className="inline-flex items-center justify-center gap-1.5 bg-lime text-void font-display font-bold text-xs uppercase tracking-wider py-2.5 px-3 hover:bg-neon transition-colors"
+                    >
+                      <span>Pesan Ulang dengan Saldo</span>
+                    </Link>
+                  )}
+                  <Link
+                    to="/isi-saldo"
+                    state={{
+                      from:
+                        typeof window !== "undefined"
+                          ? `${window.location.pathname}${window.location.search || ""}`
+                          : "/akun",
+                    }}
+                    data-testid="topup-view-wallet-link"
+                    className="inline-flex items-center justify-center gap-1.5 border border-lime/50 bg-void/80 text-lime hover:bg-lime hover:text-void font-display font-bold text-xs uppercase tracking-wider py-2.5 px-3 transition-colors"
+                  >
+                    <span>Lihat Saldo Akun</span>
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Email Delivery Confirmation & Resend Banner */}
             {txData?.buyer_email && !isWalletTopupOrder && (
@@ -733,15 +804,15 @@ export default function PaymentSuccess() {
                     className={`text-[10px] font-mono font-bold px-2 py-0.5 border ${
                       txData.digiflazz_status === "Sukses" || txData.status === "delivered"
                         ? "text-lime bg-lime/10 border-lime/30"
-                        : txData.digiflazz_status === "Gagal"
-                          ? "text-coral bg-coral/10 border-coral/30"
+                        : txData.digiflazz_status === "Gagal" || txData.wallet_refunded
+                          ? "text-lime bg-lime/10 border-lime/40"
                           : "text-neon bg-neon/10 border-neon/30"
                     }`}
                   >
                     {txData.digiflazz_status === "Sukses" || txData.status === "delivered"
                       ? "TOP UP SUKSES"
-                      : txData.digiflazz_status === "Gagal"
-                        ? "GANGGUAN / PROSES CS"
+                      : txData.digiflazz_status === "Gagal" || txData.wallet_refunded
+                        ? "DIKONVERSI KE SALDO"
                         : "SEDANG DIPROSES"}
                   </span>
                 </div>
@@ -814,12 +885,18 @@ export default function PaymentSuccess() {
                 </p>
                 <Link
                   to="/isi-saldo"
+                  state={{
+                    from:
+                      typeof window !== "undefined"
+                        ? `${window.location.pathname}${window.location.search || ""}`
+                        : "/akun",
+                  }}
                   className="inline-flex items-center justify-center gap-2 w-full bg-lime text-void font-display font-bold text-xs uppercase tracking-wider py-2.5 px-4 mt-1 hover:bg-neon transition-colors"
                 >
                   <span>Lihat Saldo Akun Saya</span>
                 </Link>
               </div>
-            ) : delivery ? (
+            ) : delivery && !(isTopupOrder && (txData?.digiflazz_status === "Gagal" || txData?.wallet_refunded)) ? (
               <div
                 className="mt-4 text-left border border-neon/40 bg-void/80 p-4 space-y-3"
                 data-testid="delivery-info-box"

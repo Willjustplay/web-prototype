@@ -160,7 +160,7 @@ export function AdminDatabase({ onReload }) {
                 Database PostgreSQL &amp; Cloud Persistence
               </h2>
               <p className="text-xs font-mono text-slate-400">
-                Dukungan penuh skema relasional PostgreSQL (13 tabel <code className="text-neon">wjp_*</code>), sinkronisasi otomatis real-time, serta penyimpanan Cloud.
+                Dukungan penuh skema relasional PostgreSQL (14 tabel <code className="text-neon">wjp_*</code> termasuk penyimpanan foto <code className="text-lime">wjp_files</code>), sinkronisasi otomatis real-time, serta penyimpanan Cloud.
               </p>
             </div>
           </div>
@@ -221,7 +221,7 @@ export function AdminDatabase({ onReload }) {
             </p>
             <p>
               Skema Relasional:{" "}
-              <span className="text-lime">13 Tabel (JSONB + Indexed Columns)</span>
+              <span className="text-lime">14 Tabel (JSONB + Foto Binary Base64)</span>
             </p>
           </div>
         </div>
@@ -467,10 +467,10 @@ export function AdminDatabase({ onReload }) {
         <div className="px-5 py-4 border-b border-line flex items-center justify-between">
           <div>
             <h3 className="font-display font-bold text-sm uppercase tracking-wider text-slate-100">
-              Struktur Tabel Relasional PostgreSQL (13 Tabel)
+              Struktur Tabel Relasional PostgreSQL (14 Tabel)
             </h3>
             <p className="text-xs font-mono text-slate-400 mt-0.5">
-              Seluruh entitas aplikasi dipetakan ke tabel relasional PostgreSQL dengan kolom indeks utama dan payload JSONB.
+              Seluruh entitas aplikasi dan file foto upload (<code className="text-neon">wjp_files</code>) dipetakan ke tabel relasional PostgreSQL dengan kolom indeks utama dan payload JSONB.
             </p>
           </div>
           <span className="text-xs font-mono text-neon font-bold">

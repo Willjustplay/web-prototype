@@ -25,25 +25,46 @@ export const formatIDR = (n) =>
     maximumFractionDigits: 0,
   }).format(n || 0);
 
-export const USD_RATE = 16000;
+export let USD_RATE =
+  typeof localStorage !== "undefined" && Number(localStorage.getItem("wjp_crypto_usd_rate")) >= 1000
+    ? Math.round(Number(localStorage.getItem("wjp_crypto_usd_rate")))
+    : 16000;
 
-export const resolveUSD = (itemOrUsd, fallbackIdr = 0) => {
+export const getUsdRate = () => USD_RATE;
+
+export const setUsdRate = (rate) => {
+  const num = Math.round(Number(rate || 0));
+  if (Number.isFinite(num) && num >= 1000) {
+    USD_RATE = num;
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem("wjp_crypto_usd_rate", String(num));
+      } catch {
+        // ignore storage error
+      }
+    }
+  }
+  return USD_RATE;
+};
+
+export const resolveUSD = (itemOrUsd, fallbackIdr = 0, customRate = 0) => {
+  const activeRate = Number(customRate) >= 1000 ? Number(customRate) : USD_RATE;
   if (itemOrUsd && typeof itemOrUsd === "object") {
     const explicit = Number(itemOrUsd.price_usd);
     if (Number.isFinite(explicit) && explicit > 0) return explicit;
     const idr = Number(itemOrUsd.price || 0);
-    if (idr > 0) return Math.max(1, Math.round((idr / USD_RATE) * 100) / 100);
+    if (idr > 0) return Math.max(0.5, Math.round((idr / activeRate) * 100) / 100);
     return 0;
   }
   const direct = Number(itemOrUsd);
   if (Number.isFinite(direct) && direct > 0) return direct;
   const idr = Number(fallbackIdr || 0);
-  if (idr > 0) return Math.max(1, Math.round((idr / USD_RATE) * 100) / 100);
+  if (idr > 0) return Math.max(0.5, Math.round((idr / activeRate) * 100) / 100);
   return 0;
 };
 
-export const formatUSD = (itemOrUsd, fallbackIdr = 0) => {
-  const val = resolveUSD(itemOrUsd, fallbackIdr);
+export const formatUSD = (itemOrUsd, fallbackIdr = 0, customRate = 0) => {
+  const val = resolveUSD(itemOrUsd, fallbackIdr, customRate);
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
