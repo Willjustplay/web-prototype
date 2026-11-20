@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -523,10 +523,15 @@ export default function PaymentSuccess() {
       "0"
     )}`;
 
+  const paidSyncedSessionRef = useRef("");
+
   useEffect(() => {
     if (status !== "paid" || !sessionId) return;
     let alive = true;
-    refreshUser?.();
+    if (paidSyncedSessionRef.current !== sessionId) {
+      paidSyncedSessionRef.current = sessionId;
+      refreshUser?.();
+    }
     if (!isWalletTopupOrder) {
       api
         .get(`/reviews/eligibility/${sessionId}`, {
@@ -808,7 +813,7 @@ export default function PaymentSuccess() {
                     "Saldo Akun Anda sudah aktif dan dapat langsung digunakan untuk membeli Produk Akun maupun Top Up Game."}
                 </p>
                 <Link
-                  to="/account?tab=wallet"
+                  to="/isi-saldo"
                   className="inline-flex items-center justify-center gap-2 w-full bg-lime text-void font-display font-bold text-xs uppercase tracking-wider py-2.5 px-4 mt-1 hover:bg-neon transition-colors"
                 >
                   <span>Lihat Saldo Akun Saya</span>

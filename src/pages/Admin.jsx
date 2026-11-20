@@ -2254,8 +2254,13 @@ export default function Admin() {
                                   <span>{(o.created_at || "").slice(0, 16).replace("T", " ")}</span>
                                 </div>
                               </td>
-                              <td className="px-4 py-3.5 text-slate-100 font-display font-bold max-w-[230px] truncate">
-                                {o.product_title}
+                              <td className="px-4 py-3.5 text-slate-100 font-display font-bold max-w-[230px]">
+                                <div className="truncate">{o.product_title}</div>
+                                {o.order_type === "wallet_topup" && (
+                                  <span className="mt-1 inline-block rounded bg-lime/15 border border-lime/40 text-lime font-mono text-[9px] font-bold uppercase px-1.5 py-0.5">
+                                    TOP UP SALDO AKUN
+                                  </span>
+                                )}
                               </td>
                               <td
                                 className="px-4 py-3.5 text-slate-300 text-[11px] max-w-[200px]"
@@ -2277,6 +2282,8 @@ export default function Admin() {
                                 <div>
                                   {o.payment_type === "crypto" ? (
                                     <span className="text-lime font-bold">CRYPTO</span>
+                                  ) : o.provider === "wallet" ? (
+                                    <span className="text-lime font-bold">SALDO AKUN</span>
                                   ) : (
                                     o.provider || "manual"
                                   )}

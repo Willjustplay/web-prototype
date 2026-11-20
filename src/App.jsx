@@ -8,6 +8,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
+import WalletTopup from "@/pages/WalletTopup";
 import Topup from "@/pages/Topup";
 import TopupGameDetail from "@/pages/TopupGameDetail";
 import PaymentSuccess from "@/pages/PaymentSuccess";
@@ -130,6 +131,9 @@ function App() {
                 <Route path="/topup/:slug" element={<TopupGameDetail />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/akun" element={<Account />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="/isi-saldo" element={<WalletTopup />} />
+                <Route path="/topup-saldo" element={<WalletTopup />} />
                 <Route path="/payment/success" element={<PaymentSuccess />} />
                 <Route path="/payment/cancel" element={<PaymentCancel />} />
                 <Route path="/reset-password" element={<ResetPassword />} />

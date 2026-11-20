@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api, getLocalUserAvatar, saveLocalUserAvatar } from "@/lib/api";
 import { AuthModal } from "@/components/AuthModal";
@@ -164,7 +164,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     try {
       const { data } = await api.get("/auth/me");
       const hydrated = hydrateUserAvatar(data);
@@ -173,7 +173,7 @@ export const AuthProvider = ({ children }) => {
     } catch {
       return null;
     }
-  };
+  }, []);
 
   return (
     <AuthContext.Provider
