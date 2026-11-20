@@ -266,6 +266,13 @@ export default function PaymentSuccess() {
         setStatus("paid");
         setDelivery(data.delivery_info || "");
         setPaymentType(data.payment_type || "");
+        if (
+          data.product_type === "topup" &&
+          data.digiflazz_status === "Pending" &&
+          tries < 120
+        ) {
+          return false;
+        }
         return true;
       }
       if (data.status === "cancelled_out_of_stock") {
@@ -702,8 +709,20 @@ export default function PaymentSuccess() {
                       Invoice Resmi Top Up Game
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono font-bold text-lime bg-lime/10 border border-lime/30 px-2 py-0.5">
-                    LUNAS
+                  <span
+                    className={`text-[10px] font-mono font-bold px-2 py-0.5 border ${
+                      txData.digiflazz_status === "Sukses" || txData.status === "delivered"
+                        ? "text-lime bg-lime/10 border-lime/30"
+                        : txData.digiflazz_status === "Gagal"
+                          ? "text-coral bg-coral/10 border-coral/30"
+                          : "text-neon bg-neon/10 border-neon/30"
+                    }`}
+                  >
+                    {txData.digiflazz_status === "Sukses" || txData.status === "delivered"
+                      ? "TOP UP SUKSES"
+                      : txData.digiflazz_status === "Gagal"
+                        ? "GANGGUAN / PROSES CS"
+                        : "SEDANG DIPROSES"}
                   </span>
                 </div>
                 <dl className="space-y-1.5 text-xs font-mono">
@@ -738,6 +757,14 @@ export default function PaymentSuccess() {
                     <div className="flex justify-between gap-3">
                       <dt className="text-slate-400">Nickname</dt>
                       <dd className="text-lime font-bold">{txData.verified_nickname}</dd>
+                    </div>
+                  )}
+                  {txData.digiflazz_sn && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-slate-400">Serial Number (SN)</dt>
+                      <dd className="text-lime font-bold text-right break-all" data-testid="topup-invoice-sn">
+                        {txData.digiflazz_sn}
+                      </dd>
                     </div>
                   )}
                   <div className="flex justify-between gap-3 pt-1.5 border-t border-line/60">

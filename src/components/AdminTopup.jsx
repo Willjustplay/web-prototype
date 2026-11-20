@@ -432,6 +432,24 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
     }
   };
 
+  const checkSkuHealth = async () => {
+    setBusy("sku-health");
+    try {
+      const { data } = await api.post("/admin/topup/check-sku-health", {}, { headers });
+      if (data.ok) {
+        toast.success(data.message || "Kesehatan SKU Digiflazz berhasil diperiksa");
+      } else {
+        toast.error(data.message || "Gagal memeriksa kesehatan SKU Digiflazz");
+      }
+      load();
+      onReload?.();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Gagal mengecek gangguan SKU Digiflazz");
+    } finally {
+      setBusy("");
+    }
+  };
+
   // ------------------------------------------------------------ order actions
   const orderAction = async (o, action, body = {}) => {
     setBusy(o.session_id);
@@ -446,13 +464,23 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
       }
       if (action === "sync") {
         const { data } = await api.post(`/admin/orders/${o.session_id}/sync`, {}, { headers });
-        toast.success(`Status PayKita: ${data.paykita_status || data.payment_status}`);
+        toast.success(`Status Pembayaran: ${data.paykita_status || data.payment_status}`);
+      }
+      if (action === "check_digiflazz") {
+        const { data } = await api.post(`/admin/topup/orders/${o.session_id}/check-digiflazz`, {}, { headers });
+        if (data.status === "Sukses") {
+          toast.success(`Digiflazz Sukses!${data.sn ? ` SN: ${data.sn}` : ""}`);
+        } else if (data.status === "Gagal") {
+          toast.error(`Digiflazz Gagal: ${data.message || "Transaksi gagal"}`);
+        } else {
+          toast.info(`Digiflazz (${data.status || "Pending"}): ${data.message || "Sedang diproses"}`);
+        }
       }
       if (action === "complete") {
         const { data } = await api.post(`/admin/topup/orders/${o.session_id}/complete`, body, { headers });
-        toast.success(data.dispatched ? "Pesanan dikirim ke supplier" : "Pesanan ditandai terkirim");
+        toast.success(data.dispatched ? "Pesanan dikirim / dicek ke Digiflazz" : "Pesanan ditandai terkirim");
       }
-      if (action !== "sync") load();
+      load();
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || "Aksi gagal");
     } finally {
@@ -596,6 +624,15 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                 <RefreshCw size={13} className={busy === "sync" ? "animate-spin" : ""} /> Sinkronkan SKU
               </button>
               <button
+                onClick={checkSkuHealth}
+                disabled={busy === "sku-health"}
+                data-testid="admin-topup-check-sku-health"
+                title="Cek status SKU ke Digiflazz sekarang (auto-hide jika gangguan, tampilkan kembali jika normal)"
+                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider border border-lime/50 text-lime hover:bg-lime/10 px-3.5 py-2 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw size={13} className={busy === "sku-health" ? "animate-spin" : ""} /> Cek Gangguan SKU
+              </button>
+              <button
                 onClick={() => clearProductsAndSkus()}
                 disabled={busy === "clear-all"}
                 data-testid="admin-topup-clear-all"
@@ -615,6 +652,14 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
           )}
           {subTab === "vendors" && (
             <>
+              <button
+                onClick={checkSkuHealth}
+                disabled={busy === "sku-health"}
+                data-testid="admin-topup-vendor-check-sku-health"
+                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider border border-lime/50 text-lime hover:bg-lime/10 px-3.5 py-2 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw size={13} className={busy === "sku-health" ? "animate-spin" : ""} /> Cek Gangguan SKU
+              </button>
               <button
                 onClick={() => setPullCatalogOpen(true)}
                 data-testid="admin-topup-open-merchant-catalog"
@@ -968,6 +1013,9 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                       <td className="px-4 py-3">
                         <p className="text-slate-100 font-bold">{o.game_name || "-"}</p>
                         <p className="text-[10px] text-slate-500">{o.denomination_label || o.denomination_code}</p>
+                        {o.vendor_sku && (
+                          <p className="text-[10px] text-neon font-mono mt-0.5">SKU: {o.vendor_sku}</p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-slate-400 break-all max-w-[220px]">
                         <p>{Object.entries(o.destination || {}).map(([k, v]) => `${k}: ${v}`).join(" • ") || "-"}</p>
@@ -981,10 +1029,31 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                         {o.buyer_email || o.buyer_whatsapp || "-"}
                       </td>
                       <td className="px-4 py-3 text-neon font-bold">{formatIDR(o.amount)}</td>
-                      <td className="px-4 py-3">
-                        <span data-testid={`admin-topup-order-status-${o.session_id}`} className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 border ${statusStyle(o)}`}>
+                      <td className="px-4 py-3 space-y-1">
+                        <span data-testid={`admin-topup-order-status-${o.session_id}`} className={`inline-block text-[9px] font-bold uppercase tracking-widest px-2 py-1 border ${statusStyle(o)}`}>
                           {statusLabel(o)}
                         </span>
+                        {o.digiflazz_status && (
+                          <div className="text-[10px] font-mono">
+                            <span
+                              className={`inline-block font-bold px-1.5 py-0.5 border ${
+                                o.digiflazz_status === "Sukses"
+                                  ? "text-lime border-lime/40 bg-lime/10"
+                                  : o.digiflazz_status === "Gagal"
+                                    ? "text-coral border-coral/40 bg-coral/10"
+                                    : "text-amber-300 border-amber-400/40 bg-amber-400/10"
+                              }`}
+                            >
+                              DF: {o.digiflazz_status}
+                            </span>
+                            {o.digiflazz_sn && (
+                              <p className="text-lime break-all mt-0.5">SN: {o.digiflazz_sn}</p>
+                            )}
+                            {!o.digiflazz_sn && o.digiflazz_message && (
+                              <p className="text-slate-400 break-words max-w-[180px] mt-0.5">{o.digiflazz_message}</p>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
@@ -997,9 +1066,20 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                               Bukti
                             </button>
                           )}
+                          {o.payment_status === "paid" && (
+                            <button
+                              onClick={() => orderAction(o, "check_digiflazz")}
+                              disabled={busy === o.session_id}
+                              data-testid={`admin-topup-check-df-${o.session_id}`}
+                              title="Cek status transaksi atau kirim ke Digiflazz"
+                              className="text-[10px] uppercase tracking-widest border border-neon/50 text-neon hover:bg-neon/10 px-2 py-1.5 transition-colors disabled:opacity-50"
+                            >
+                              {o.digiflazz_status ? "Cek Digiflazz" : "Kirim Digiflazz"}
+                            </button>
+                          )}
                           {o.payment_status === "paid" && o.status !== "delivered" && (
                             <button
-                              onClick={() => orderAction(o, "complete", { note: "Pesanan telah dikirim dan diproses", dispatch: true })}
+                              onClick={() => orderAction(o, "complete", { note: "Pesanan telah dikirim dan diproses", dispatch: false })}
                               disabled={busy === o.session_id}
                               data-testid={`admin-topup-complete-${o.session_id}`}
                               className="text-[10px] uppercase tracking-widest bg-lime text-void hover:bg-neon px-2 py-1.5 transition-colors disabled:opacity-50"
@@ -1039,7 +1119,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                               data-testid={`admin-topup-sync-${o.session_id}`}
                               className="text-[10px] uppercase tracking-widest border border-line text-slate-400 hover:text-neon px-2 py-1.5 transition-colors disabled:opacity-50"
                             >
-                              Cek
+                              Cek Bayar
                             </button>
                           )}
                           {o.payment_status !== "paid" && (
@@ -1073,6 +1153,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
             onCheckBalance={() => vendorOp(
               vendors.find((v) => isActiveVendor(v)) || vendors.find((v) => v.kind === activeVendor) || vendors[0] || {}, "balance"
             )}
+            onCheckSkuHealth={checkSkuHealth}
             onImport={(slug) => {
               const game = games.find((g) => g.slug === slug);
               if (game) setImportTarget(game);
@@ -1464,7 +1545,7 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                       const currentGroup = resolveSkuGroup(d);
                       if (adminDenomTab !== "all" && currentGroup !== adminDenomTab) return null;
                       return (
-                        <div key={d.vendor_sku || d.code || i} data-testid={`denom-row-${i}`} className="border border-line bg-void/30 p-3">
+                        <div key={d.vendor_sku || d.code || i} data-testid={`denom-row-${i}`} className={`border p-3 ${d.digiflazz_problem ? "border-coral/50 bg-coral/5" : "border-line bg-void/30"}`}>
                           <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-line/60">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[10px] font-mono font-bold text-neon border border-neon/40 bg-neon/10 px-2 py-0.5" data-testid={`denom-sku-${i}`}>
@@ -1479,6 +1560,15 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
                               >
                                 {currentGroup === "membership" ? "Membership" : form.currency || "Item"}
                               </span>
+                              {d.digiflazz_problem && (
+                                <span
+                                  data-testid={`denom-problem-${i}`}
+                                  title={d.digiflazz_status_note || "SKU sedang gangguan di Digiflazz dan otomatis disembunyikan"}
+                                  className="text-[10px] font-mono font-bold text-coral border border-coral/50 bg-coral/15 px-2 py-0.5"
+                                >
+                                  Gangguan Digiflazz (Auto-Hide)
+                                </span>
+                              )}
                               <span className="text-xs font-display font-bold text-slate-100">
                                 {d.label}
                               </span>
@@ -2428,7 +2518,7 @@ const ImportDialog = ({ game, vendors, headers, onClose, onDone }) => {
 };
 
 /** Status cards shown above the supplier list. */
-const IntegrationSummary = ({ integration, onCheckBalance, onImport, busy }) => {
+const IntegrationSummary = ({ integration, onCheckBalance, onCheckSkuHealth, onImport, busy }) => {
   if (!integration) {
     return (
       <div data-testid="admin-topup-integration" className="border border-line bg-panel p-4">
@@ -2436,9 +2526,30 @@ const IntegrationSummary = ({ integration, onCheckBalance, onImport, busy }) => 
       </div>
     );
   }
-  const { active = {}, balance = {}, orders = {}, games_without_sku: missing = [] } = integration;
+  const {
+    active = {},
+    balance = {},
+    orders = {},
+    sku_health: skuHealth = {},
+    webhook_logs: webhookLogs = [],
+    games_without_sku: missing = [],
+  } = integration;
   const sourceLabel =
     active.source === "db" ? "database" : active.source === "env" ? "file .env" : "belum diatur";
+  const webhookUrl =
+    active.webhook_url || `${window.location.origin}/api/webhook/digiflazz`;
+  const callbackUrl =
+    active.callback_url || `${window.location.origin}/api/callback/digiflazz`;
+  const problemSkus = Number(skuHealth.problem_skus || 0);
+  const healthySkus = Number(skuHealth.healthy_skus || 0);
+  const totalSkus = Number(skuHealth.total_skus || 0);
+  const problemItems = Array.isArray(skuHealth.problem_items) ? skuHealth.problem_items : [];
+
+  const copyText = (url, label) => {
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success(`${label} berhasil disalin`));
+  };
 
   return (
     <div data-testid="admin-topup-integration" className="space-y-3">
@@ -2452,7 +2563,7 @@ const IntegrationSummary = ({ integration, onCheckBalance, onImport, busy }) => 
             Kredensial dari: <span className={active.source === "none" ? "text-coral" : "text-slate-300"}>{sourceLabel}</span>
           </p>
           <p className="text-[10px] font-mono mt-0.5">
-            Auto-kirim:{" "}
+            Auto-kirim saat lunas:{" "}
             <span className={active.auto_dispatch ? "text-lime" : "text-slate-400"}>
               {active.auto_dispatch ? "aktif" : "nonaktif"}
             </span>
@@ -2473,7 +2584,7 @@ const IntegrationSummary = ({ integration, onCheckBalance, onImport, busy }) => 
             <button
               type="button"
               onClick={onCheckBalance}
-              disabled={busy}
+              disabled={Boolean(busy)}
               data-testid="integration-balance-refresh"
               className="mt-2 text-[10px] uppercase tracking-widest border border-line text-slate-400 hover:text-neon px-2 py-1 transition-colors disabled:opacity-50"
             >
@@ -2487,33 +2598,173 @@ const IntegrationSummary = ({ integration, onCheckBalance, onImport, busy }) => 
           <p className="font-display font-bold text-lg mt-1 text-slate-100">{orders.paid_undelivered ?? 0}</p>
           <p className="text-[10px] font-mono text-slate-500 mt-1">lunas tapi belum terkirim</p>
           <p className="text-[10px] font-mono text-slate-500 mt-0.5">
-            {orders.waiting_approval ?? 0} perlu verifikasi • {orders.unpaid ?? 0} belum bayar
+            {orders.digiflazz_pending ?? 0} pending DF • {orders.digiflazz_failed ?? 0} gagal DF
           </p>
         </div>
 
         <div
-          className={`border p-4 ${missing.length ? "border-coral/40 bg-coral/5" : "border-line bg-panel"}`}
+          className={`border p-4 ${problemSkus > 0 ? "border-coral/40 bg-coral/5" : "border-line bg-panel"}`}
           data-testid="integration-sku"
         >
-          <p className="text-[10px] uppercase tracking-widest text-slate-500">SKU Supplier</p>
-          {missing.length ? (
+          <p className="text-[10px] uppercase tracking-widest text-slate-500">
+            Kesehatan SKU (Cek Tiap 5 Menit)
+          </p>
+          {problemSkus > 0 ? (
             <>
-              <p className="font-display font-bold text-lg mt-1 text-coral">{missing.length} game</p>
-              <p className="text-[10px] font-mono text-slate-400 mt-1">belum punya SKU di semua nominal</p>
+              <p className="font-display font-bold text-lg mt-1 text-coral">
+                {problemSkus} SKU Gangguan (Auto-Hide)
+              </p>
+              <p className="text-[10px] font-mono text-slate-400 mt-1">
+                {healthySkus} dari {totalSkus} SKU aktif normal
+              </p>
             </>
           ) : (
             <>
-              <p className="font-display font-bold text-lg mt-1 text-lime">Lengkap</p>
-              <p className="text-[10px] font-mono text-slate-500 mt-1">semua nominal punya SKU</p>
+              <p className="font-display font-bold text-lg mt-1 text-lime">
+                {totalSkus > 0 ? `${healthySkus} SKU Normal` : "Siap Pantau"}
+              </p>
+              <p className="text-[10px] font-mono text-slate-500 mt-1">
+                Auto-hide gangguan &amp; auto-unhide saat normal
+              </p>
             </>
           )}
-          {integration.products_unsynced > 0 && (
-            <p className="text-[10px] font-mono text-coral mt-0.5">
-              {integration.products_unsynced} produk belum disinkronkan
-            </p>
-          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {onCheckSkuHealth && (
+              <button
+                type="button"
+                onClick={onCheckSkuHealth}
+                disabled={busy === "sku-health"}
+                data-testid="integration-check-sku-health-btn"
+                className="text-[10px] uppercase tracking-widest border border-lime/50 text-lime hover:bg-lime/10 px-2 py-1 transition-colors disabled:opacity-50"
+              >
+                {busy === "sku-health" ? "Mengecek..." : "Cek Gangguan Sekarang"}
+              </button>
+            )}
+            {skuHealth.last_checked_at && (
+              <span className="text-[9px] font-mono text-slate-500">
+                Cek: {new Date(skuHealth.last_checked_at).toLocaleTimeString("id-ID")}
+              </span>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Digiflazz Webhook & Callback Endpoint Box */}
+      <div className="border border-neon/30 bg-panel p-4 space-y-2.5" data-testid="digiflazz-webhook-panel">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-display font-bold uppercase tracking-wider text-neon">
+              Webhook &amp; Callback Transaksi Digiflazz
+            </p>
+            <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+              Pasang URL di bawah ini pada menu <strong className="text-slate-200">Pengaturan &rarr; Webhook</strong> di dashboard member.digiflazz.com agar status Sukses / Pending / Gagal &amp; SN masuk otomatis.
+            </p>
+          </div>
+          <span
+            className={`text-[10px] font-mono font-bold px-2 py-1 border ${
+              active.webhook_secret_set
+                ? "text-lime border-lime/40 bg-lime/10"
+                : "text-neon border-neon/40 bg-neon/10"
+            }`}
+          >
+            {active.webhook_secret_set ? "X-Hub-Signature Aktif" : "Siap Menerima Callback"}
+          </span>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-2.5">
+          <div className="flex items-center justify-between gap-2 bg-void border border-line px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-[9px] font-mono uppercase tracking-wider text-slate-500">
+                URL Webhook Utama
+              </p>
+              <p className="text-xs font-mono text-slate-200 truncate" data-testid="digiflazz-webhook-url">
+                {webhookUrl}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyText(webhookUrl, "URL Webhook Digiflazz")}
+              data-testid="copy-digiflazz-webhook-url"
+              className="shrink-0 text-[10px] font-mono uppercase tracking-wider border border-neon/50 text-neon hover:bg-neon hover:text-void px-2.5 py-1 transition-colors"
+            >
+              Salin
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 bg-void border border-line px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-[9px] font-mono uppercase tracking-wider text-slate-500">
+                URL Callback Alternatif
+              </p>
+              <p className="text-xs font-mono text-slate-200 truncate" data-testid="digiflazz-callback-url">
+                {callbackUrl}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyText(callbackUrl, "URL Callback Digiflazz")}
+              data-testid="copy-digiflazz-callback-url"
+              className="shrink-0 text-[10px] font-mono uppercase tracking-wider border border-line text-slate-300 hover:border-neon hover:text-neon px-2.5 py-1 transition-colors"
+            >
+              Salin
+            </button>
+          </div>
+        </div>
+
+        {webhookLogs.length > 0 && (
+          <div className="pt-2 border-t border-line/60">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mb-1.5">
+              Riwayat Callback Digiflazz Terakhir:
+            </p>
+            <div className="space-y-1 max-h-28 overflow-y-auto text-[10px] font-mono">
+              {webhookLogs.slice(0, 5).map((log, idx) => (
+                <div key={`${log.ref_id}-${idx}`} className="flex flex-wrap items-center justify-between gap-2 bg-void/50 border border-line/60 px-2.5 py-1">
+                  <span className="text-slate-300">
+                    <strong>{log.ref_id}</strong> ({log.sku || "-"}) &rarr;{" "}
+                    <span
+                      className={
+                        /^sukses$/i.test(log.status)
+                          ? "text-lime font-bold"
+                          : /^gagal$/i.test(log.status)
+                            ? "text-coral font-bold"
+                            : "text-amber-300"
+                      }
+                    >
+                      {log.status}
+                    </span>
+                    {log.sn ? ` • SN: ${log.sn}` : ""}
+                  </span>
+                  <span className="text-slate-500">
+                    {log.at ? new Date(log.at).toLocaleTimeString("id-ID") : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Currently Auto-Hidden Problem SKUs Alert */}
+      {problemItems.length > 0 && (
+        <div className="border border-coral/40 bg-coral/5 p-3 space-y-2" data-testid="integration-problem-skus">
+          <p className="flex items-start gap-2 text-[11px] font-mono text-coral font-bold">
+            <AlertCircle size={13} className="mt-0.5 shrink-0 text-coral" />
+            <span>
+              {problemSkus} SKU sedang mengalami gangguan di Digiflazz dan otomatis di-hide dari halaman pembeli (akan tampil kembali otomatis saat normal pada cek 5 menit berikutnya):
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {problemItems.slice(0, 12).map((item) => (
+              <span
+                key={`${item.game_slug}-${item.sku}`}
+                className="text-[10px] font-mono border border-coral/40 bg-void/70 text-slate-200 px-2 py-1"
+              >
+                <strong className="text-coral">{item.sku}</strong> ({item.game_name} — {item.label}): {item.reason}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {missing.length > 0 && (
         <div className="border border-coral/30 bg-coral/5 p-3" data-testid="integration-sku-warning">

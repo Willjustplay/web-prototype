@@ -994,7 +994,10 @@ function productIdFor(gameSlug: string, code: string) {
 
 function activeDenominations(game: any): any[] {
   const rows = (game?.denominations || []).filter(
-    (d: any) => d.is_active !== false && String(d.vendor_sku || "").trim() !== ""
+    (d: any) =>
+      d.is_active !== false &&
+      d.digiflazz_problem !== true &&
+      String(d.vendor_sku || "").trim() !== ""
   );
   return rows.sort((a: any, b: any) => (a.seq || 0) - (b.seq || 0) || String(a.code).localeCompare(String(b.code)));
 }
@@ -5130,15 +5133,16 @@ const VENDOR_CATALOG = [
   {
     kind: "digiflazz",
     label: "Digiflazz Indonesia",
-    description: "Supplier H2H Top-Up Game & Voucher #1 Indonesia. Mendukung tarik produk otomatis, verifikasi ID game, cek saldo deposit, dan pengiriman instan.",
+    description: "Supplier H2H Top-Up Game & Voucher #1 Indonesia. Mendukung tarik produk otomatis, verifikasi ID game, cek saldo deposit, webhook callback status transaksi, dan pengecekan gangguan SKU berkala tiap 5 menit.",
     fields: [
       { key: "username", label: "Username Digiflazz", required: true, secret: false },
       { key: "api_key", label: "Production API Key", required: true, secret: true },
       { key: "dev_key", label: "Development API Key (opsional)", required: false, secret: true },
+      { key: "webhook_secret", label: "Webhook Secret Digiflazz (opsional, X-Hub-Signature)", required: false, secret: true },
       { key: "use_dev", label: "Gunakan Development Key / Sandbox", required: false, secret: false, type: "boolean" },
       { key: "brand_override", label: "Filter Brand Default (opsional)", required: false, secret: false },
     ],
-    supports: { check: true, balance: true, import: true },
+    supports: { check: true, balance: true, import: true, webhook: true, sku_health: true },
   },
 ];
 
@@ -5156,6 +5160,7 @@ function maskedVendorView(doc: any) {
     username: process.env.DIGIFLAZZ_USERNAME,
     api_key: process.env.DIGIFLAZZ_API_KEY,
     dev_key: process.env.DIGIFLAZZ_DEV_KEY,
+    webhook_secret: process.env.DIGIFLAZZ_WEBHOOK_SECRET,
   };
   for (const f of spec.fields) {
     const dbVal = String(cfg[f.key] ?? "").trim();
@@ -5185,6 +5190,11 @@ function maskedVendorView(doc: any) {
         : "env"
       : "none",
     available: hasRealCreds,
+    webhook_url: `${FRONTEND_URL}/api/webhook/digiflazz`,
+    callback_url: `${FRONTEND_URL}/api/callback/digiflazz`,
+    webhook_secret_set: Boolean(String(doc.config?.webhook_secret || process.env.DIGIFLAZZ_WEBHOOK_SECRET || "").trim()),
+    sku_health: doc.sku_health || null,
+    webhook_logs: Array.isArray(doc.webhook_logs) ? doc.webhook_logs.slice(0, 15) : [],
   };
 }
 
@@ -5422,6 +5432,295 @@ function extractAmountFromLabel(labelStr: string, fallback = 0): number {
   return fallback;
 }
 
+function isWithinDigiflazzCutOff(startCutOff?: string, endCutOff?: string): boolean {
+  const s = String(startCutOff || "").trim();
+  const e = String(endCutOff || "").trim();
+  if (!s || !e || s === e || (s === "00:00" && e === "00:00")) return false;
+  const sm = s.match(/^(\d{1,2}):(\d{2})/);
+  const em = e.match(/^(\d{1,2}):(\d{2})/);
+  if (!sm || !em) return false;
+  const startMin = Number(sm[1]) * 60 + Number(sm[2]);
+  const endMin = Number(em[1]) * 60 + Number(em[2]);
+  if (startMin === endMin) return false;
+  // Convert current time to WIB (UTC+7)
+  const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const curMin = nowWib.getUTCHours() * 60 + nowWib.getUTCMinutes();
+  if (startMin < endMin) {
+    return curMin >= startMin && curMin <= endMin;
+  }
+  return curMin >= startMin || curMin <= endMin;
+}
+
+function applyDigiflazzRawListHealthToLocalGames(
+  rawList: any[],
+  providerDoc?: any,
+  triggerSource = "periodic_5m"
+) {
+  const doc =
+    providerDoc ||
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+
+  const statusBySku = new Map<
+    string,
+    {
+      buyer_product_status: boolean;
+      seller_product_status: boolean;
+      is_cut_off: boolean;
+      is_healthy: boolean;
+      price: number;
+      reason: string;
+    }
+  >();
+
+  for (const row of rawList || []) {
+    if (!row || typeof row !== "object") continue;
+    const sku = String(row.buyer_sku_code || "").trim().toUpperCase();
+    if (!sku) continue;
+    const buyerOk = row.buyer_product_status !== false;
+    const sellerOk = row.seller_product_status !== false;
+    const cutOff = isWithinDigiflazzCutOff(row.start_cut_off, row.end_cut_off);
+    const healthy = buyerOk && sellerOk && !cutOff;
+    let reason = "Normal (Aktif)";
+    if (!buyerOk) reason = "Buyer SKU Nonaktif di Digiflazz";
+    else if (!sellerOk) reason = "Gangguan Seller di Digiflazz";
+    else if (cutOff) reason = `Sedang Cut-Off (${row.start_cut_off} - ${row.end_cut_off} WIB)`;
+
+    // If multiple rows share a SKU code, prefer a healthy one if any exists
+    const existing = statusBySku.get(sku);
+    if (!existing || (!existing.is_healthy && healthy)) {
+      statusBySku.set(sku, {
+        buyer_product_status: buyerOk,
+        seller_product_status: sellerOk,
+        is_cut_off: cutOff,
+        is_healthy: healthy,
+        price: Number(row.price || 0),
+        reason,
+      });
+    }
+  }
+
+  const checkedAt = nowIso();
+  let totalSkus = 0;
+  let healthySkus = 0;
+  let problemSkus = 0;
+  let newlyHidden = 0;
+  let newlyRestored = 0;
+  let changed = false;
+  const problemItems: Array<{
+    game_name: string;
+    game_slug: string;
+    sku: string;
+    label: string;
+    reason: string;
+  }> = [];
+
+  for (const game of db.games || []) {
+    let gameChanged = false;
+    for (const denom of game.denominations || []) {
+      const skuKey = String(denom.vendor_sku || "").trim().toUpperCase();
+      if (!skuKey) continue;
+      totalSkus++;
+      const remote = statusBySku.get(skuKey);
+      if (remote) {
+        const wasProblem = Boolean(denom.digiflazz_problem);
+        if (!remote.is_healthy) {
+          problemSkus++;
+          if (!wasProblem) {
+            newlyHidden++;
+            gameChanged = true;
+            changed = true;
+          }
+          denom.digiflazz_problem = true;
+          denom.digiflazz_status = "gangguan";
+          denom.digiflazz_status_note = remote.reason;
+          denom.digiflazz_checked_at = checkedAt;
+          problemItems.push({
+            game_name: game.name,
+            game_slug: game.slug,
+            sku: skuKey,
+            label: denom.label || denom.code,
+            reason: remote.reason,
+          });
+        } else {
+          healthySkus++;
+          if (wasProblem) {
+            newlyRestored++;
+            gameChanged = true;
+            changed = true;
+          }
+          denom.digiflazz_problem = false;
+          denom.digiflazz_status = "normal";
+          denom.digiflazz_status_note = "Normal (Aktif)";
+          denom.digiflazz_checked_at = checkedAt;
+          if (remote.price > 0 && denom.modal_price !== remote.price) {
+            denom.modal_price = remote.price;
+          }
+        }
+      } else {
+        // SKU is currently mapped in local game; preserve current state if price-list actually returned items
+        if (denom.digiflazz_problem) {
+          problemSkus++;
+          problemItems.push({
+            game_name: game.name,
+            game_slug: game.slug,
+            sku: skuKey,
+            label: denom.label || denom.code,
+            reason: denom.digiflazz_status_note || "SKU Tidak Ditemukan / Gangguan di Digiflazz",
+          });
+        } else {
+          healthySkus++;
+        }
+      }
+    }
+    if (gameChanged) {
+      syncGameProducts(game);
+    }
+  }
+
+  const summary = {
+    ok: true,
+    trigger: triggerSource,
+    interval_minutes: 5,
+    last_checked_at: checkedAt,
+    total_skus: totalSkus,
+    healthy_skus: healthySkus,
+    problem_skus: problemSkus,
+    newly_hidden: newlyHidden,
+    newly_restored: newlyRestored,
+    problem_items: problemItems.slice(0, 50),
+    message:
+      problemSkus > 0
+        ? `${problemSkus} SKU sedang gangguan & otomatis di-hide (${healthySkus} SKU normal)`
+        : `Semua ${healthySkus} SKU aktif & normal`,
+  };
+
+  if (doc) {
+    doc.sku_health = summary;
+  }
+  if (changed || doc) {
+    saveDb();
+  }
+  return summary;
+}
+
+function markDigiflazzSkuProblemByCode(skuCode: string, reasonNote = "Gangguan saat transaksi di Digiflazz") {
+  const skuKey = String(skuCode || "").trim().toUpperCase();
+  if (!skuKey) return false;
+  let updated = false;
+  const checkedAt = nowIso();
+  for (const game of db.games || []) {
+    let gameChanged = false;
+    for (const denom of game.denominations || []) {
+      if (String(denom.vendor_sku || "").trim().toUpperCase() === skuKey) {
+        if (!denom.digiflazz_problem) {
+          gameChanged = true;
+          updated = true;
+        }
+        denom.digiflazz_problem = true;
+        denom.digiflazz_status = "gangguan";
+        denom.digiflazz_status_note = reasonNote;
+        denom.digiflazz_checked_at = checkedAt;
+      }
+    }
+    if (gameChanged) {
+      syncGameProducts(game);
+    }
+  }
+  if (updated) {
+    saveDb();
+  }
+  return updated;
+}
+
+async function checkAndSyncDigiflazzSkuHealth(triggerSource = "periodic_5m") {
+  const doc =
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+  const username = String(doc?.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const apiKey = String(
+    (doc?.config?.use_dev ? doc?.config?.dev_key : doc?.config?.api_key) ||
+      doc?.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
+
+  if (isDemoDigiflazzCredential(username, apiKey)) {
+    let totalSkus = 0;
+    let problemSkus = 0;
+    for (const g of db.games || []) {
+      for (const d of g.denominations || []) {
+        if (String(d.vendor_sku || "").trim()) {
+          totalSkus++;
+          if (d.digiflazz_problem) problemSkus++;
+        }
+      }
+    }
+    const unconfiguredSummary = {
+      ok: false,
+      trigger: triggerSource,
+      interval_minutes: 5,
+      last_checked_at: nowIso(),
+      total_skus: totalSkus,
+      healthy_skus: Math.max(0, totalSkus - problemSkus),
+      problem_skus: problemSkus,
+      newly_hidden: 0,
+      newly_restored: 0,
+      problem_items: [],
+      message: "Kredensial Digiflazz belum dikonfigurasi. Isi Username & API Key untuk pengecekan gangguan SKU otomatis.",
+    };
+    if (doc) doc.sku_health = unconfiguredSummary;
+    return unconfiguredSummary;
+  }
+
+  try {
+    const sign = crypto.createHash("md5").update(username + apiKey + "pricelist").digest("hex");
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const resp = await fetch("https://api.digiflazz.com/v1/price-list", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "prepaid", username, sign }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    const json: any = await resp.json().catch(() => null);
+    const rawList = Array.isArray(json?.data) ? json.data : [];
+    if (rawList.length > 0) {
+      return applyDigiflazzRawListHealthToLocalGames(rawList, doc, triggerSource);
+    }
+    const errMsg = json?.data?.message
+      ? `Digiflazz API: ${String(json.data.message)}`
+      : "Respons price-list Digiflazz kosong atau gagal diverifikasi.";
+    const errSummary = {
+      ...(doc?.sku_health || {}),
+      ok: false,
+      trigger: triggerSource,
+      interval_minutes: 5,
+      last_checked_at: nowIso(),
+      message: errMsg,
+    };
+    if (doc) {
+      doc.sku_health = errSummary;
+      saveDb();
+    }
+    return errSummary;
+  } catch (err: any) {
+    const errSummary = {
+      ...(doc?.sku_health || {}),
+      ok: false,
+      trigger: triggerSource,
+      interval_minutes: 5,
+      last_checked_at: nowIso(),
+      message: `Gagal mengecek status SKU ke Digiflazz: ${String(err?.message || "Koneksi gagal")}`,
+    };
+    if (doc) {
+      doc.sku_health = errSummary;
+    }
+    return errSummary;
+  }
+}
+
 async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): Promise<{
   items: any[];
   source: "digiflazz_live";
@@ -5480,13 +5779,21 @@ async function fetchDigiflazzPriceList(providerDoc: any, forceRefresh = false): 
       const json: any = await resp.json().catch(() => null);
       const rawList = Array.isArray(json?.data) ? json.data : [];
       if (rawList.length > 0) {
+        // Sync SKU health (auto-hide gangguan SKUs & auto-unhide normal SKUs) whenever price-list is fetched
+        applyDigiflazzRawListHealthToLocalGames(rawList, doc, "pricelist_fetch");
         for (const row of rawList) {
           if (!row || typeof row !== "object") continue;
           const sku = String(row.buyer_sku_code || "").trim();
           const modalPrice = Number(row.price || 0);
           if (!sku || modalPrice <= 0) continue;
-          // Skip inactive seller/buyer products
-          if (row.buyer_product_status === false || row.seller_product_status === false) continue;
+          // Skip inactive seller/buyer products or products currently in cut-off
+          if (
+            row.buyer_product_status === false ||
+            row.seller_product_status === false ||
+            isWithinDigiflazzCutOff(row.start_cut_off, row.end_cut_off)
+          ) {
+            continue;
+          }
 
           const brand = String(row.brand || "").trim();
           const category = String(row.category || "Games").trim();
@@ -9762,6 +10069,227 @@ const ensureOngoingHomeTransactionStockAvailable = (tx: any): boolean => {
   return true;
 };
 
+const applyDigiflazzTransactionUpdate = (tx: any, data: any, source = "digiflazz_api") => {
+  if (!tx || !data || typeof data !== "object") return tx;
+  const doc =
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+
+  const rawStatus = String(data.status || "").trim();
+  const rc = String(data.rc ?? "").trim();
+  const sn = String(data.sn || "").trim();
+  const message = String(data.message || "").trim();
+  const sku = String(data.buyer_sku_code || tx.vendor_sku || "").trim();
+  const refId = String(data.ref_id || tx.digiflazz_ref_id || tx.session_id || "").trim();
+  const lastSaldo = data.buyer_last_saldo;
+
+  if (doc && typeof lastSaldo === "number" && !Number.isNaN(lastSaldo)) {
+    doc.cached_balance = Number(lastSaldo);
+  }
+
+  const isSukses = /^sukses|success|berhasil$/i.test(rawStatus) || rc === "00";
+  const isPending =
+    /^pending|diproses|process$/i.test(rawStatus) || rc === "03" || rc === "39" || rc === "99";
+  const isGagal =
+    /^gagal|failed|error$/i.test(rawStatus) || (!isSukses && !isPending && Boolean(rc));
+
+  tx.vendor_kind = "digiflazz";
+  tx.vendor_ref = refId;
+  tx.digiflazz_ref_id = refId;
+  if (rc) tx.digiflazz_rc = rc;
+  if (message) tx.digiflazz_message = message;
+  if (typeof data.price === "number" && data.price > 0) {
+    tx.digiflazz_price = Number(data.price);
+  }
+  tx.digiflazz_checked_at = nowIso();
+  tx.digiflazz_updated_by = source;
+  tx.updated_at = nowIso();
+
+  if (isSukses) {
+    tx.digiflazz_status = "Sukses";
+    tx.status = "delivered";
+    tx.delivered_at = tx.delivered_at || nowIso();
+    if (sn) {
+      tx.digiflazz_sn = sn;
+      const curDelivery = String(tx.delivery_info || "");
+      if (!curDelivery.includes(sn)) {
+        tx.delivery_info = `${curDelivery ? `${curDelivery} • ` : ""}SN: ${sn}`;
+      }
+    }
+  } else if (isPending) {
+    tx.digiflazz_status = "Pending";
+    if (tx.status !== "delivered") {
+      tx.status = "processing";
+    }
+  } else if (isGagal) {
+    tx.digiflazz_status = "Gagal";
+    if (tx.status !== "delivered") {
+      tx.status = "digiflazz_failed";
+    }
+    const isSkuProblem =
+      ["51", "52", "53", "54", "55", "57", "58", "68"].includes(rc) ||
+      /gangguan|cut\s*off|tidak\s+aktif|sedang\s+tidak\s+tersedia|produk\s+sedang\s+gangguan|seller|close/i.test(
+        message
+      );
+    if (isSkuProblem && sku) {
+      markDigiflazzSkuProblemByCode(sku, message || `Gangguan Digiflazz (RC ${rc})`);
+    }
+  }
+
+  saveDb();
+  if (isSukses && !tx.fulfillment_email_sent_at) {
+    void sendOrderFulfillmentEmail(tx);
+  }
+  return tx;
+};
+
+const dispatchOrCheckDigiflazzTransaction = async (
+  tx: any,
+  opts: { reason?: string; force?: boolean } = {}
+): Promise<{
+  ok: boolean;
+  status: string;
+  rc?: string;
+  sn?: string;
+  message: string;
+}> => {
+  if (!tx || tx.product_type !== PRODUCT_TYPE) {
+    return { ok: false, status: "invalid", message: "Bukan transaksi Top Up" };
+  }
+  if (tx.payment_status !== "paid") {
+    return { ok: false, status: "unpaid", message: "Pesanan belum lunas" };
+  }
+  if (tx.digiflazz_status === "Sukses" && !opts.force) {
+    return {
+      ok: true,
+      status: "Sukses",
+      rc: tx.digiflazz_rc || "00",
+      sn: tx.digiflazz_sn || "",
+      message: tx.digiflazz_message || "Transaksi Top Up sudah sukses di Digiflazz",
+    };
+  }
+
+  const doc =
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+  const username = String(doc?.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const apiKey = String(
+    (doc?.config?.use_dev ? doc?.config?.dev_key : doc?.config?.api_key) ||
+      doc?.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
+
+  const game = db.games.find((g) => g.slug === tx.game_slug || g.id === tx.game_id);
+  const sku = String(tx.vendor_sku || "").trim();
+  const customerNo =
+    String(tx.customer_no || "").trim() ||
+    (game ? buildDigiflazzCustomerNo(game, tx.destination || {}) : "");
+  const refId = String(tx.digiflazz_ref_id || tx.session_id || "").trim();
+
+  if (!sku || !customerNo) {
+    tx.digiflazz_status = tx.digiflazz_status || "Pending";
+    tx.digiflazz_message = "SKU Digiflazz atau Nomor Tujuan (customer_no) belum lengkap.";
+    tx.digiflazz_checked_at = nowIso();
+    saveDb();
+    return { ok: false, status: tx.digiflazz_status, message: tx.digiflazz_message };
+  }
+
+  if (isDemoDigiflazzCredential(username, apiKey)) {
+    tx.digiflazz_status = tx.digiflazz_status || "Pending";
+    tx.digiflazz_message =
+      "Kredensial Digiflazz (Username & API Key) belum dikonfigurasi di Panel Admin.";
+    tx.digiflazz_checked_at = nowIso();
+    saveDb();
+    return { ok: false, status: tx.digiflazz_status, message: tx.digiflazz_message };
+  }
+
+  try {
+    const sign = crypto.createHash("md5").update(username + apiKey + refId).digest("hex");
+    const payload: Record<string, any> = {
+      username,
+      buyer_sku_code: sku,
+      customer_no: customerNo,
+      ref_id: refId,
+      sign,
+    };
+    if (doc?.config?.use_dev) {
+      payload.testing = true;
+    }
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    const resp = await fetch("https://api.digiflazz.com/v1/transaction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    const json: any = await resp.json().catch(() => null);
+    const data = json?.data || json || {};
+
+    tx.digiflazz_dispatched_at = tx.digiflazz_dispatched_at || nowIso();
+    tx.digiflazz_poll_count = Number(tx.digiflazz_poll_count || 0) + 1;
+    applyDigiflazzTransactionUpdate(tx, data, opts.reason || "digiflazz_api");
+
+    return {
+      ok: tx.digiflazz_status !== "Gagal",
+      status: tx.digiflazz_status || "Pending",
+      rc: tx.digiflazz_rc || "",
+      sn: tx.digiflazz_sn || "",
+      message:
+        tx.digiflazz_message ||
+        (tx.digiflazz_status === "Sukses"
+          ? "Transaksi Top Up Berhasil di Digiflazz"
+          : tx.digiflazz_status === "Gagal"
+            ? "Transaksi Top Up Gagal di Digiflazz"
+            : "Transaksi sedang diproses oleh Digiflazz"),
+    };
+  } catch (err: any) {
+    tx.digiflazz_checked_at = nowIso();
+    tx.digiflazz_message = `Gagal menghubungi API Transaksi Digiflazz: ${String(err?.message || "Koneksi gagal")}`;
+    saveDb();
+    return {
+      ok: false,
+      status: tx.digiflazz_status || "Pending",
+      message: tx.digiflazz_message,
+    };
+  }
+};
+
+const pollPendingDigiflazzTransactions = async () => {
+  const doc =
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+  const username = String(doc?.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
+  const apiKey = String(
+    (doc?.config?.use_dev ? doc?.config?.dev_key : doc?.config?.api_key) ||
+      doc?.config?.api_key ||
+      process.env.DIGIFLAZZ_API_KEY ||
+      ""
+  ).trim();
+  if (isDemoDigiflazzCredential(username, apiKey)) return;
+
+  const autoDispatch = doc?.auto_dispatch !== false;
+  const nowMs = Date.now();
+  const candidates = (db.transactions || []).filter((t) => {
+    if (t.product_type !== PRODUCT_TYPE || t.payment_status !== "paid") return false;
+    if (t.status === "delivered" || t.digiflazz_status === "Sukses" || t.digiflazz_status === "Gagal") {
+      return false;
+    }
+    const polls = Number(t.digiflazz_poll_count || 0);
+    if (polls >= 20) return false;
+    if (!t.digiflazz_dispatched_at && !autoDispatch) return false;
+    const lastCheckMs = t.digiflazz_checked_at ? new Date(t.digiflazz_checked_at).getTime() : 0;
+    return nowMs - lastCheckMs >= 30 * 1000;
+  });
+
+  for (const tx of candidates.slice(0, 5)) {
+    await dispatchOrCheckDigiflazzTransaction(tx, { reason: "periodic_poll" });
+  }
+};
+
 const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
   if (!tx) return;
   if (tx.payment_status !== "paid" && tx.payment_status !== "failed") {
@@ -9784,7 +10312,7 @@ const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
       tx.stock_deducted = true;
     }
     tx.payment_status = "paid";
-    tx.status = "completed";
+    tx.status = tx.product_type === PRODUCT_TYPE ? "processing" : "completed";
     tx.paykita_confirmed = true;
     tx.paykita_confirmed_by = confirmedBy;
     tx.paykita_confirmed_at = nowIso();
@@ -9793,6 +10321,13 @@ const markPaykitaTransactionPaid = (tx: any, confirmedBy = "paykita") => {
       cancelOngoingTransactionsForOutOfStockProduct(p.id, tx.session_id);
     }
     saveDb();
+    if (tx.product_type === PRODUCT_TYPE) {
+      const dfProvider =
+        db.topup_providers.find((v) => v.kind === "digiflazz") || db.topup_providers[0];
+      if (!dfProvider || dfProvider.auto_dispatch !== false) {
+        void dispatchOrCheckDigiflazzTransaction(tx, { reason: `auto_${confirmedBy}` });
+      }
+    }
     void sendOrderFulfillmentEmail(tx);
   } else if (tx.payment_status === "paid" && !tx.fulfillment_email_sent_at) {
     void sendOrderFulfillmentEmail(tx);
@@ -10434,6 +10969,142 @@ api.post("/webhook/paykita", async (req: any, res) => {
   });
 });
 
+// ---------------- Digiflazz Webhook & Callback Endpoints ----------------
+const handleDigiflazzWebhookGet = (_req: Request, res: Response) => {
+  res.json({
+    ok: true,
+    provider: "digiflazz",
+    status: "ready",
+    webhook_url: `${FRONTEND_URL}/api/webhook/digiflazz`,
+    callback_url: `${FRONTEND_URL}/api/callback/digiflazz`,
+    message: "Endpoint Webhook & Callback Digiflazz aktif dan siap menerima update status transaksi (Sukses / Pending / Gagal).",
+  });
+};
+
+const handleDigiflazzWebhookPost = async (req: any, res: Response) => {
+  const body = req.body || {};
+  const eventHeader = String(req.headers["x-digiflazz-event"] || body.event || "update").trim();
+  const hubSig = String(req.headers["x-hub-signature"] || "").trim();
+
+  const doc =
+    db.topup_providers.find((v) => v.kind === "digiflazz") ||
+    db.topup_providers[0];
+  const webhookSecret = String(
+    doc?.config?.webhook_secret || process.env.DIGIFLAZZ_WEBHOOK_SECRET || ""
+  ).trim();
+
+  // Verify X-Hub-Signature (sha1=<hmac_sha1(rawBody, secret)>) when webhook_secret is configured
+  if (webhookSecret) {
+    const rawPayload = req.rawBody
+      ? req.rawBody
+      : Buffer.from(JSON.stringify(body), "utf8");
+    const expectedSig = `sha1=${crypto
+      .createHmac("sha1", webhookSecret)
+      .update(rawPayload)
+      .digest("hex")}`;
+    const expectedBodySig = `sha1=${crypto
+      .createHmac("sha1", webhookSecret)
+      .update(JSON.stringify(body))
+      .digest("hex")}`;
+    const sigMatch =
+      Boolean(hubSig) &&
+      (safeTimingCompare(hubSig.toLowerCase(), expectedSig.toLowerCase()) ||
+        safeTimingCompare(hubSig.toLowerCase(), expectedBodySig.toLowerCase()));
+    if (!sigMatch) {
+      writeAuditLog({
+        actor: null,
+        action: "security.digiflazz_webhook_invalid_signature",
+        metadata: { event: eventHeader, has_signature: Boolean(hubSig) },
+        req,
+      });
+      return res.status(401).json({
+        ok: false,
+        detail: "Signature X-Hub-Signature webhook Digiflazz tidak valid",
+      });
+    }
+  }
+
+  const data = body.data && typeof body.data === "object" ? body.data : body;
+  const refId = String(data.ref_id || data.trx_id || "").trim();
+  if (!refId || eventHeader.toLowerCase() === "ping") {
+    return res.json({
+      ok: true,
+      event: eventHeader || "ping",
+      message: "Ping / Test Webhook Digiflazz diterima",
+    });
+  }
+
+  const status = String(data.status || "").trim();
+  const rc = String(data.rc ?? "").trim();
+  const sn = String(data.sn || "").trim();
+  const message = String(data.message || "").trim();
+  const sku = String(data.buyer_sku_code || "").trim();
+
+  if (doc) {
+    if (typeof data.buyer_last_saldo === "number" && !Number.isNaN(data.buyer_last_saldo)) {
+      doc.cached_balance = Number(data.buyer_last_saldo);
+    }
+    const logEntry = {
+      at: nowIso(),
+      event: eventHeader,
+      ref_id: refId,
+      sku,
+      status: status || "Unknown",
+      rc,
+      sn,
+      message,
+    };
+    doc.webhook_logs = [logEntry, ...(Array.isArray(doc.webhook_logs) ? doc.webhook_logs : [])].slice(
+      0,
+      25
+    );
+  }
+
+  const tx = db.transactions.find(
+    (t) =>
+      t.product_type === PRODUCT_TYPE &&
+      (t.session_id === refId || t.digiflazz_ref_id === refId || t.vendor_ref === refId)
+  );
+
+  if (!tx) {
+    // Even if order is not found locally (e.g. test payload), if it reports SKU gangguan, mark SKU problem
+    if (/^gagal|failed$/i.test(status) && sku) {
+      const isSkuProblem =
+        ["51", "52", "53", "54", "55", "57", "58", "68"].includes(rc) ||
+        /gangguan|cut\s*off|tidak\s+aktif|sedang\s+tidak\s+tersedia|produk\s+sedang\s+gangguan|seller|close/i.test(
+          message
+        );
+      if (isSkuProblem) {
+        markDigiflazzSkuProblemByCode(sku, message || `Gangguan Digiflazz (RC ${rc})`);
+      }
+    }
+    saveDb();
+    return res.json({
+      ok: true,
+      matched: false,
+      ref_id: refId,
+      message: "Callback Digiflazz diterima (transaksi ref_id tidak ditemukan di database lokal)",
+    });
+  }
+
+  applyDigiflazzTransactionUpdate(tx, data, `digiflazz_webhook_${eventHeader}`);
+  return res.json({
+    ok: true,
+    matched: true,
+    session_id: tx.session_id,
+    ref_id: refId,
+    digiflazz_status: tx.digiflazz_status,
+    digiflazz_rc: tx.digiflazz_rc || null,
+    digiflazz_sn: tx.digiflazz_sn || null,
+    status: tx.status,
+  });
+};
+
+api.get("/webhook/digiflazz", handleDigiflazzWebhookGet);
+api.post("/webhook/digiflazz", handleDigiflazzWebhookPost);
+api.get("/callback/digiflazz", handleDigiflazzWebhookGet);
+api.post("/callback/digiflazz", handleDigiflazzWebhookPost);
+
 const handleManualOrCryptoCheckout = (req: Request, res: Response) => {
   try {
     if (!enforceCheckoutRateLimit(req, res, "manual_or_crypto")) return;
@@ -10522,6 +11193,11 @@ api.post("/payments/topup/checkout", async (req, res) => {
     const code = String(body.denomination_code || body.denomination || "").trim();
     const denom = findDenomination(game, code);
     if (!denom || denom.is_active === false) return res.status(404).json({ detail: "Nominal top up tidak tersedia" });
+    if (denom.digiflazz_problem === true) {
+      return res.status(400).json({
+        detail: "Nominal / SKU ini sedang mengalami gangguan dari pusat (Digiflazz) dan disembunyikan sementara. Silakan pilih nominal lainnya.",
+      });
+    }
     const product =
       findProductFlexible(body.product_id) ||
       db.products.find(
@@ -10810,6 +11486,24 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
   const paid =
     tx.payment_status === "paid" &&
     (tx.provider !== "paykita" || Boolean(tx.paykita_confirmed));
+  if (
+    paid &&
+    tx.product_type === PRODUCT_TYPE &&
+    tx.digiflazz_status !== "Sukses" &&
+    tx.digiflazz_status !== "Gagal"
+  ) {
+    const lastCheckMs = tx.digiflazz_checked_at
+      ? new Date(tx.digiflazz_checked_at).getTime()
+      : 0;
+    const dfProvider =
+      db.topup_providers.find((v) => v.kind === "digiflazz") || db.topup_providers[0];
+    if (
+      (!dfProvider || dfProvider.auto_dispatch !== false || tx.digiflazz_dispatched_at) &&
+      Date.now() - lastCheckMs >= 12 * 1000
+    ) {
+      await dispatchOrCheckDigiflazzTransaction(tx, { reason: "buyer_status_check" });
+    }
+  }
   const effectivePaymentStatus =
     tx.provider === "paykita" && tx.payment_status === "paid" && !tx.paykita_confirmed
       ? "pending"
@@ -10892,6 +11586,13 @@ const handlePaymentStatus = async (req: Request, res: Response) => {
     verified_nickname: tx.verified_nickname || null,
     denomination_code: tx.denomination_code,
     denomination_label: tx.denomination_label,
+    vendor_sku: tx.vendor_sku || null,
+    digiflazz_status: tx.digiflazz_status || null,
+    digiflazz_sn: paid ? tx.digiflazz_sn || null : null,
+    digiflazz_rc: tx.digiflazz_rc || null,
+    digiflazz_message: tx.digiflazz_message || null,
+    digiflazz_ref_id: tx.digiflazz_ref_id || tx.vendor_ref || null,
+    digiflazz_checked_at: tx.digiflazz_checked_at || null,
     admin_note: paid ? tx.admin_note || null : null,
     destination_id: tx.destination_id,
     destination_name: tx.destination_name,
@@ -11202,7 +11903,7 @@ admin.post("/orders/:session_id/approve", async (req, res) => {
       detail: "Stok produk ini sudah habis (0) karena telah dibeli oleh pembeli lain.",
     });
   }
-  tx.status = "completed";
+  tx.status = tx.product_type === PRODUCT_TYPE ? "processing" : "completed";
   tx.payment_status = "paid";
   if (tx.provider === "paykita" || tx.payment_type === "paykita") {
     tx.paykita_confirmed = true;
@@ -11221,6 +11922,13 @@ admin.post("/orders/:session_id/approve", async (req, res) => {
     cancelOngoingTransactionsForOutOfStockProduct(prod.id, tx.session_id);
   }
   saveDb();
+  if (tx.product_type === PRODUCT_TYPE) {
+    const dfProvider =
+      db.topup_providers.find((v) => v.kind === "digiflazz") || db.topup_providers[0];
+    if (!dfProvider || dfProvider.auto_dispatch !== false) {
+      await dispatchOrCheckDigiflazzTransaction(tx, { reason: "admin_approve" });
+    }
+  }
   await sendOrderFulfillmentEmail(tx, req);
   res.json(tx);
 });
@@ -12916,14 +13624,54 @@ admin.post("/topup/orders/:session_id/complete", async (req, res) => {
     return res.status(400).json({ detail: "Pesanan belum lunas. Setujui pembayaran terlebih dahulu." });
   }
   const dispatched = Boolean(req.body?.dispatch !== false);
+  if (dispatched) {
+    const dfRes = await dispatchOrCheckDigiflazzTransaction(tx, {
+      reason: "admin_dispatch",
+      force: true,
+    });
+    if (req.body?.note) tx.admin_note = String(req.body.note).trim();
+    if (tx.digiflazz_status !== "Sukses" && req.body?.force_manual_complete === true) {
+      tx.status = "delivered";
+      tx.delivered_at = tx.delivered_at || nowIso();
+    }
+    saveDb();
+    return res.json({ ...tx, dispatched, digiflazz_result: dfRes });
+  }
   tx.status = "delivered";
   tx.vendor_kind = "digiflazz";
-  tx.vendor_ref = `DF-${uuidHex(8).toUpperCase()}`;
+  tx.vendor_ref = tx.vendor_ref || tx.session_id;
   tx.delivered_at = nowIso();
   tx.updated_at = nowIso();
   if (req.body?.note) tx.admin_note = String(req.body.note).trim();
   saveDb();
   res.json({ ...tx, dispatched });
+});
+
+admin.post("/topup/orders/:session_id/check-digiflazz", async (req, res) => {
+  const tx = db.transactions.find(
+    (t) => t.session_id === req.params.session_id && t.product_type === PRODUCT_TYPE
+  );
+  if (!tx) return res.status(404).json({ detail: "Pesanan top up tidak ditemukan" });
+  if (tx.payment_status !== "paid") {
+    return res.status(400).json({ detail: "Pesanan belum lunas. Konfirmasi pembayaran terlebih dahulu sebelum cek ke Digiflazz." });
+  }
+  const dfRes = await dispatchOrCheckDigiflazzTransaction(tx, {
+    reason: "admin_manual_check",
+    force: true,
+  });
+  res.json({
+    ok: dfRes.ok,
+    status: dfRes.status,
+    rc: dfRes.rc || null,
+    sn: dfRes.sn || null,
+    message: dfRes.message,
+    order: tx,
+  });
+});
+
+admin.post("/topup/check-sku-health", async (_req, res) => {
+  const summary = await checkAndSyncDigiflazzSkuHealth("admin_manual");
+  res.json(summary);
 });
 
 admin.get("/topup/integration", (_req, res) => {
@@ -12944,6 +13692,33 @@ admin.get("/topup/integration", (_req, res) => {
     .filter((x) => x.total === 0)
     .sort((a, b) => a.game.localeCompare(b.game));
 
+  let totalSkus = 0;
+  let problemSkus = 0;
+  const problemItems: Array<{
+    game_name: string;
+    game_slug: string;
+    sku: string;
+    label: string;
+    reason: string;
+  }> = [];
+  for (const g of db.games || []) {
+    for (const d of g.denominations || []) {
+      const skuKey = String(d.vendor_sku || "").trim().toUpperCase();
+      if (!skuKey) continue;
+      totalSkus++;
+      if (d.digiflazz_problem) {
+        problemSkus++;
+        problemItems.push({
+          game_name: g.name,
+          game_slug: g.slug,
+          sku: skuKey,
+          label: d.label || d.code,
+          reason: d.digiflazz_status_note || "Gangguan di Digiflazz (Auto-Hide)",
+        });
+      }
+    }
+  }
+
   const rawUser = String(activeRow.config?.username || process.env.DIGIFLAZZ_USERNAME || "").trim();
   const rawKey = String(
     (activeRow.config?.use_dev ? activeRow.config?.dev_key : activeRow.config?.api_key) ||
@@ -12953,6 +13728,22 @@ admin.get("/topup/integration", (_req, res) => {
   ).trim();
   const hasRealCreds = !isDemoDigiflazzCredential(rawUser, rawKey);
   const hasBalance = hasRealCreds && typeof activeRow.cached_balance === "number";
+
+  const skuHealth = activeRow.sku_health || {
+    ok: hasRealCreds,
+    interval_minutes: 5,
+    last_checked_at: activeRow.cached_pricelist_at || null,
+    total_skus: totalSkus,
+    healthy_skus: Math.max(0, totalSkus - problemSkus),
+    problem_skus: problemSkus,
+    problem_items: problemItems.slice(0, 50),
+    message:
+      problemSkus > 0
+        ? `${problemSkus} SKU sedang gangguan & otomatis di-hide`
+        : totalSkus > 0
+          ? `Semua ${totalSkus} SKU aktif & normal`
+          : "Belum ada SKU yang ditarik dari Digiflazz",
+  };
 
   res.json({
     active: {
@@ -12966,6 +13757,11 @@ admin.get("/topup/integration", (_req, res) => {
           ? "db"
           : "env"
         : "none",
+      webhook_url: `${FRONTEND_URL}/api/webhook/digiflazz`,
+      callback_url: `${FRONTEND_URL}/api/callback/digiflazz`,
+      webhook_secret_set: Boolean(
+        String(activeRow.config?.webhook_secret || process.env.DIGIFLAZZ_WEBHOOK_SECRET || "").trim()
+      ),
     },
     active_id: activeRow.id || "vp-digiflazz",
     vendors: db.topup_providers.filter((v) => v.kind === "digiflazz").map(maskedVendorView),
@@ -12979,6 +13775,14 @@ admin.get("/topup/integration", (_req, res) => {
           ? "Klik Cek Saldo untuk sinkronisasi saldo Digiflazz"
           : "Kredensial Digiflazz belum dikonfigurasi",
     },
+    sku_health: {
+      ...skuHealth,
+      total_skus: totalSkus,
+      healthy_skus: Math.max(0, totalSkus - problemSkus),
+      problem_skus: problemSkus,
+      problem_items: problemItems.slice(0, 50),
+    },
+    webhook_logs: Array.isArray(activeRow.webhook_logs) ? activeRow.webhook_logs.slice(0, 15) : [],
     games_without_sku: missingSku,
     products_unsynced: 0,
     orders: {
@@ -12986,6 +13790,8 @@ admin.get("/topup/integration", (_req, res) => {
       waiting_approval: orderRows.filter((o) => o.status === "waiting_approval").length,
       paid_undelivered: orderRows.filter((o) => o.payment_status === "paid" && o.status !== "delivered").length,
       delivered: orderRows.filter((o) => o.status === "delivered").length,
+      digiflazz_pending: orderRows.filter((o) => o.payment_status === "paid" && o.digiflazz_status === "Pending").length,
+      digiflazz_failed: orderRows.filter((o) => o.payment_status === "paid" && o.digiflazz_status === "Gagal").length,
       total: orderRows.length,
     },
   });
@@ -14003,6 +14809,19 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`WillJustPlay server listening on http://0.0.0.0:${PORT}`);
+
+    // Initial Digiflazz SKU health check 8 seconds after boot, then every 5 minutes
+    setTimeout(() => {
+      void checkAndSyncDigiflazzSkuHealth("startup_check");
+    }, 8 * 1000);
+    setInterval(() => {
+      void checkAndSyncDigiflazzSkuHealth("periodic_5m");
+    }, 5 * 60 * 1000);
+
+    // Periodic check for paid Top Up transactions still Pending in Digiflazz (every 45 seconds)
+    setInterval(() => {
+      void pollPendingDigiflazzTransactions();
+    }, 45 * 1000);
   });
 }
 
