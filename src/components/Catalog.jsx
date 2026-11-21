@@ -11,7 +11,6 @@ import {
   SlidersHorizontal,
   ArrowUpRight,
   Sparkles,
-  CheckCircle2,
   RotateCcw,
   Star,
 } from "lucide-react";
@@ -52,7 +51,6 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
   const [category, setCategory] = useState("Semua Kategori");
   const [sort, setSort] = useState("populer");
   const [q, setQ] = useState("");
-  const [onlyReady, setOnlyReady] = useState(false);
   const [onlyPromo, setOnlyPromo] = useState(false);
   const [mobileCompact, setMobileCompact] = useState(true);
 
@@ -102,19 +100,13 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
         p.title.toLowerCase().includes(q.toLowerCase()) ||
         (p.game || "").toLowerCase().includes(q.toLowerCase()) ||
         (p.category || "").toLowerCase().includes(q.toLowerCase());
-      const matchReady =
-        !onlyReady ||
-        ((p.stock ?? 1) > 0 &&
-          String(p.condition || "ready").toLowerCase() !== "sold");
       const matchPromo =
         !onlyPromo ||
         (p.original_price && p.original_price > p.price) ||
         (p.badges || []).includes("Diskon Hot") ||
         p.badge === "Diskon Hot";
 
-      return (
-        matchGame && matchCat && matchQuery && matchReady && matchPromo
-      );
+      return matchGame && matchCat && matchQuery && matchPromo;
     });
     const sorters = {
       termurah: (a, b) => a.price - b.price,
@@ -124,14 +116,13 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
         new Date(b.created_at || 0) - new Date(a.created_at || 0),
     };
     return [...list].sort(sorters[sort]);
-  }, [storeProducts, game, category, q, sort, onlyReady, onlyPromo]);
+  }, [storeProducts, game, category, q, sort, onlyPromo]);
 
   const resetFilters = () => {
     setGame("Semua Game");
     setCategory("Semua Kategori");
     setQ("");
     setSort("populer");
-    setOnlyReady(false);
     setOnlyPromo(false);
   };
 
@@ -278,22 +269,6 @@ export const Catalog = ({ products = [], loading = false, onSelect }) => {
                   </button>
                 );
               })}
-            </div>
-
-            {/* Quick Status Filter Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-              <button
-                type="button"
-                onClick={() => setOnlyReady((v) => !v)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-mono font-semibold uppercase tracking-wider border transition-all shrink-0 active:scale-95 ${
-                  onlyReady
-                    ? "border-lime bg-lime/15 text-lime shadow-[0_0_14px_rgba(163,230,53,0.2)]"
-                    : "border-line/80 bg-panel/60 text-slate-400 hover:text-slate-200 hover:border-slate-600"
-                }`}
-              >
-                <CheckCircle2 size={12} className={onlyReady ? "text-lime" : "text-slate-500"} />
-                <span>{t("Stok Ready", "In Stock")}</span>
-              </button>
             </div>
           </div>
 
