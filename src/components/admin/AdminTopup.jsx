@@ -6,6 +6,13 @@ import {
 import { toast } from "sonner";
 import { api, formatIDR, formatApiError, imgSrc } from "@/lib/api";
 
+import {
+  slugify,
+  resolveSkuGroup,
+  resolveBuiltInDigiflazzFields,
+  resolveCustomerNoFormatLabel,
+} from "@/lib/topupUtils";
+
 const inputCls =
   "mt-1.5 w-full bg-void border border-line focus:border-neon/60 outline-none text-xs font-mono px-3 py-2.5 placeholder:text-slate-600 transition-colors";
 const labelCls = "block text-[10px] uppercase tracking-[0.2em] text-slate-500";
@@ -24,104 +31,6 @@ const EMPTY_GAME = {
   vendor_prefix: "", cek_id_sku: "", vendor_id: "vp-digiflazz",
   fields: [{ ...EMPTY_FIELD, key: "user_id", label: "User ID" }],
   denominations: [],
-};
-
-const resolveSkuGroup = (d) => {
-  const g = String(d?.sku_group || "").trim().toLowerCase();
-  if (g === "membership" || g === "currency") return g;
-  const hay = `${d?.vendor_sku || d?.sku || ""} ${d?.code || ""} ${d?.label || d?.name || ""} ${d?.badge || ""}`;
-  if (
-    /\b(membership|member|welkin|blessing|inter-knot|interknot|wdp|weekly\s*diamond\s*pass|twilight\s*pass|starlight|supply\s*pass|express\s*supply|lunite\s*subscription|royale\s*pass|booyah\s*pass|elite\s*pass|battle\s*pass|season\s*pass|star\s*pass|premium\s*pass|monthly\s*card|weekly\s*card|monthly\s*pass|weekly\s*pass|vip\s*card|kartu\s*bulanan|kartu\s*mingguan|berkah|langganan|subscription|pass|paket\s*mingguan|paket\s*bulanan|level\s*up\s*pass)\b/i.test(
-      hay
-    )
-  ) {
-    return "membership";
-  }
-  return "currency";
-};
-
-const slugify = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-const resolveBuiltInDigiflazzFields = (gameOrMeta, allGames = []) => {
-  const slug = slugify(gameOrMeta?.slug || gameOrMeta?.name || "");
-  const prefix = String(gameOrMeta?.vendor_prefix || "").trim().toUpperCase();
-
-  const matchedExisting = (allGames || []).find(
-    (g) =>
-      String(g.slug || "").toLowerCase() === slug ||
-      (prefix && String(g.vendor_prefix || "").toUpperCase() === prefix)
-  );
-  if (matchedExisting && Array.isArray(matchedExisting.fields) && matchedExisting.fields.length > 0) {
-    return matchedExisting.fields;
-  }
-
-  if (
-    slug.includes("mobile-legends") ||
-    slug.includes("magic-chess") ||
-    prefix === "ML" ||
-    prefix === "MCGG"
-  ) {
-    return [
-      { key: "user_id", label: "User ID", placeholder: "123456789", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 15, pattern: "^[0-9]{5,15}$", help: "Masukkan angka User ID sesuai profil game Anda" },
-      { key: "zone_id", label: "Zone ID", placeholder: "1234", type: "text", inputmode: "numeric", required: true, min_len: 3, max_len: 6, pattern: "^[0-9]{3,6}$", help: "Masukkan angka Zone ID (di dalam tanda kurung)" },
-    ];
-  }
-
-  if (
-    slug.includes("genshin") ||
-    slug.includes("zenless") ||
-    slug.includes("honkai-star-rail") ||
-    prefix === "GI" ||
-    prefix === "ZZZ" ||
-    prefix === "HSR"
-  ) {
-    return [
-      { key: "user_id", label: "UID", placeholder: "800123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "Masukkan UID angka akun HoYoverse Anda" },
-      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, options: ["Asia", "America", "Europe", "TW, HK, MO"], help: "Pilih server akun HoYoverse Anda" },
-    ];
-  }
-
-  if (slug.includes("wuthering") || prefix === "WW") {
-    return [
-      { key: "user_id", label: "UID", placeholder: "900123456", type: "text", inputmode: "numeric", required: true, min_len: 8, max_len: 12, pattern: "^[0-9]{8,12}$", help: "Masukkan 9 digit UID Wuthering Waves" },
-      { key: "server", label: "Server", placeholder: "Pilih Server", type: "select", inputmode: "text", required: true, min_len: 2, max_len: 20, options: ["SEA", "Asia", "America", "Europe", "HMT (HK, MO, TW)"], help: "Pilih server Wuthering Waves Anda" },
-    ];
-  }
-
-  if (slug.includes("ragnarok") || prefix === "ROM" || prefix === "ROO") {
-    return [
-      { key: "user_id", label: "Role ID / Character ID", placeholder: "4300123456", type: "text", inputmode: "numeric", required: true, min_len: 5, max_len: 16, pattern: "^[0-9]{5,16}$", help: "Masukkan angka Role ID / Character ID karakter Anda" },
-      { key: "server", label: "Server", placeholder: "Nama Server", type: "text", inputmode: "text", required: true, min_len: 2, max_len: 30, help: "Masukkan nama Server karakter Anda" },
-    ];
-  }
-
-  if (slug.includes("valorant") || slug.includes("wild-rift") || prefix === "VAL" || prefix === "WR") {
-    return [
-      { key: "riot_id", label: "Riot ID#Tag", placeholder: "Player#IDN", type: "text", inputmode: "text", required: true, min_len: 4, max_len: 32, help: "Format wajib: Nickname#Tag (Contoh: Player#IDN)" },
-    ];
-  }
-
-  if (Array.isArray(gameOrMeta?.fields) && gameOrMeta.fields.length > 0) {
-    return gameOrMeta.fields;
-  }
-
-  return [
-    { key: "user_id", label: "User ID / Player ID", placeholder: "Masukkan ID Akun Game", type: "text", inputmode: "numeric", required: true, min_len: 4, max_len: 24, help: "Masukkan User ID / Player ID sesuai profil di dalam game" },
-  ];
-};
-
-const resolveCustomerNoFormatLabel = (fields = []) => {
-  const keys = fields.map((f) => f.key);
-  if (keys.includes("user_id") && keys.includes("zone_id")) {
-    return "{user_id}{zone_id} (Digabung otomatis ke Digiflazz)";
-  }
-  if (keys.includes("riot_id")) {
-    return "{riot_id} (Nickname#Tag)";
-  }
-  if (keys.includes("user_id") && keys.includes("server")) {
-    return "{user_id} + {server}";
-  }
-  return "{user_id}";
 };
 
 const statusStyle = (o) => {

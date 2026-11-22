@@ -39,6 +39,7 @@ export const validateTopupDestination = async (gameSlug, destination) => {
       ok: !!data.valid,
       format_valid: data.format_valid !== false,
       checked: !!data.checked,
+      warning: Boolean(data.warning || data.code === "CEK_ID_DISRUPTED"),
       code: data.code || (data.valid ? "VERIFIED" : "UNVERIFIED"),
       nickname: data.nickname || "",
       sn: data.sn || "",
@@ -56,16 +57,19 @@ export const validateTopupDestination = async (gameSlug, destination) => {
         ok: false,
         format_valid: false,
         checked: false,
+        warning: false,
         code: "FORMAT_INVALID",
-        message: err.response?.data?.detail || "Data tidak valid",
+        message: err.response?.data?.detail || "Data ID atau Server tidak valid",
       };
     }
     return {
       ok: true,
       format_valid: true,
       checked: false,
-      code: "DIRECT_ID_OK",
-      message: "Format ID tujuan sesuai dan siap diproses.",
+      warning: true,
+      code: "CEK_ID_DISRUPTED",
+      message:
+        "Server Cek ID sedang gangguan sementara. Pastikan kembali User ID dan Server Anda sudah benar sebelum melanjutkan pembayaran.",
     };
   }
 };

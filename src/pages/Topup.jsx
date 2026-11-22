@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 import { TopupGameGrid } from "@/components/topup/TopupGameGrid";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTopupGames } from "@/hooks/useTopup";

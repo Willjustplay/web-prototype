@@ -31,7 +31,7 @@ import {
   removeActiveClientSession,
 } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { ReviewModal } from "@/components/ReviewModal";
+import { ReviewModal } from "@/components/store/ReviewModal";
 
 function parseClientDeliveryInfo(rawInput, serverStructured) {
   if (serverStructured && serverStructured.is_structured) {
@@ -678,7 +678,12 @@ export default function PaymentSuccess() {
             </h1>
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
               {isWalletTopupOrder
-                ? `Saldo sebesar ${formatIDR(txData?.amount || 0)} telah berhasil ditambahkan ke Saldo Akun Anda.`
+                ? `Saldo sebesar ${formatIDR(
+                    txData?.wallet_credited_amount ||
+                      txData?.base_amount ||
+                      txData?.amount ||
+                      0
+                  )} telah berhasil ditambahkan ke Saldo Akun Anda.`
                 : isTopupOrder && (txData?.digiflazz_status === "Gagal" || txData?.wallet_refunded)
                 ? `Pembayaran Anda telah lunas, namun karena terjadi ${
                     txData?.wallet_refund_category === "wrong_id"
@@ -858,6 +863,22 @@ export default function PaymentSuccess() {
                       </dd>
                     </div>
                   )}
+                  {Number(txData.fee_amount || txData.admin_fee || 0) > 0 && (
+                    <>
+                      <div className="flex justify-between gap-3 pt-1.5 border-t border-line/60">
+                        <dt className="text-slate-400">Harga Produk</dt>
+                        <dd className="text-slate-200 tabular-nums">
+                          {formatIDR(txData.base_amount || txData.amount || 0)}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-slate-400">Biaya Admin Payment Gateway</dt>
+                        <dd className="text-amber-300 font-semibold tabular-nums">
+                          +{formatIDR(txData.fee_amount || txData.admin_fee || 0)}
+                        </dd>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between gap-3 pt-1.5 border-t border-line/60">
                     <dt className="text-slate-300 font-semibold">Total Dibayar</dt>
                     <dd className="text-lime font-bold">
@@ -876,9 +897,30 @@ export default function PaymentSuccess() {
                 <div className="flex items-center justify-between text-xs font-mono">
                   <span className="text-slate-300">Nominal Saldo Ditambahkan</span>
                   <strong className="text-lime text-sm font-extrabold">
-                    +{formatIDR(txData?.amount || 0)}
+                    +{formatIDR(
+                      txData?.wallet_credited_amount ||
+                        txData?.base_amount ||
+                        txData?.amount ||
+                        0
+                    )}
                   </strong>
                 </div>
+                {Number(txData?.fee_amount || txData?.admin_fee || 0) > 0 && (
+                  <div className="pt-1.5 border-t border-line/60 space-y-1 text-xs font-mono">
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Biaya Admin Payment Gateway</span>
+                      <span className="text-amber-300">
+                        +{formatIDR(txData?.fee_amount || txData?.admin_fee || 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-200 font-semibold">
+                      <span>Total Dibayar</span>
+                      <span className="text-neon">
+                        {formatIDR(txData?.pay_amount || txData?.amount || 0)}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <p className="text-xs font-mono text-slate-300 leading-relaxed">
                   {delivery ||
                     "Saldo Akun Anda sudah aktif dan dapat langsung digunakan untuk membeli Produk Akun maupun Top Up Game."}
@@ -1699,8 +1741,8 @@ export default function PaymentSuccess() {
                       )}
                       {feeAmount > 0 && (
                         <div className="flex items-center justify-between text-xs font-mono text-slate-400 tabular-nums">
-                          <span>Biaya Layanan</span>
-                          <span className="text-slate-200">
+                          <span>Biaya Admin Payment Gateway</span>
+                          <span className="text-amber-300 font-semibold">
                             +{formatIDR(feeAmount)}
                           </span>
                         </div>

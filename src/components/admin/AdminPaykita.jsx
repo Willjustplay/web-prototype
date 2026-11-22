@@ -738,7 +738,32 @@ export function AdminPaykita() {
   const [enabledMethods, setEnabledMethods] = useState([]);
   const [apiKey, setApiKey] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
+  const [adminFeeFlat, setAdminFeeFlat] = useState(0);
+  const [adminFeePercent, setAdminFeePercent] = useState(0);
+  const [channelFees, setChannelFees] = useState({});
+  const [editingChannelFeeCode, setEditingChannelFeeCode] = useState(null);
+  const [feeSimBase, setFeeSimBase] = useState(50000);
   const [testResult, setTestResult] = useState(null);
+
+  const formatRupiah = (n) =>
+    `Rp ${Math.max(0, Math.round(Number(n || 0))).toLocaleString("id-ID")}`;
+
+  const formatFeeSummary = (flatVal, pctVal) => {
+    const f = Math.max(0, Math.round(Number(flatVal || 0)));
+    const p = Math.max(0, Number(Number(pctVal || 0).toFixed(2)));
+    if (f > 0 && p > 0) return `+${formatRupiah(f)} + ${p}%`;
+    if (f > 0) return `+${formatRupiah(f)}`;
+    if (p > 0) return `+${p}%`;
+    return "Rp 0 (Bebas Admin)";
+  };
+
+  const computePreviewFee = (base, flatVal, pctVal) => {
+    const b = Math.max(0, Math.round(Number(base || 0)));
+    const f = Math.max(0, Math.round(Number(flatVal || 0)));
+    const p = Math.max(0, Number(pctVal || 0));
+    if (b <= 0) return 0;
+    return Math.max(0, Math.round(f + (b * p) / 100));
+  };
 
   const getCatalogForTab = (tabId) => {
     return GATEWAY_CHANNELS_MAP[tabId] || DUITKU_CHANNELS_CATALOG;
@@ -768,9 +793,76 @@ export function AdminPaykita() {
         ? gw.enabled_methods
         : defaultCodes
     );
+    setAdminFeeFlat(Math.max(0, Math.round(Number(gw.admin_fee_flat || 0))));
+    setAdminFeePercent(
+      Math.max(0, Number(Number(gw.admin_fee_percent || 0).toFixed(2)))
+    );
+    setChannelFees(
+      gw.channel_fees && typeof gw.channel_fees === "object"
+        ? gw.channel_fees
+        : {}
+    );
+    setEditingChannelFeeCode(null);
     setApiKey("");
     setWebhookSecret("");
     setTestResult(gw.last_test || null);
+  };
+
+  const updateChannelFeeEntry = (code, patch) => {
+    const cleanCode = String(code || "").trim().toUpperCase();
+    if (!cleanCode) return;
+    setChannelFees((prev) => {
+      const existing = prev[cleanCode] || {
+        flat: Number(adminFeeFlat || 0),
+        percent: Number(adminFeePercent || 0),
+        use_custom: false,
+      };
+      const merged = { ...existing, ...patch };
+      const flat = Math.max(0, Math.round(Number(merged.flat || 0)));
+      const percent = Math.max(
+        0,
+        Math.min(100, Number(Number(merged.percent || 0).toFixed(2)))
+      );
+      const useCustom = Boolean(merged.use_custom);
+      return {
+        ...prev,
+        [cleanCode]: {
+          flat,
+          percent,
+          use_custom: useCustom,
+        },
+      };
+    });
+  };
+
+  const applyCategoryFeePreset = (category, flat, percent) => {
+    const catalog = getCatalogForTab(selectedTab);
+    setChannelFees((prev) => {
+      const next = { ...prev };
+      for (const ch of catalog) {
+        if (!category || ch.category === category) {
+          next[ch.code] = {
+            flat: Math.max(0, Math.round(Number(flat || 0))),
+            percent: Math.max(0, Number(Number(percent || 0).toFixed(2))),
+            use_custom: true,
+          };
+        }
+      }
+      return next;
+    });
+    toast.success(
+      `Tarif admin kategori ${
+        category ? category.toUpperCase() : "Semua Channel"
+      } diterapkan (${formatFeeSummary(flat, percent)}). Klik Simpan Pengaturan untuk menyimpan.`
+    );
+  };
+
+  const resetAllChannelFeesToDefault = () => {
+    setChannelFees({});
+    setEditingChannelFeeCode(null);
+    toast.info(
+      "Semua channel dikembalikan mengikuti Biaya Admin Default Gateway."
+    );
   };
 
   const load = async (preserveTab = false) => {
@@ -847,6 +939,12 @@ export function AdminPaykita() {
       merchant_code: merchantCode.trim(),
       payment_method: paymentMethod,
       enabled_methods: enabledMethods,
+      admin_fee_flat: Math.max(0, Math.round(Number(adminFeeFlat || 0))),
+      admin_fee_percent: Math.max(
+        0,
+        Math.min(100, Number(Number(adminFeePercent || 0).toFixed(2)))
+      ),
+      channel_fees: channelFees,
     };
     if (apiKey.trim()) payload.api_key = apiKey.trim();
     if (webhookSecret.trim()) {
@@ -1108,11 +1206,15 @@ export function AdminPaykita() {
                   </span>
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-[hsl(var(--border))]/60 flex items-center justify-between w-full text-[11px]">
+                <div className="mt-3 pt-2.5 border-t border-[hsl(var(--border))]/60 flex items-center justify-between gap-2 w-full text-[11px]">
                   <span className="text-[hsl(var(--muted-foreground))] truncate">
                     {gw.id === "paykita"
-                      ? "QRIS Otomatis Beranda & Top Up"
-                      : `${enabledChannelCount} Channel Top Up Aktif`}
+                      ? "QRIS Beranda & Top Up"
+                      : `${enabledChannelCount} Channel Aktif`}
+                    {" · "}
+                    <strong className="text-[hsl(var(--foreground))] font-mono">
+                      Admin: {formatFeeSummary(gwState.admin_fee_flat, gwState.admin_fee_percent)}
+                    </strong>
                   </span>
                   <span className="inline-flex items-center gap-1.5 font-mono text-[10px] shrink-0">
                     <span
@@ -1214,6 +1316,152 @@ export function AdminPaykita() {
           )}
         </div>
 
+        {/* Pengaturan Biaya Admin Payment Gateway (Rp & %) */}
+        <div
+          className="rounded-2xl border border-[hsl(var(--accent))]/35 bg-[hsl(var(--accent))]/5 p-4 space-y-4"
+          data-testid="gateway-admin-fee-section"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[hsl(var(--border))]">
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[hsl(var(--foreground))] flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-[hsl(var(--accent))]" />
+                Penyesuaian Biaya Admin Payment Gateway ({currentMeta.name})
+              </h4>
+              <p className="text-[11px] text-[hsl(var(--muted-foreground))] mt-0.5">
+                Atur biaya tambahan admin yang ditarik oleh {currentMeta.name} (kombinasi nominal tetap Rp dan persentase %). Otomatis ditambahkan ke harga di halaman Top Up Game, Produk Beranda, dan Isi Saldo Akun.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { label: "Bebas Admin (0)", flat: 0, pct: 0 },
+                { label: "QRIS 0.7%", flat: 0, pct: 0.7 },
+                { label: "Rp 1.000 + 0.7%", flat: 1000, pct: 0.7 },
+                { label: "VA Rp 4.000", flat: 4000, pct: 0 },
+                { label: "E-Wallet 1.5%", flat: 0, pct: 1.5 },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    setAdminFeeFlat(preset.flat);
+                    setAdminFeePercent(preset.pct);
+                  }}
+                  className="px-2.5 py-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--accent))] text-[10px] font-semibold transition-colors cursor-pointer"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold block">
+                Biaya Admin Default Tetap (Rp)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-[hsl(var(--muted-foreground))]">
+                  Rp
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={adminFeeFlat}
+                  onChange={(e) =>
+                    setAdminFeeFlat(
+                      Math.max(0, Math.round(Number(e.target.value || 0)))
+                    )
+                  }
+                  data-testid="gateway-admin-fee-flat-input"
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs font-mono focus:outline-none focus:border-[hsl(var(--foreground))]"
+                  placeholder="0"
+                />
+              </div>
+              <p className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                Nominal tetap yang ditambahkan per transaksi (contoh: Rp 1.000 atau Rp 4.000).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold block">
+                Biaya Admin Default Persentase (%)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.05}
+                  value={adminFeePercent}
+                  onChange={(e) =>
+                    setAdminFeePercent(
+                      Math.max(
+                        0,
+                        Math.min(100, Number(e.target.value || 0))
+                      )
+                    )
+                  }
+                  data-testid="gateway-admin-fee-percent-input"
+                  className="w-full pl-3.5 pr-9 py-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-xs font-mono focus:outline-none focus:border-[hsl(var(--foreground))]"
+                  placeholder="0.7"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-[hsl(var(--muted-foreground))]">
+                  %
+                </span>
+              </div>
+              <p className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                Persentase dari harga dasar produk (contoh: 0.7 untuk QRIS 0.7%).
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                  Simulasi Harga Produk
+                </span>
+                <input
+                  type="number"
+                  min={1000}
+                  step={5000}
+                  value={feeSimBase}
+                  onChange={(e) =>
+                    setFeeSimBase(
+                      Math.max(0, Math.round(Number(e.target.value || 0)))
+                    )
+                  }
+                  className="w-24 px-2 py-0.5 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[11px] font-mono text-right"
+                />
+              </div>
+              {(() => {
+                const simFee = computePreviewFee(
+                  feeSimBase,
+                  adminFeeFlat,
+                  adminFeePercent
+                );
+                const simTotal = Math.max(0, Math.round(Number(feeSimBase || 0))) + simFee;
+                return (
+                  <div className="text-xs font-mono space-y-0.5 pt-1 border-t border-[hsl(var(--border))]/60">
+                    <div className="flex justify-between text-[11px] text-[hsl(var(--muted-foreground))]">
+                      <span>Biaya Admin Default:</span>
+                      <strong className="text-[hsl(var(--foreground))]">
+                        +{formatRupiah(simFee)} ({formatFeeSummary(adminFeeFlat, adminFeePercent)})
+                      </strong>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold">
+                      <span>Total Tagihan:</span>
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {formatRupiah(simTotal)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+
         {/* Merchant Code & Default Channel Row for Multi-Method Gateways */}
         {(currentMeta.hasMerchantCode || currentMeta.hasMultiChannels) && (
           <div className="grid sm:grid-cols-2 gap-4">
@@ -1278,13 +1526,48 @@ export function AdminPaykita() {
             <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[hsl(var(--border))]">
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[hsl(var(--foreground))]">
-                  Daftar Channel Pembayaran {currentMeta.name} yang Diaktifkan ({enabledMethods.length}/{allCurrentCodes.length})
+                  Daftar Channel &amp; Tarif Biaya Admin Per Channel {currentMeta.name} ({enabledMethods.length}/{allCurrentCodes.length} Aktif)
                 </h4>
                 <p className="text-[11px] text-[hsl(var(--muted-foreground))] mt-0.5">
-                  Klik metode di bawah untuk mengaktifkan atau menonaktifkan channel {currentMeta.name} di halaman Top Up Game.
+                  Aktifkan channel dan klik <strong>&ldquo;Atur Biaya Admin&rdquo;</strong> pada channel tertentu jika tarifnya berbeda dari Biaya Admin Default Gateway.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => applyCategoryFeePreset("qris", 0, 0.7)}
+                  className="px-2.5 py-1.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--accent))] text-[10px] font-semibold transition-colors cursor-pointer"
+                >
+                  Set Semua QRIS 0.7%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCategoryFeePreset("va", 4000, 0)}
+                  className="px-2.5 py-1.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--accent))] text-[10px] font-semibold transition-colors cursor-pointer"
+                >
+                  Set Semua VA Rp 4.000
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCategoryFeePreset("ewallet", 0, 1.5)}
+                  className="px-2.5 py-1.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--accent))] text-[10px] font-semibold transition-colors cursor-pointer"
+                >
+                  Set Semua E-Wallet 1.5%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCategoryFeePreset("retail", 5000, 0)}
+                  className="px-2.5 py-1.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--accent))] text-[10px] font-semibold transition-colors cursor-pointer"
+                >
+                  Set Semua Retail Rp 5.000
+                </button>
+                <button
+                  type="button"
+                  onClick={resetAllChannelFeesToDefault}
+                  className="px-2.5 py-1.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-rose-500/50 text-[10px] font-semibold transition-colors cursor-pointer"
+                >
+                  Reset Tarif ke Default
+                </button>
                 <button
                   type="button"
                   onClick={() => setEnabledMethods(allCurrentCodes)}
@@ -1309,48 +1592,176 @@ export function AdminPaykita() {
                       <GroupIcon className="w-3.5 h-3.5 text-[hsl(var(--accent))]" />
                       <span>{grp.label}</span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                       {channelsInGroup.map((ch) => {
                         const isChActive = enabledMethods.includes(ch.code);
                         const isDefault = paymentMethod === ch.code;
+                        const customEntry = channelFees[ch.code] || null;
+                        const hasCustomFee = Boolean(customEntry?.use_custom);
+                        const effectiveFlat = hasCustomFee
+                          ? Number(customEntry?.flat || 0)
+                          : Number(adminFeeFlat || 0);
+                        const effectivePct = hasCustomFee
+                          ? Number(customEntry?.percent || 0)
+                          : Number(adminFeePercent || 0);
+                        const isEditingThis = editingChannelFeeCode === ch.code;
+
                         return (
-                          <button
+                          <div
                             key={ch.code}
-                            type="button"
-                            onClick={() => toggleGatewayChannel(ch.code)}
-                            data-testid={`duitku-channel-toggle-${ch.code}`}
-                            className={`flex items-start justify-between gap-2 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            className={`rounded-xl border transition-all flex flex-col justify-between ${
                               isChActive
                                 ? "border-[hsl(var(--accent))]/60 bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-2xs"
-                                : "border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 text-[hsl(var(--muted-foreground))] opacity-60 hover:opacity-90"
+                                : "border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 text-[hsl(var(--muted-foreground))] opacity-65 hover:opacity-95"
                             }`}
                           >
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]">
-                                  {ch.code}
-                                </span>
-                                <span className="text-xs font-semibold truncate">
-                                  {ch.name}
-                                </span>
-                                {isDefault && isChActive && (
-                                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-lime/20 text-lime">
-                                    Utama
+                            <button
+                              type="button"
+                              onClick={() => toggleGatewayChannel(ch.code)}
+                              data-testid={`duitku-channel-toggle-${ch.code}`}
+                              className="flex items-start justify-between gap-2 p-2.5 text-left w-full cursor-pointer"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]">
+                                    {ch.code}
                                   </span>
-                                )}
+                                  <span className="text-xs font-semibold truncate">
+                                    {ch.name}
+                                  </span>
+                                  {isDefault && isChActive && (
+                                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-lime/20 text-lime">
+                                      Utama
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-1 truncate">
+                                  {ch.desc}
+                                </p>
                               </div>
-                              <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-1 truncate">
-                                {ch.desc}
-                              </p>
+                              <CheckCircle2
+                                className={`w-4 h-4 shrink-0 mt-0.5 ${
+                                  isChActive
+                                    ? "text-emerald-500"
+                                    : "text-[hsl(var(--muted-foreground))]/40"
+                                }`}
+                              />
+                            </button>
+
+                            <div className="px-2.5 pb-2.5 pt-1.5 border-t border-[hsl(var(--border))]/60 space-y-2">
+                              <div className="flex items-center justify-between gap-2 text-[10px]">
+                                <span
+                                  className={`font-mono px-1.5 py-0.5 rounded ${
+                                    hasCustomFee
+                                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-300 font-semibold"
+                                      : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+                                  }`}
+                                >
+                                  {hasCustomFee ? "Tarif Khusus: " : "Default: "}
+                                  {formatFeeSummary(effectiveFlat, effectivePct)}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditingChannelFeeCode(
+                                      isEditingThis ? null : ch.code
+                                    )
+                                  }
+                                  data-testid={`channel-fee-edit-btn-${ch.code}`}
+                                  className="text-[10px] font-semibold text-[hsl(var(--accent))] hover:underline cursor-pointer shrink-0"
+                                >
+                                  {isEditingThis ? "Tutup" : "Atur Biaya Admin"}
+                                </button>
+                              </div>
+
+                              {isEditingThis && (
+                                <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 p-2 space-y-2 text-[11px]">
+                                  <label className="flex items-center justify-between gap-2 cursor-pointer">
+                                    <span className="font-semibold text-[10px]">
+                                      Gunakan Tarif Khusus Channel {ch.code}
+                                    </span>
+                                    <input
+                                      type="checkbox"
+                                      checked={hasCustomFee}
+                                      onChange={(e) =>
+                                        updateChannelFeeEntry(ch.code, {
+                                          use_custom: e.target.checked,
+                                          flat:
+                                            customEntry?.flat !== undefined
+                                              ? customEntry.flat
+                                              : adminFeeFlat,
+                                          percent:
+                                            customEntry?.percent !== undefined
+                                              ? customEntry.percent
+                                              : adminFeePercent,
+                                        })
+                                      }
+                                      data-testid={`channel-fee-custom-toggle-${ch.code}`}
+                                    />
+                                  </label>
+
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    <div>
+                                      <label className="block text-[9px] text-[hsl(var(--muted-foreground))] mb-0.5">
+                                        Tetap (Rp)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={100}
+                                        value={effectiveFlat}
+                                        onChange={(e) =>
+                                          updateChannelFeeEntry(ch.code, {
+                                            use_custom: true,
+                                            flat: e.target.value,
+                                            percent: effectivePct,
+                                          })
+                                        }
+                                        data-testid={`channel-fee-flat-${ch.code}`}
+                                        className="w-full px-2 py-1 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[11px] font-mono"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[9px] text-[hsl(var(--muted-foreground))] mb-0.5">
+                                        Persen (%)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        step={0.05}
+                                        value={effectivePct}
+                                        onChange={(e) =>
+                                          updateChannelFeeEntry(ch.code, {
+                                            use_custom: true,
+                                            flat: effectiveFlat,
+                                            percent: e.target.value,
+                                          })
+                                        }
+                                        data-testid={`channel-fee-percent-${ch.code}`}
+                                        className="w-full px-2 py-1 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[11px] font-mono"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-[10px] font-mono text-[hsl(var(--muted-foreground))] pt-1 border-t border-[hsl(var(--border))]/50">
+                                    <span>Simulasi {formatRupiah(feeSimBase)}:</span>
+                                    <strong className="text-[hsl(var(--foreground))]">
+                                      {formatRupiah(
+                                        Number(feeSimBase || 0) +
+                                          computePreviewFee(
+                                            feeSimBase,
+                                            effectiveFlat,
+                                            effectivePct
+                                          )
+                                      )}
+                                    </strong>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <CheckCircle2
-                              className={`w-4 h-4 shrink-0 mt-0.5 ${
-                                isChActive
-                                  ? "text-emerald-500"
-                                  : "text-[hsl(var(--muted-foreground))]/40"
-                              }`}
-                            />
-                          </button>
+                          </div>
                         );
                       })}
                     </div>

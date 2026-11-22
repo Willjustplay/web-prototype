@@ -43,15 +43,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatIDR, formatUSD, resolveUSD, imgSrc, formatApiError } from "@/lib/api";
-import { AdminTestimonials } from "@/components/AdminTestimonials";
-import { AdminPayment } from "@/components/AdminPayment";
-import { AdminPaykita } from "@/components/AdminPaykita";
-import { AdminSocials } from "@/components/AdminSocials";
-import { AdminTopup } from "@/components/AdminTopup";
-import { AdminUsers } from "@/components/AdminUsers";
-import { AdminAuditLogs } from "@/components/AdminAuditLogs";
-import { AdminEmailVerification } from "@/components/AdminEmailVerification";
-import { AdminDatabase } from "@/components/AdminDatabase";
+import { AdminTestimonials } from "@/components/admin/AdminTestimonials";
+import { AdminPayment } from "@/components/admin/AdminPayment";
+import { AdminPaykita } from "@/components/admin/AdminPaykita";
+import { AdminSocials } from "@/components/admin/AdminSocials";
+import { AdminTopup } from "@/components/admin/AdminTopup";
+import { AdminUsers } from "@/components/admin/AdminUsers";
+import { AdminAuditLogs } from "@/components/admin/AdminAuditLogs";
+import { AdminEmailVerification } from "@/components/admin/AdminEmailVerification";
+import { AdminDatabase } from "@/components/admin/AdminDatabase";
 import { useAuth } from "@/context/AuthContext";
 
 const CATEGORIES = ["Akun Game", "Jasa Joki", "Item Game", "Lainnya"];

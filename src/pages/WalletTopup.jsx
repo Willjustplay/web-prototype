@@ -18,8 +18,8 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/context/AuthContext";
 import {
   api,
@@ -98,6 +98,7 @@ export default function WalletTopup() {
   const [walletAmountInput, setWalletAmountInput] = useState("50000");
   const [walletUsdInput, setWalletUsdInput] = useState("5");
   const [walletPaymentType, setWalletPaymentType] = useState("manual");
+  const [walletMethods, setWalletMethods] = useState([]);
   const [manualDests, setManualDests] = useState([]);
   const [selectedManualDestId, setSelectedManualDestId] = useState("");
   const [selectedCryptoDestId, setSelectedCryptoDestId] = useState("");
@@ -152,6 +153,7 @@ export default function WalletTopup() {
 
         if (wMethods.status === "fulfilled" && Array.isArray(wMethods.value?.data)) {
           const list = wMethods.value.data;
+          setWalletMethods(list);
           if (list.length > 0) {
             setWalletPaymentType((cur) =>
               list.some((m) => m.id === cur) ? cur : list[0].id
@@ -676,52 +678,105 @@ export default function WalletTopup() {
                     </div>
 
                     {/* Total & Submit Bar */}
-                    <div className="rounded-xl bg-void/80 border border-line px-4 py-3 flex items-center justify-between gap-3">
-                      <div>
-                        <span className="block text-[10px] font-mono uppercase text-slate-400">
-                          {isCryptoMode ? "Total Bayar (USD → IDR)" : "Total Bayar"}
-                        </span>
-                        {isCryptoMode ? (
-                          <div className="flex flex-wrap items-baseline gap-2">
-                            <p
-                              data-testid="wallet-topup-total-preview"
-                              className="font-mono font-extrabold text-base sm:text-lg text-lime tabular-nums"
-                            >
-                              {formatUSD(parsedUsdAmount || 0)} USD
-                            </p>
-                            <span className="text-xs font-mono font-bold text-neon tabular-nums">
-                              &asymp; {formatIDR(parsedWalletAmount || 0)}
-                            </span>
-                          </div>
-                        ) : (
-                          <p
-                            data-testid="wallet-topup-total-preview"
-                            className="font-mono font-extrabold text-base sm:text-lg text-neon tabular-nums"
-                          >
-                            {formatIDR(parsedWalletAmount || 0)}
-                          </p>
-                        )}
-                      </div>
+                    {(() => {
+                      const paykitaWalletMethod = walletMethods.find(
+                        (m) => m.id === "paykita"
+                      );
+                      const gwFlat = Math.max(
+                        0,
+                        Math.round(
+                          Number(
+                            paykitaWalletMethod?.fee_flat ??
+                              paykitaWalletMethod?.admin_fee_flat ??
+                              0
+                          )
+                        )
+                      );
+                      const gwPct = Math.max(
+                        0,
+                        Number(
+                          paykitaWalletMethod?.fee_percent ??
+                            paykitaWalletMethod?.admin_fee_percent ??
+                            0
+                        )
+                      );
+                      const walletAdminFee =
+                        walletPaymentType === "paykita" && parsedWalletAmount > 0
+                          ? Math.max(
+                              0,
+                              Math.round(
+                                gwFlat + (parsedWalletAmount * gwPct) / 100
+                              )
+                            )
+                          : 0;
+                      const totalWalletPayAmount =
+                        (parsedWalletAmount || 0) + walletAdminFee;
 
-                      <button
-                        type="submit"
-                        disabled={submittingWalletTopup || parsedWalletAmount < minTopup}
-                        data-testid="wallet-topup-submit-btn"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-lime hover:bg-neon text-void font-display font-extrabold text-xs uppercase tracking-wider px-5 py-3 transition-colors disabled:opacity-50 cursor-pointer"
-                      >
-                        {submittingWalletTopup ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />
-                            <span>Memproses...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>Bayar Sekarang</span>
-                            <ArrowRight size={14} />
-                          </>
-                        )}
-                      </button>
-                    </div>
+                      return (
+                        <div className="rounded-xl bg-void/80 border border-line px-4 py-3 flex items-center justify-between gap-3">
+                          <div>
+                            <span className="block text-[10px] font-mono uppercase text-slate-400">
+                              {isCryptoMode
+                                ? "Total Bayar (USD → IDR)"
+                                : "Total Bayar"}
+                            </span>
+                            {isCryptoMode ? (
+                              <div className="flex flex-wrap items-baseline gap-2">
+                                <p
+                                  data-testid="wallet-topup-total-preview"
+                                  className="font-mono font-extrabold text-base sm:text-lg text-lime tabular-nums"
+                                >
+                                  {formatUSD(parsedUsdAmount || 0)} USD
+                                </p>
+                                <span className="text-xs font-mono font-bold text-neon tabular-nums">
+                                  &asymp; {formatIDR(parsedWalletAmount || 0)}
+                                </span>
+                              </div>
+                            ) : (
+                              <div>
+                                <p
+                                  data-testid="wallet-topup-total-preview"
+                                  className="font-mono font-extrabold text-base sm:text-lg text-neon tabular-nums"
+                                >
+                                  {formatIDR(totalWalletPayAmount)}
+                                </p>
+                                {walletAdminFee > 0 && (
+                                  <p
+                                    data-testid="wallet-topup-admin-fee-preview"
+                                    className="text-[10px] font-mono text-amber-300 tabular-nums mt-0.5"
+                                  >
+                                    Saldo diterima {formatIDR(parsedWalletAmount || 0)} + Biaya Admin{" "}
+                                    {formatIDR(walletAdminFee)}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={
+                              submittingWalletTopup ||
+                              parsedWalletAmount < minTopup
+                            }
+                            data-testid="wallet-topup-submit-btn"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-lime hover:bg-neon text-void font-display font-extrabold text-xs uppercase tracking-wider px-5 py-3 transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            {submittingWalletTopup ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>Memproses...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Bayar Sekarang</span>
+                                <ArrowRight size={14} />
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </form>
                 </div>
 

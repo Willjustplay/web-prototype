@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api, getLocalUserAvatar, saveLocalUserAvatar } from "@/lib/api";
-import { AuthModal } from "@/components/AuthModal";
+import { AuthModal } from "@/components/layout/AuthModal";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);

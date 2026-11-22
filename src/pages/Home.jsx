@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from '@/components/Navbar';
-import { Hero } from '@/components/Hero';
-import { Marquee } from '@/components/Marquee';
-import { Catalog } from '@/components/Catalog';
-import { HowItWorks } from '@/components/HowItWorks';
-import { Testimonials } from '@/components/Testimonials';
-import { Footer } from '@/components/Footer';
-import { ProductModal } from '@/components/ProductModal';
+import { Navbar } from '@/components/layout/Navbar';
+import { Hero } from '@/components/store/Hero';
+import { Marquee } from '@/components/store/Marquee';
+import { Catalog } from '@/components/store/Catalog';
+import { HowItWorks } from '@/components/store/HowItWorks';
+import { Testimonials } from '@/components/store/Testimonials';
+import { Footer } from '@/components/layout/Footer';
+import { ProductModal } from '@/components/store/ProductModal';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 

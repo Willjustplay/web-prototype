@@ -29,9 +29,14 @@ import {
   Plus,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
-import { DEFAULT_DUITKU_CHANNELS } from "@/components/topup/TopupPaymentStep";
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
+import { DEFAULT_DUITKU_CHANNELS } from "@/constants/paymentChannels";
+import {
+  slugify as slugifyId,
+  resolveSkuGroup as resolveDenomGroup,
+  translateFieldMeta,
+} from "@/lib/topupUtils";
 import {
   api,
   formatApiError,
@@ -44,88 +49,6 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTopupGames, validateTopupDestination, localFieldError } from "@/hooks/useTopup";
-
-const slugifyId = (v) =>
-  String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-const resolveDenomGroup = (d) => {
-  const g = String(d?.sku_group || "").trim().toLowerCase();
-  if (g === "membership" || g === "currency") return g;
-  const hay = `${d?.vendor_sku || ""} ${d?.code || ""} ${d?.label || ""} ${d?.badge || ""}`;
-  if (
-    /\b(membership|member|welkin|blessing|inter-knot|interknot|wdp|weekly\s*diamond\s*pass|twilight\s*pass|starlight|supply\s*pass|express\s*supply|lunite\s*subscription|royale\s*pass|booyah\s*pass|elite\s*pass|battle\s*pass|season\s*pass|star\s*pass|premium\s*pass|monthly\s*card|weekly\s*card|monthly\s*pass|weekly\s*pass|vip\s*card|kartu\s*bulanan|kartu\s*mingguan|berkah|langganan|subscription|pass|paket\s*mingguan|paket\s*bulanan|level\s*up\s*pass)\b/i.test(
-      hay
-    )
-  ) {
-    return "membership";
-  }
-  return "currency";
-};
-
-const translateFieldMeta = (field, lang) => {
-  if (!field || lang !== "en") {
-    return {
-      label: field?.label || "",
-      placeholder: field?.placeholder || `Masukkan ${field?.label || "ID"}...`,
-      help: field?.help || "",
-    };
-  }
-  const rawLabel = String(field.label || "").trim();
-  const labelMap = {
-    "User ID": "User ID",
-    "Zone ID": "Zone ID",
-    "Server": "Server",
-    "Server / Region": "Server / Region",
-    "Region Server": "Server Region",
-    "UID": "UID",
-    "Player ID": "Player ID",
-    "Player Tag": "Player Tag",
-    "IGG ID": "IGG ID",
-    "Hunter ID": "Hunter ID",
-    "Account ID (PID)": "Account ID (PID)",
-    "Space ID": "Space ID",
-    "Username In-Game": "In-Game Username",
-    "No. WhatsApp / Steam ID": "WhatsApp No. / Steam ID",
-    "Riot ID": "Riot ID",
-    "Tagline": "Tagline",
-    "Open ID": "Open ID",
-    "Character ID": "Character ID",
-    "Role ID": "Role ID",
-    "ID Tujuan": "Target ID",
-    "Nomor Tujuan": "Target Number",
-  };
-  const label = labelMap[rawLabel] || rawLabel;
-
-  let placeholder = String(field.placeholder || "").trim();
-  if (!placeholder) {
-    placeholder = Array.isArray(field.options) && field.options.length > 0
-      ? `Select ${label}...`
-      : `Enter ${label}...`;
-  } else {
-    placeholder = placeholder
-      .replace(/^Pilih\s+/i, "Select ")
-      .replace(/^Masukkan\s+/i, "Enter ")
-      .replace(/^Contoh:\s*/i, "Example: ")
-      .replace(/\batau\b/gi, "or")
-      .replace(/\bdigit\b/gi, "digits");
-  }
-
-  let help = String(field.help || "").trim();
-  if (help) {
-    help = help
-      .replace(/Lihat di profil in-game/gi, "Check your in-game profile")
-      .replace(/Lihat di profil/gi, "Check your profile")
-      .replace(/Pilih server sesuai akun game Anda\.?/gi, "Select the server matching your game account.")
-      .replace(/Pilih server tempat karakter Anda berada\.?/gi, "Select the server where your character is located.")
-      .replace(/Masukkan angka di dalam tanda kurung sebelah User ID\.?/gi, "Enter the digits inside parentheses next to your User ID.")
-      .replace(/Masukkan User ID akun game Anda\.?/gi, "Enter your in-game User ID.")
-      .replace(/Masukkan UID yang tertera di pojok kanan bawah layar\.?/gi, "Enter the UID shown at the bottom-right corner of your screen.")
-      .replace(/Format:\s*/gi, "Format: ")
-      .replace(/Wajib diisi/gi, "Required");
-  }
-
-  return { label, placeholder, help };
-};
 
 const translateLocalFieldErr = (errMsg, lang) => {
   if (!errMsg || lang !== "en") return errMsg;
@@ -301,6 +224,52 @@ export default function TopupGameDetail() {
       DEFAULT_DUITKU_CHANNELS[0]
     );
   }, [channels, duitkuChannel, walletChannelObj]);
+
+  const computeChannelAdminFee = useCallback((basePrice, ch) => {
+    if (!ch || ch.code === "WALLET" || ch.gateway_id === "wallet") return 0;
+    const base = Math.max(0, Math.round(Number(basePrice || 0)));
+    if (base <= 0) return 0;
+    const flat = Math.max(
+      0,
+      Math.round(Number(ch.fee_flat ?? ch.admin_fee_flat ?? 0))
+    );
+    const pct = Math.max(
+      0,
+      Number(ch.fee_percent ?? ch.admin_fee_percent ?? 0)
+    );
+    return Math.max(0, Math.round(flat + (base * pct) / 100));
+  }, []);
+
+  const formatChannelFeeRule = useCallback(
+    (ch) => {
+      if (!ch || ch.code === "WALLET" || ch.gateway_id === "wallet") {
+        return t("Bebas Biaya Admin", "No Admin Fee");
+      }
+      const flat = Math.max(
+        0,
+        Math.round(Number(ch.fee_flat ?? ch.admin_fee_flat ?? 0))
+      );
+      const pct = Math.max(
+        0,
+        Number(Number(ch.fee_percent ?? ch.admin_fee_percent ?? 0).toFixed(2))
+      );
+      if (flat > 0 && pct > 0) return `+Admin ${formatIDR(flat)} + ${pct}%`;
+      if (flat > 0) return `+Admin ${formatIDR(flat)}`;
+      if (pct > 0) return `+Admin ${pct}%`;
+      return t("Bebas Biaya Admin", "No Admin Fee");
+    },
+    [t]
+  );
+
+  const selectedChannelFee = useMemo(() => {
+    if (!denomination) return 0;
+    return computeChannelAdminFee(denomination.price, selectedChannelObj);
+  }, [denomination, selectedChannelObj, computeChannelAdminFee]);
+
+  const finalTopupPayAmount = useMemo(() => {
+    if (!denomination) return 0;
+    return Math.max(0, Math.round(Number(denomination.price || 0))) + selectedChannelFee;
+  }, [denomination, selectedChannelFee]);
 
   const paymentGroups = useMemo(
     () => [
@@ -494,24 +463,22 @@ export default function TopupGameDetail() {
       return;
     }
 
-    // 5. Verify Game ID when buyer clicks Checkout, then open Confirmation Modal
+    // 5. Verify Game ID & Server to Digiflazz when buyer clicks Checkout, then open Confirmation Modal
     setChecking(true);
     try {
-      let currentValidation = validation;
-      if (!currentValidation) {
-        currentValidation = await validateTopupDestination(game.slug, values);
-        setValidation(currentValidation);
-      }
+      const currentValidation = await validateTopupDestination(game.slug, values);
+      setValidation(currentValidation);
 
       if (
+        !currentValidation?.ok ||
         currentValidation?.format_valid === false ||
         currentValidation?.code === "ACCOUNT_NOT_FOUND"
       ) {
         const errMsg =
-          currentValidation.message ||
+          currentValidation?.message ||
           t(
-            "Data ID tujuan tidak ditemukan atau tidak valid.",
-            "Target account ID not found or invalid."
+            "ID Akun atau Zone/Server tidak ditemukan di Digiflazz. Periksa kembali ID & Server Anda.",
+            "Target Account ID or Zone/Server not found on Digiflazz. Please double-check your ID & Server."
           );
         setSummaryError(errMsg);
         toast.error(errMsg);
@@ -519,15 +486,33 @@ export default function TopupGameDetail() {
         return;
       }
 
+      if (
+        currentValidation?.warning ||
+        currentValidation?.code === "CEK_ID_DISRUPTED"
+      ) {
+        toast.warning(
+          currentValidation.message ||
+            t(
+              "Server Cek ID sedang gangguan. Pastikan kembali ID & Server sudah benar sebelum lanjut bayar.",
+              "ID verification server is temporarily disrupted. Please double-check your ID & Server before paying."
+            )
+        );
+      }
+
       setConfirmModalOpen(true);
     } catch (_e) {
-      // Fallback: if ID check service is unreachable, still allow checkout when local format is valid
+      // Fallback: if ID check service is unreachable, allow checkout with explicit warning when local format is valid
       setValidation({
         ok: true,
         format_valid: true,
         checked: false,
-        code: "DIRECT_ID_OK",
+        warning: true,
+        code: "CEK_ID_DISRUPTED",
         nickname: "",
+        message: t(
+          "Server Cek ID sedang gangguan sementara. Pastikan kembali ID & Server Anda sudah benar sebelum lanjut bayar.",
+          "ID check service is temporarily disrupted. Please verify your ID & Server carefully before paying."
+        ),
       });
       setConfirmModalOpen(true);
     } finally {
@@ -1037,13 +1022,35 @@ export default function TopupGameDetail() {
                         <Check size={13} strokeWidth={3} className="shrink-0" />
                         <span className="truncate">
                           {validation.nickname}
+                          {validation.server_label ? ` · ${validation.server_label}` : ""}
                         </span>
                       </div>
                       <span className="text-[10px] uppercase tracking-wider text-lime/90 shrink-0">
-                        {t("Terverifikasi", "Verified")}
+                        {t("ID & Server Terverifikasi", "ID & Server Verified")}
                       </span>
                     </motion.div>
                   )}
+                  {validation?.ok &&
+                    !validation.checked &&
+                    (validation.warning || validation.code === "CEK_ID_DISRUPTED") && (
+                      <motion.div
+                        key="warn"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        data-testid="topup-validate-warning"
+                        className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-xs font-mono border bg-amber-500/10 border-amber-400/45 text-amber-300 min-w-0"
+                      >
+                        <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                        <span className="text-[11px] break-words min-w-0 flex-1">
+                          {validation.message ||
+                            t(
+                              "Server Cek ID sedang gangguan sementara. Format ID & Server valid.",
+                              "ID check server is temporarily disrupted. ID & Server format is valid."
+                            )}
+                        </span>
+                      </motion.div>
+                    )}
                   {validation &&
                     (!validation.ok ||
                       validation.format_valid === false ||
@@ -1059,7 +1066,7 @@ export default function TopupGameDetail() {
                         <AlertCircle size={14} className="shrink-0 mt-0.5" />
                         <span className="text-[11px] break-words min-w-0 flex-1">
                           {validation.message ||
-                            t("ID Akun tidak ditemukan", "Account ID not found")}
+                            t("ID Akun atau Server tidak ditemukan", "Account ID or Server not found")}
                         </span>
                       </motion.div>
                     )}
@@ -1373,6 +1380,15 @@ export default function TopupGameDetail() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
                     {activePaymentGroup.items.map((ch) => {
                       const selected = duitkuChannel === ch.code;
+                      const chFee = denomination
+                        ? computeChannelAdminFee(denomination.price, ch)
+                        : 0;
+                      const chTotal = denomination
+                        ? Math.max(0, Math.round(Number(denomination.price || 0))) + chFee
+                        : 0;
+                      const hasConfiguredFee =
+                        Number(ch.fee_flat ?? ch.admin_fee_flat ?? 0) > 0 ||
+                        Number(ch.fee_percent ?? ch.admin_fee_percent ?? 0) > 0;
                       return (
                         <button
                           key={ch.code}
@@ -1395,15 +1411,33 @@ export default function TopupGameDetail() {
                             >
                               {selected && <Check size={10} strokeWidth={3} />}
                             </span>
-                            <span className="font-display font-bold text-xs text-slate-100 truncate">
-                              {stripGatewayNames(ch.short_name || ch.name)}
-                            </span>
+                            <div className="min-w-0 flex-1">
+                              <span className="font-display font-bold text-xs text-slate-100 block truncate">
+                                {stripGatewayNames(ch.short_name || ch.name)}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono block truncate ${
+                                  hasConfiguredFee ? "text-amber-300/90" : "text-slate-400"
+                                }`}
+                              >
+                                {denomination && chFee > 0
+                                  ? `${t("Biaya Admin", "Admin Fee")} +${formatIDR(chFee)}`
+                                  : formatChannelFeeRule(ch)}
+                              </span>
+                            </div>
                           </div>
 
                           {denomination && (
-                            <span className="font-mono font-extrabold text-xs text-lime tabular-nums shrink-0">
-                              {formatIDR(denomination.price)}
-                            </span>
+                            <div className="text-right shrink-0">
+                              <span className="font-mono font-extrabold text-xs text-lime tabular-nums block">
+                                {formatIDR(chTotal)}
+                              </span>
+                              {chFee > 0 && (
+                                <span className="text-[9px] font-mono text-slate-400 tabular-nums block">
+                                  {formatIDR(denomination.price)} + {formatIDR(chFee)}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </button>
                       );
@@ -1524,8 +1558,14 @@ export default function TopupGameDetail() {
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono font-black text-base sm:text-lg text-lime tabular-nums">
-                            {formatIDR(denomination.price)}
+                            {formatIDR(finalTopupPayAmount)}
                           </span>
+                          {selectedChannelFee > 0 && (
+                            <span className="text-[10px] font-mono text-amber-300 tabular-nums">
+                              ({formatIDR(denomination.price)} + {t("Admin", "Admin")}{" "}
+                              {formatIDR(selectedChannelFee)})
+                            </span>
+                          )}
                           {destinationLabel && (
                             <span className="text-[10px] font-mono text-slate-400 truncate">
                               ({validation?.nickname ? `${validation.nickname} · ` : ""}
@@ -1551,7 +1591,7 @@ export default function TopupGameDetail() {
                     {checking ? (
                       <>
                         <Loader2 size={14} className="animate-spin shrink-0" />
-                        <span>{t("Memeriksa...", "Checking...")}</span>
+                        <span>{t("Mengecek ID & Server...", "Checking ID & Server...")}</span>
                       </>
                     ) : submitting ? (
                       <>
@@ -1626,7 +1666,7 @@ export default function TopupGameDetail() {
                     </span>
                     <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase text-lime">
                       <ShieldCheck size={12} />
-                      {t("Terverifikasi", "Verified")}
+                      {t("Terverifikasi Digiflazz", "Verified by Digiflazz")}
                     </span>
                   </div>
                   <p
@@ -1639,11 +1679,45 @@ export default function TopupGameDetail() {
                     ID: <strong className="text-slate-100">{destinationLabel || validation.customer_no}</strong>
                   </p>
                 </div>
+              ) : validation?.warning || validation?.code === "CEK_ID_DISRUPTED" ? (
+                <div
+                  data-testid="topup-confirm-disrupted-warning"
+                  className="rounded-xl border bg-amber-500/10 border-amber-400/50 p-3 space-y-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-amber-200">
+                      {t("ID & Server Tujuan", "Target ID & Server")}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase text-amber-300">
+                      <AlertCircle size={12} />
+                      {t("Cek ID Gangguan", "ID Check Disrupted")}
+                    </span>
+                  </div>
+                  <p
+                    data-testid="topup-confirm-destination"
+                    className="font-mono font-extrabold text-sm sm:text-base text-slate-100 break-all"
+                  >
+                    {destinationLabel || validation?.customer_no}
+                  </p>
+                  <p className="text-[11px] font-mono text-amber-200/90 leading-relaxed">
+                    {validation?.message ||
+                      t(
+                        "Server Cek ID Digiflazz sedang gangguan sementara. Pastikan kembali User ID dan Zone/Server Anda sudah benar sebelum menekan Lanjut Bayar.",
+                        "Digiflazz ID verification service is temporarily disrupted. Please double-check that your User ID and Zone/Server are correct before paying."
+                      )}
+                  </p>
+                </div>
               ) : (
                 <div className="rounded-xl border bg-neon/8 border-neon/35 p-3 space-y-1">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300 block">
-                    {t("ID Tujuan", "Target ID")}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
+                      {t("ID & Server Tujuan", "Target ID & Server")}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase text-neon">
+                      <Check size={12} />
+                      {t("Format ID & Server Valid", "Valid ID & Server Format")}
+                    </span>
+                  </div>
                   <p
                     data-testid="topup-confirm-destination"
                     className="font-mono font-extrabold text-sm sm:text-base text-slate-100 break-all"
@@ -1675,10 +1749,28 @@ export default function TopupGameDetail() {
                     )}
                   </span>
                 </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-slate-400 shrink-0">{t("Harga Produk", "Item Price")}</span>
+                  <span className="text-slate-200 text-right tabular-nums">
+                    {formatIDR(denomination.price)}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-slate-400 shrink-0">{t("Biaya Admin", "Admin Fee")}</span>
+                  <span
+                    className={`text-right tabular-nums ${
+                      selectedChannelFee > 0 ? "text-amber-300 font-bold" : "text-lime"
+                    }`}
+                  >
+                    {selectedChannelFee > 0
+                      ? `+${formatIDR(selectedChannelFee)}`
+                      : t("Gratis (Rp 0)", "Free (Rp 0)")}
+                  </span>
+                </div>
                 <div className="pt-2 border-t border-line/80 flex items-center justify-between gap-3">
                   <span className="text-slate-300 font-bold">Total</span>
                   <span className="font-mono font-black text-base text-lime tabular-nums">
-                    {formatIDR(denomination.price)}
+                    {formatIDR(finalTopupPayAmount)}
                   </span>
                 </div>
               </div>

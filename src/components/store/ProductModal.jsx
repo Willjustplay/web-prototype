@@ -34,7 +34,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSwipeNav } from "@/hooks/useSwipeNav";
-import { ImageZoomViewer } from "@/components/ImageZoomViewer";
+import { ImageZoomViewer } from "@/components/store/ImageZoomViewer";
 
 const condTone = (c) => {
   const v = (c || "").toLowerCase();
@@ -86,6 +86,27 @@ export const ProductModal = ({
   const userBalance = Math.max(0, Math.round(Number(user?.balance || 0)));
   const productPrice = Math.max(0, Math.round(Number(product?.price || 0)));
   const isWalletSufficient = Boolean(user && userBalance >= productPrice);
+  const paykitaFeeFlat = Math.max(
+    0,
+    Math.round(
+      Number(paykitaMethodObj?.fee_flat ?? paykitaMethodObj?.admin_fee_flat ?? 0)
+    )
+  );
+  const paykitaFeePercent = Math.max(
+    0,
+    Number(
+      paykitaMethodObj?.fee_percent ?? paykitaMethodObj?.admin_fee_percent ?? 0
+    )
+  );
+  const paykitaComputedFee =
+    productPrice > 0
+      ? Math.max(
+          0,
+          Math.round(paykitaFeeFlat + (productPrice * paykitaFeePercent) / 100)
+        )
+      : 0;
+  const activeAdminFee = method === "paykita" ? paykitaComputedFee : 0;
+  const finalCheckoutPrice = productPrice + activeAdminFee;
 
   const [active, setActive] = useState(0);
   const [zoom, setZoom] = useState(false);
@@ -728,6 +749,36 @@ export const ProductModal = ({
                         )}
                       </motion.div>
                     )}
+                    {method === "paykita" && paykitaComputedFee > 0 && (
+                      <motion.div
+                        key="panel-paykita-fee"
+                        initial={{ opacity: 0, y: 2 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -2 }}
+                        transition={{ duration: 0.12 }}
+                        className="rounded-lg border border-neon/35 bg-void/70 px-3 py-2 text-[11px] font-mono space-y-1"
+                        data-testid="paykita-admin-fee-box"
+                      >
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>{t("Harga Produk", "Product Price")}</span>
+                          <span className="text-slate-200 tabular-nums">
+                            {formatIDR(productPrice)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>{t("Biaya Admin QRIS", "QRIS Admin Fee")}</span>
+                          <span className="text-amber-300 font-bold tabular-nums">
+                            +{formatIDR(paykitaComputedFee)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-line/60 text-slate-200 font-bold">
+                          <span>{t("Total Bayar", "Total Pay")}</span>
+                          <span className="text-lime tabular-nums">
+                            {formatIDR(finalCheckoutPrice)}
+                          </span>
+                        </div>
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </div>
 
@@ -803,7 +854,7 @@ export const ProductModal = ({
                         ? t("Login & Bayar", "Login & Pay")
                         : method === "wallet" && !isWalletSufficient
                         ? t("Isi Saldo Dulu", "Top Up First")
-                        : `${t("Beli Sekarang", "Buy Now")} · ${formatIDR(product.price)}`}
+                        : `${t("Beli Sekarang", "Buy Now")} · ${formatIDR(finalCheckoutPrice)}`}
                     </span>
                   </button>
 
