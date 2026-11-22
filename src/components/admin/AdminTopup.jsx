@@ -46,7 +46,7 @@ const statusLabel = (o) => {
   return o.provider === "manual" ? "Belum Bayar" : "Menunggu QRIS";
 };
 
-export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
+export const AdminTopup = ({ headers, sections, defaultSection, onReload, skuCount }) => {
   const allowedSections = useMemo(
     () => (sections?.length ? sections : ["games", "orders", "vendors"]),
     [sections]
@@ -501,102 +501,193 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
   const showSubTabs = TABS.length > 1;
 
   return (
-    <div data-testid="admin-topup">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex flex-wrap gap-2" data-testid="admin-topup-subtabs">
-          {showSubTabs &&
-            TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setSubTab(t.id)}
-                data-testid={`admin-topup-tab-${t.id}`}
-                className={`flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider px-3.5 py-2 border transition-colors cursor-pointer ${
-                  subTab === t.id ? "bg-neon text-void border-neon" : "border-line bg-void/60 text-slate-400 hover:text-neon"
-                }`}
-              >
-                <t.icon size={13} /> {t.label}
-              </button>
-            ))}
+    <div data-testid="admin-topup" className="space-y-4">
+      {/* Unified Compact Single-Row Toolbar */}
+      <div
+        data-testid="admin-topup-merchant-pull-bar"
+        className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3.5 border-b border-line/70"
+      >
+        {/* Left: Sub-Tabs + SKU Counter */}
+        <div className="flex flex-wrap items-center gap-2" data-testid="admin-topup-subtabs">
+          {showSubTabs && (
+            <div className="inline-flex items-center gap-1 rounded-xl border border-line bg-void/80 p-1">
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setSubTab(t.id)}
+                  data-testid={`admin-topup-tab-${t.id}`}
+                  className={`inline-flex items-center gap-1.5 rounded-lg text-xs font-display font-bold px-3 py-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    subTab === t.id
+                      ? "bg-neon text-void shadow-[0_0_12px_rgba(0,240,255,0.25)]"
+                      : "text-slate-400 hover:text-slate-100"
+                  }`}
+                >
+                  <t.icon size={13} />
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {typeof skuCount === "number" && (
+            <span className="text-xs font-mono text-slate-400 tabular-nums whitespace-nowrap">
+              &middot; <strong className="text-lime">{skuCount}</strong> SKU aktif
+            </span>
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={load}
-            data-testid="admin-topup-reload"
-            className="flex items-center gap-2 rounded-xl text-[11px] font-mono border border-line bg-void/60 text-slate-300 hover:text-neon hover:border-neon/50 px-3.5 py-2 transition-colors cursor-pointer"
-          >
-            <RefreshCw size={13} className={loading ? "animate-spin text-neon" : ""} /> Muat Ulang
-          </button>
+
+        {/* Right: Dynamic Actions & Digiflazz Controls */}
+        <div className="flex flex-wrap items-center gap-1.5">
           {subTab === "games" && (
             <>
+              {/* Inline Margin + Pull Digiflazz Group */}
+              <div className="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-neon/35 bg-void/80 p-1">
+                <select
+                  value={[0, 5, 8, 10, 15, 20].includes(Number(pullMargin)) ? pullMargin : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value !== "custom") setPullMargin(Number(e.target.value));
+                  }}
+                  data-testid="merchant-pull-select-margin"
+                  title="Margin harga jual dari modal Digiflazz"
+                  className="rounded-lg bg-panel border border-line focus:border-neon text-[11px] font-mono text-slate-100 px-2 py-1.5 outline-none cursor-pointer"
+                >
+                  <option value={5}>Margin +5%</option>
+                  <option value={8}>Margin +8%</option>
+                  <option value={10}>Margin +10%</option>
+                  <option value={15}>Margin +15%</option>
+                  <option value={20}>Margin +20%</option>
+                  <option value={0}>Rekomendasi</option>
+                  <option value="custom">Custom %</option>
+                </select>
+
+                {![0, 5, 8, 10, 15, 20].includes(Number(pullMargin)) && (
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={pullMargin}
+                    onChange={(e) => setPullMargin(Math.max(0, Number(e.target.value) || 0))}
+                    title="Margin % custom"
+                    className="w-14 rounded-lg bg-panel border border-line focus:border-neon text-[11px] font-mono text-neon text-center px-1.5 py-1.5 outline-none tabular-nums"
+                  />
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => pullDirectFromMerchant({ vendor_kind: "digiflazz", margin_percent: pullMargin })}
+                  disabled={busy.startsWith("pull-")}
+                  data-testid="merchant-pull-all-btn"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-lime text-void hover:bg-neon font-display font-bold text-[11px] uppercase tracking-wider px-3 py-1.5 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  {busy.startsWith("pull-") ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Zap size={12} />
+                  )}
+                  <span>Tarik SKU</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPullCatalogOpen(true)}
+                  data-testid="merchant-pull-choose-btn"
+                  className="inline-flex items-center gap-1 rounded-lg border border-neon/40 text-neon hover:bg-neon/10 font-mono font-bold text-[11px] px-2.5 py-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <Download size={12} />
+                  <span>Per Game</span>
+                </button>
+              </div>
+
               <button
-                onClick={() => pullDirectFromMerchant({ vendor_kind: "digiflazz", margin_percent: pullMargin })}
-                disabled={busy.startsWith("pull-")}
-                data-testid="admin-topup-quick-pull"
-                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider bg-lime text-void hover:bg-neon px-3.5 py-2 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                {busy.startsWith("pull-") ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />} Tarik Produk Digiflazz
-              </button>
-              <button
+                type="button"
                 onClick={syncAll}
                 disabled={busy === "sync"}
                 data-testid="admin-topup-sync"
-                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider border border-neon/50 text-neon hover:bg-neon/10 px-3.5 py-2 transition-colors disabled:opacity-50 cursor-pointer"
+                title="Sinkronkan SKU ke katalog"
+                className="inline-flex items-center gap-1.5 rounded-xl text-[11px] font-mono font-bold border border-line bg-void/70 text-slate-200 hover:text-neon hover:border-neon/50 px-3 py-2 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <RefreshCw size={13} className={busy === "sync" ? "animate-spin" : ""} /> Sinkronkan SKU
+                <RefreshCw size={12} className={busy === "sync" ? "animate-spin text-neon" : ""} />
+                <span>Sinkron</span>
               </button>
+
               <button
+                type="button"
                 onClick={checkSkuHealth}
                 disabled={busy === "sku-health"}
                 data-testid="admin-topup-check-sku-health"
-                title="Cek status SKU ke Digiflazz sekarang (auto-hide jika gangguan, tampilkan kembali jika normal)"
-                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider border border-lime/50 text-lime hover:bg-lime/10 px-3.5 py-2 transition-colors disabled:opacity-50 cursor-pointer"
+                title="Cek status gangguan SKU Digiflazz"
+                className="inline-flex items-center gap-1.5 rounded-xl text-[11px] font-mono font-bold border border-line bg-void/70 text-slate-200 hover:text-lime hover:border-lime/50 px-3 py-2 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <RefreshCw size={13} className={busy === "sku-health" ? "animate-spin" : ""} /> Cek Gangguan SKU
+                <RefreshCw size={12} className={busy === "sku-health" ? "animate-spin text-lime" : ""} />
+                <span>Cek SKU</span>
               </button>
+
               <button
+                type="button"
                 onClick={() => clearProductsAndSkus()}
                 disabled={busy === "clear-all"}
                 data-testid="admin-topup-clear-all"
-                title="Hapus semua produk topup bawaan dan kosongkan semua nominal & SKU pada semua game lokal"
-                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider border border-coral/50 text-coral hover:bg-coral/10 px-3.5 py-2 transition-colors disabled:opacity-50 cursor-pointer"
+                title="Kosongkan semua produk & SKU top up"
+                className="inline-flex items-center gap-1.5 rounded-xl text-[11px] font-mono font-bold border border-coral/40 bg-void/70 text-coral hover:bg-coral/10 px-3 py-2 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                {busy === "clear-all" ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Kosongkan Produk &amp; SKU
+                {busy === "clear-all" ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                <span>Kosongkan</span>
               </button>
+
               <button
+                type="button"
                 onClick={openNew}
                 data-testid="admin-topup-add-game"
-                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-extrabold uppercase tracking-wider bg-gradient-to-r from-neon to-cyan-300 text-void hover:from-lime hover:to-neon px-4 py-2 shadow-[0_0_16px_rgba(0,240,255,0.25)] transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl text-[11px] font-display font-extrabold uppercase tracking-wider bg-gradient-to-r from-neon to-cyan-300 text-void hover:from-lime hover:to-neon px-3.5 py-2 shadow-[0_0_14px_rgba(0,240,255,0.22)] transition-all whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Plus size={13} /> Game Top Up Baru
+                <Plus size={13} />
+                <span>Game Baru</span>
               </button>
             </>
           )}
+
           {subTab === "vendors" && (
             <>
               <button
+                type="button"
                 onClick={checkSkuHealth}
                 disabled={busy === "sku-health"}
                 data-testid="admin-topup-vendor-check-sku-health"
-                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider border border-lime/50 text-lime hover:bg-lime/10 px-3.5 py-2 transition-colors disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider border border-lime/50 text-lime hover:bg-lime/10 px-3 py-2 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <RefreshCw size={13} className={busy === "sku-health" ? "animate-spin" : ""} /> Cek Gangguan SKU
+                <RefreshCw size={12} className={busy === "sku-health" ? "animate-spin" : ""} />
+                <span>Cek SKU</span>
               </button>
               <button
+                type="button"
                 onClick={() => setPullCatalogOpen(true)}
                 data-testid="admin-topup-open-merchant-catalog"
-                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider bg-lime text-void hover:bg-neon px-3.5 py-2 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider bg-lime text-void hover:bg-neon px-3 py-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Download size={13} /> Tarik Katalog Digiflazz
+                <Download size={12} />
+                <span>Tarik Katalog</span>
               </button>
               <button
+                type="button"
                 onClick={() => openVendor(vendors[0] || null)}
                 data-testid="admin-topup-add-vendor"
-                className="flex items-center gap-2 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider bg-neon text-void hover:bg-lime px-4 py-2 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl text-[11px] font-display font-bold uppercase tracking-wider bg-neon text-void hover:bg-lime px-3.5 py-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Plug size={13} /> Konfigurasi Digiflazz
+                <Plug size={12} />
+                <span>Konfigurasi Digiflazz</span>
               </button>
             </>
           )}
+
+          <button
+            type="button"
+            onClick={load}
+            data-testid="admin-topup-reload"
+            title="Muat ulang data"
+            className="inline-flex items-center gap-1.5 rounded-xl text-[11px] font-mono border border-line bg-void/70 text-slate-300 hover:text-neon hover:border-neon/50 px-2.5 py-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <RefreshCw size={12} className={loading ? "animate-spin text-neon" : ""} />
+          </button>
         </div>
       </div>
 
@@ -609,104 +700,6 @@ export const AdminTopup = ({ headers, sections, defaultSection, onReload }) => {
       {/* ------------------------------------------------ games & denominations */}
       {!loading && subTab === "games" && (
         <div className="space-y-4">
-          {/* Product-Only Digiflazz Pull Banner */}
-          <div
-            data-testid="admin-topup-merchant-pull-bar"
-            className="rounded-xl border border-neon/40 bg-gradient-to-r from-neon/10 via-void/80 to-lime/5 p-4"
-          >
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-lime">
-                    <Zap size={11} /> Sinkronisasi Produk Digiflazz
-                  </span>
-                  <span className="text-slate-600">&middot;</span>
-                  <h3 className="font-display font-bold text-sm text-slate-100">
-                    Tarik Produk &amp; Harga Digiflazz ke Game Top Up Lokal
-                  </h3>
-                </div>
-                <p className="text-[11px] font-mono text-slate-400 mt-1">
-                  Daftar Game Top Up dikelola secara lokal dengan ikon 3D eksklusif. Tarik otomatis hanya{" "}
-                  <span className="text-neon font-bold">produk (SKU/nominal)</span> dari Digiflazz ke game lokal yang ada dengan perhitungan{" "}
-                  <span className="text-lime font-bold">Harga Modal + Margin (%)</span> otomatis.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap sm:flex-nowrap items-end gap-2.5 shrink-0">
-                <div className="w-full sm:w-40">
-                  <label className="block text-[9px] font-mono uppercase tracking-widest text-slate-400 mb-1">
-                    Supplier Produk
-                  </label>
-                  <select
-                    value="digiflazz"
-                    onChange={() => setPullVendorKind("digiflazz")}
-                    data-testid="merchant-pull-select-vendor"
-                    className="w-full rounded-lg bg-void border border-line focus:border-neon text-xs font-mono text-neon font-bold px-2.5 py-2 outline-none"
-                  >
-                    <option value="digiflazz">Digiflazz H2H</option>
-                  </select>
-                </div>
-
-                <div className="w-full sm:w-48">
-                  <label className="block text-[9px] font-mono uppercase tracking-widest text-slate-400 mb-1">
-                    Harga Jual (Modal + Margin %)
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={[0, 5, 8, 10, 15, 20].includes(Number(pullMargin)) ? pullMargin : "custom"}
-                      onChange={(e) => {
-                        if (e.target.value !== "custom") setPullMargin(Number(e.target.value));
-                      }}
-                      data-testid="merchant-pull-select-margin"
-                      className="w-full rounded-lg bg-void border border-line focus:border-neon text-xs font-mono text-slate-100 px-2.5 py-2 outline-none"
-                    >
-                      <option value={5}>Modal + 5%</option>
-                      <option value={8}>Modal + 8%</option>
-                      <option value={10}>Modal + 10% (Default)</option>
-                      <option value={15}>Modal + 15%</option>
-                      <option value={20}>Modal + 20%</option>
-                      <option value={0}>Harga Rekomendasi</option>
-                      <option value="custom">Custom %</option>
-                    </select>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={pullMargin}
-                      onChange={(e) => setPullMargin(Math.max(0, Number(e.target.value) || 0))}
-                      title="Margin % dari harga modal Digiflazz"
-                      className="w-16 rounded-lg bg-void border border-line focus:border-neon text-xs font-mono text-neon text-center px-2 py-2 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => pullDirectFromMerchant({ vendor_kind: "digiflazz", margin_percent: pullMargin })}
-                  disabled={busy.startsWith("pull-")}
-                  data-testid="merchant-pull-all-btn"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-neon text-void hover:bg-lime font-display font-bold text-[11px] uppercase tracking-wider px-4 py-2.5 transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer"
-                >
-                  {busy.startsWith("pull-") ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Zap size={13} />
-                  )}
-                  Tarik Produk Otomatis
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPullCatalogOpen(true)}
-                  data-testid="merchant-pull-choose-btn"
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-neon/50 text-neon hover:bg-neon/10 font-mono font-bold text-[11px] uppercase tracking-wider px-3.5 py-2.5 transition-colors whitespace-nowrap cursor-pointer"
-                >
-                  <Download size={13} /> Pilih Produk per Game
-                </button>
-              </div>
-            </div>
-          </div>
-
           {/* Search & Status Filter for Top Up Games */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-1.5">

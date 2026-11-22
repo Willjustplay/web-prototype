@@ -64,6 +64,12 @@ import {
   buildGameCoverArtSvg,
   MERCHANT_MASTER_GAMES,
 } from "./server/modules/masterGames";
+import {
+  buildFullJsonBackup,
+  parseSqlDumpToCollections,
+  parseJsonBackupToCollections,
+  mergeArrayById,
+} from "./server/modules/databaseBackup";
 
 // ---------------- Seed & Persistent In-Memory Document Store ----------------
 const SEED_PATH = path.join(__dirname, "server", "seed_data.json");
@@ -917,6 +923,30 @@ function generatePostgresSqlDump(): string {
     const id = String(s.id || uuidHex(12));
     lines.push(
       `INSERT INTO wjp_social_links (id, platform, name, url, is_active, data) VALUES (${sqlLiteral(id)}, ${sqlLiteral(s.platform || "link")}, ${sqlLiteral(s.name || "Social")}, ${sqlLiteral(s.url || "#")}, ${sqlLiteral(s.is_active !== false)}, ${sqlLiteral(JSON.stringify({ ...s, id }))}::jsonb) ON CONFLICT (id) DO UPDATE SET platform = EXCLUDED.platform, name = EXCLUDED.name, url = EXCLUDED.url, is_active = EXCLUDED.is_active, data = EXCLUDED.data;`
+    );
+  }
+  lines.push("");
+
+  for (const vp of db.topup_providers || []) {
+    const id = String(vp.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_topup_providers (id, kind, name, is_active, data) VALUES (${sqlLiteral(id)}, ${sqlLiteral(vp.kind || "digiflazz")}, ${sqlLiteral(vp.name || "Digiflazz")}, ${sqlLiteral(vp.is_active !== false)}, ${sqlLiteral(JSON.stringify({ ...vp, id }))}::jsonb) ON CONFLICT (id) DO UPDATE SET kind = EXCLUDED.kind, name = EXCLUDED.name, is_active = EXCLUDED.is_active, data = EXCLUDED.data;`
+    );
+  }
+  lines.push("");
+
+  for (const al of (db.audit_logs || []).slice(0, 500)) {
+    const id = String(al.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_audit_logs (id, action, actor_email, created_at, data) VALUES (${sqlLiteral(id)}, ${sqlLiteral(al.action || "event")}, ${sqlLiteral(al.actor_email || "")}, ${sqlLiteral(al.created_at || nowIso())}, ${sqlLiteral(JSON.stringify({ ...al, id }))}::jsonb) ON CONFLICT (id) DO UPDATE SET action = EXCLUDED.action, actor_email = EXCLUDED.actor_email, created_at = EXCLUDED.created_at, data = EXCLUDED.data;`
+    );
+  }
+  lines.push("");
+
+  for (const em of (db.email_events || []).slice(0, 200)) {
+    const id = String(em.id || uuidHex(12));
+    lines.push(
+      `INSERT INTO wjp_email_events (id, to_email, template, status, created_at, data) VALUES (${sqlLiteral(id)}, ${sqlLiteral(em.to_email || "")}, ${sqlLiteral(em.template || "")}, ${sqlLiteral(em.status || "sent")}, ${sqlLiteral(em.created_at || nowIso())}, ${sqlLiteral(JSON.stringify({ ...em, id }))}::jsonb) ON CONFLICT (id) DO UPDATE SET to_email = EXCLUDED.to_email, template = EXCLUDED.template, status = EXCLUDED.status, created_at = EXCLUDED.created_at, data = EXCLUDED.data;`
     );
   }
   lines.push("");
@@ -5878,7 +5908,7 @@ app.use((_req, res, next) => {
 
 app.use(
   express.json({
-    limit: "10mb",
+    limit: "50mb",
     verify: (req: any, _res, buf) => {
       req.rawBody = buf.toString("utf8");
     },
@@ -5918,8 +5948,10 @@ api.use((req, res, next) => {
   }
 
   // Deep recursive sanitization against XSS, SQL/NoSQL Injection, Null-Byte & Prototype Pollution
+  // Skip WAF body sanitization for authenticated admin manual database backup import (/admin/database/import)
+  const isDatabaseImportRoute = req.path === "/admin/database/import";
   const threats = new Set<string>();
-  if (req.body && typeof req.body === "object") {
+  if (req.body && typeof req.body === "object" && !isDatabaseImportRoute) {
     req.body = sanitizeInputRecursive(req.body, threats);
   }
   if (req.query && typeof req.query === "object") {
@@ -15913,6 +15945,318 @@ admin.get("/database/postgres/sql-dump", (_req, res) => {
     filename: `willjustplay_postgres_${new Date().toISOString().slice(0, 10)}.sql`,
     sql,
     ddl_statements: POSTGRES_DDL_STATEMENTS,
+  });
+});
+
+admin.get("/database/export-json", (_req, res) => {
+  const backup = buildFullJsonBackup(db);
+  res.json({
+    ok: true,
+    filename: `willjustplay_backup_${new Date().toISOString().slice(0, 10)}.json`,
+    backup,
+  });
+});
+
+admin.post("/database/import", async (req, res) => {
+  const actor = (req as any).adminUser || null;
+  const body = req.body || {};
+  const mode = String(body.mode || "merge").toLowerCase() === "replace" ? "replace" : "merge";
+  const formatHint = String(body.format || "").toLowerCase();
+  const rawContent = body.content ?? body.backup ?? body.data;
+
+  if (!rawContent) {
+    return res.status(400).json({
+      ok: false,
+      detail: "File atau isi database belum dipilih. Silakan unggah file .json atau .sql terlebih dahulu.",
+    });
+  }
+
+  const isSql =
+    formatHint === "sql" ||
+    (typeof rawContent === "string" &&
+      /INSERT\s+INTO\s+(?:public\.)?wjp_[a-z0-9_]+/i.test(rawContent) &&
+      !rawContent.trim().startsWith("{"));
+
+  const parseRes = isSql
+    ? parseSqlDumpToCollections(typeof rawContent === "string" ? rawContent : String(rawContent))
+    : parseJsonBackupToCollections(rawContent);
+
+  if (!parseRes.ok) {
+    return res.status(400).json({
+      ok: false,
+      detail: parseRes.error || "Gagal membaca file database yang diunggah.",
+    });
+  }
+
+  const incoming = parseRes.collections;
+
+  // 1. Files (upload images base64)
+  if (!db.files || typeof db.files !== "object") db.files = {};
+  if (mode === "replace" && incoming.files && Object.keys(incoming.files).length > 0) {
+    db.files = { ...incoming.files };
+  } else if (incoming.files) {
+    db.files = { ...db.files, ...incoming.files };
+  }
+
+  // Extract any _embedded_files from incoming entities
+  const normalizeEntityList = (list?: any[]) =>
+    Array.isArray(list) ? list.map((item) => extractAndStripEmbeddedFiles(item)) : undefined;
+
+  const incUsers = normalizeEntityList(incoming.users);
+  const incProducts = normalizeEntityList(incoming.products);
+  const incGames = normalizeEntityList(incoming.games);
+  const incTransactions = normalizeEntityList(incoming.transactions);
+  const incTestimonials = normalizeEntityList(incoming.testimonials);
+  const incManualDests = normalizeEntityList(incoming.manual_destinations);
+  const incSocialLinks = Array.isArray(incoming.social_links) ? incoming.social_links : undefined;
+  const incTopupProviders = Array.isArray(incoming.topup_providers) ? incoming.topup_providers : undefined;
+  const incAuditLogs = Array.isArray(incoming.audit_logs) ? incoming.audit_logs : undefined;
+  const incEmailEvents = Array.isArray(incoming.email_events) ? incoming.email_events : undefined;
+
+  // 2. Users (Always ensure current admin user is preserved even in replace mode)
+  if (incUsers && incUsers.length > 0) {
+    const adminSnapshot = (db.users || []).filter((u) => u && u.role === "admin");
+    if (mode === "replace") {
+      db.users = mergeArrayById(adminSnapshot, incUsers, (u) =>
+        String(u.email || u.id || "").toLowerCase()
+      );
+    } else {
+      db.users = mergeArrayById(db.users || [], incUsers, (u) =>
+        String(u.email || u.id || "").toLowerCase()
+      );
+    }
+  }
+
+  // 3. Products
+  if (incProducts) {
+    if (mode === "replace") {
+      db.products = [...incProducts];
+    } else {
+      db.products = mergeArrayById(db.products || [], incProducts, (p) => String(p.id || ""));
+    }
+  }
+
+  // 4. Games & Denominations
+  if (incGames) {
+    const mergeDenoms = (existingDenoms: any[], incomingDenoms: any[]) => {
+      const dMap = new Map<string, any>();
+      const getDKey = (d: any) =>
+        String(d?.vendor_sku || d?.code || "")
+          .trim()
+          .toUpperCase();
+      for (const d of Array.isArray(existingDenoms) ? existingDenoms : []) {
+        const k = getDKey(d);
+        if (k) dMap.set(k, { ...d });
+      }
+      for (const d of Array.isArray(incomingDenoms) ? incomingDenoms : []) {
+        const k = getDKey(d);
+        if (!k) continue;
+        const prev = dMap.get(k);
+        dMap.set(k, prev ? { ...prev, ...d } : { ...d });
+      }
+      const list = Array.from(dMap.values());
+      list.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+      return list.map((d, idx) => ({ ...d, seq: idx }));
+    };
+
+    if (mode === "replace") {
+      db.games = incGames.map((g, idx) => ({
+        ...g,
+        seq: typeof g.seq === "number" ? g.seq : idx,
+        denominations: Array.isArray(g.denominations) ? g.denominations : [],
+      }));
+    } else {
+      const localBySlug = new Map<string, any>();
+      for (const lg of db.games || []) {
+        if (lg?.slug) localBySlug.set(String(lg.slug).toLowerCase(), lg);
+      }
+      for (const ig of incGames) {
+        if (!ig) continue;
+        const slugKey = String(ig.slug || slugify(ig.name || "")).toLowerCase();
+        if (!slugKey) continue;
+        const existing = localBySlug.get(slugKey);
+        if (existing) {
+          localBySlug.set(slugKey, {
+            ...existing,
+            ...ig,
+            icon: String(ig.icon || existing.icon || "").trim(),
+            banner: String(ig.banner || existing.banner || "").trim(),
+            denominations: mergeDenoms(existing.denominations || [], ig.denominations || []),
+          });
+        } else {
+          localBySlug.set(slugKey, {
+            ...ig,
+            slug: slugKey,
+            denominations: Array.isArray(ig.denominations) ? ig.denominations : [],
+          });
+        }
+      }
+      db.games = Array.from(localBySlug.values());
+    }
+    upgradeLocalGameIcons();
+  }
+
+  // Reconstruct any topup denomination present in db.products into its matching game in db.games
+  for (const g of db.games || []) {
+    const slugLower = String(g.slug || "").trim().toLowerCase();
+    if (!slugLower) continue;
+    const denomMap = new Map<string, any>();
+    for (const d of Array.isArray(g.denominations) ? g.denominations : []) {
+      const k = String(d?.vendor_sku || d?.code || "").trim().toUpperCase();
+      if (k) denomMap.set(k, d);
+    }
+    let addedFromProducts = false;
+    for (const p of db.products || []) {
+      if (!isTopupProduct(p)) continue;
+      const pSlug = String(p.slug || slugify(p.game || "")).trim().toLowerCase();
+      if (pSlug !== slugLower) continue;
+      const code = String(p.denomination_code || p.denomination?.code || "").trim();
+      const vendorSku = String(p.vendor_sku || p.denomination?.vendor_sku || code).trim();
+      const key = (vendorSku || code).toUpperCase();
+      if (!key || denomMap.has(key)) continue;
+      const label = String(p.denomination?.label || p.title || code).replace(/^.*?—\s*/, "").trim();
+      const price = Math.max(500, Number(p.price || 0));
+      denomMap.set(key, {
+        code: code || vendorSku.toLowerCase(),
+        vendor_sku: vendorSku || code.toUpperCase(),
+        label: label || code,
+        amount: Number(p.denomination?.amount || extractAmountFromLabel(label, 1) || 1),
+        modal_price: Math.max(500, Number(p.modal_price || Math.floor(price * 0.9))),
+        price,
+        price_strike: Number(
+          p.price_strike || p.denomination?.price_strike || Math.ceil((price * 1.12) / 1000) * 1000
+        ),
+        stock: Number(p.stock ?? 999),
+        badge: String(p.badge || ""),
+        sku_group: normalizeSkuGroup(p.sku_group || p.denomination?.sku_group, vendorSku || code, label),
+        featured: Boolean(p.featured),
+        is_active: true,
+        seq: denomMap.size,
+      });
+      addedFromProducts = true;
+    }
+    if (addedFromProducts) {
+      g.denominations = Array.from(denomMap.values()).map((d, idx) => ({ ...d, seq: idx }));
+    }
+    syncGameProducts(g, false);
+  }
+
+  // 5. Transactions, Testimonials, Manual Destinations, Social Links, Topup Providers
+  if (incTransactions) {
+    db.transactions =
+      mode === "replace"
+        ? [...incTransactions]
+        : mergeArrayById(db.transactions || [], incTransactions, (tx) =>
+            String(tx.session_id || tx.id || "")
+          );
+  }
+  if (incTestimonials) {
+    db.testimonials =
+      mode === "replace"
+        ? [...incTestimonials]
+        : mergeArrayById(db.testimonials || [], incTestimonials, (t) => String(t.id || ""));
+  }
+  if (incManualDests) {
+    db.manual_destinations =
+      mode === "replace"
+        ? [...incManualDests]
+        : mergeArrayById(db.manual_destinations || [], incManualDests, (d) => String(d.id || ""));
+  }
+  if (incSocialLinks) {
+    db.social_links =
+      mode === "replace"
+        ? [...incSocialLinks]
+        : mergeArrayById(db.social_links || [], incSocialLinks, (s) => String(s.id || ""));
+  }
+  if (incTopupProviders && incTopupProviders.length > 0) {
+    db.topup_providers =
+      mode === "replace"
+        ? [...incTopupProviders]
+        : mergeArrayById(db.topup_providers || [], incTopupProviders, (vp) =>
+            String(vp.id || vp.kind || "")
+          );
+  }
+  if (incAuditLogs) {
+    db.audit_logs =
+      mode === "replace"
+        ? [...incAuditLogs]
+        : mergeArrayById(db.audit_logs || [], incAuditLogs, (a) => String(a.id || ""));
+  }
+  if (incEmailEvents) {
+    db.email_events =
+      mode === "replace"
+        ? [...incEmailEvents]
+        : mergeArrayById(db.email_events || [], incEmailEvents, (e) => String(e.id || ""));
+  }
+
+  // 6. Settings (Preserve active postgres_config connection string if not overridden)
+  if (incoming.settings && typeof incoming.settings === "object") {
+    const prevPgConfig = db.settings?.postgres_config;
+    db.settings =
+      mode === "replace"
+        ? { ...incoming.settings }
+        : { ...(db.settings || {}), ...incoming.settings };
+    if (
+      prevPgConfig?.connection_string &&
+      (!db.settings.postgres_config || !db.settings.postgres_config.connection_string)
+    ) {
+      db.settings.postgres_config = prevPgConfig;
+    }
+  }
+
+  saveDb();
+
+  let pgSynced = false;
+  if (pgPool && pgRuntime.connected) {
+    if (mode === "replace") {
+      try {
+        await pgPool.query(
+          "TRUNCATE TABLE wjp_products, wjp_games, wjp_transactions, wjp_testimonials, wjp_manual_destinations, wjp_social_links, wjp_topup_providers, wjp_files"
+        );
+      } catch {
+        // non-fatal if table truncation skipped
+      }
+    }
+    const pushRes = await pushToPostgres(pgPool);
+    pgSynced = pushRes.ok;
+  }
+
+  const totalDenominations = (db.games || []).reduce(
+    (sum, g) => sum + (Array.isArray(g?.denominations) ? g.denominations.length : 0),
+    0
+  );
+
+  const summary = {
+    format: isSql ? "sql" : "json",
+    mode,
+    parsed_rows: parseRes.parsedRows,
+    postgres_synced: pgSynced,
+    totals: {
+      users: (db.users || []).length,
+      products: (db.products || []).length,
+      games: (db.games || []).length,
+      denominations: totalDenominations,
+      transactions: (db.transactions || []).length,
+      testimonials: (db.testimonials || []).length,
+      files: Object.keys(db.files || {}).length,
+    },
+  };
+
+  writeAuditLog({
+    actor,
+    action: "admin.database_manual_import",
+    metadata: summary,
+    req,
+  });
+
+  res.json({
+    ok: true,
+    ...summary,
+    message: `Database manual (${isSql ? "SQL Dump" : "JSON Backup"}) berhasil dimasukkan dengan mode ${
+      mode === "replace" ? "TIMPA PENUH (Replace)" : "GABUNGKAN AMAN (Merge)"
+    }! Total sekarang: ${summary.totals.products} Produk, ${summary.totals.games} Game (${
+      summary.totals.denominations
+    } Nominal), ${summary.totals.files} Foto${pgSynced ? " & tersinkron ke PostgreSQL" : ""}.`,
   });
 });
 

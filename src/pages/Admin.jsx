@@ -1777,14 +1777,11 @@ export default function Admin() {
             {(tab === "produk" || tab === "topup") && (
               <div className="space-y-6">
                 {/* Dynamic Catalog Switcher Bar */}
-                <div className="rounded-2xl border border-line bg-panel/90 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="font-display font-extrabold text-base sm:text-lg text-slate-100 tracking-tight">
-                      Manajemen Katalog Terpadu
+                <div className="rounded-2xl border border-line bg-panel/90 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="font-display font-extrabold text-sm sm:text-base text-slate-100 tracking-tight">
+                      Manajemen Katalog
                     </h2>
-                    <p className="text-xs font-mono text-slate-400 mt-0.5">
-                      Kelola Katalog Produk Beranda dan Katalog Produk Top Up dalam satu halaman dengan katalog terpisah.
-                    </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-1.5 bg-void/80 border border-line rounded-xl p-1.5">
@@ -2131,32 +2128,12 @@ export default function Admin() {
 
                 {/* CATALOG 02: PRODUK TOP UP & GAME */}
                 {catalogScope === "topup" && (
-                  <section className="rounded-2xl border border-line bg-panel/75 p-4 sm:p-5 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-line/70">
-                      <div className="flex items-start sm:items-center gap-3">
-                        <span className="w-9 h-9 rounded-xl grid place-items-center bg-lime/10 border border-lime/40 text-lime shrink-0">
-                          <Gamepad2 size={16} />
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-display font-extrabold text-sm sm:text-base text-slate-100">
-                              Katalog Produk Top Up &amp; Game
-                            </h3>
-                            <span className="text-[11px] font-mono text-slate-400 tabular-nums">
-                              &middot; {topupProducts.length} SKU aktif
-                            </span>
-                          </div>
-                          <p className="text-[11px] font-mono text-slate-400 mt-0.5">
-                            Daftar game Top Up Instan, nominal diamond/voucher, serta sinkronisasi otomatis dari merchant.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
+                  <section className="rounded-2xl border border-line bg-panel/75 p-4 sm:p-5">
                     <AdminTopup
                       headers={headers}
                       sections={["games", "orders"]}
                       defaultSection="games"
+                      skuCount={topupProducts.length}
                       onReload={() => load(false)}
                     />
                   </section>
